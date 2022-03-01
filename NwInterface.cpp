@@ -27,7 +27,7 @@ int netfilter_callback(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg,
 
 /* **************************************************** */
 
-NetfilterInterface::NetfilterInterface(u_int nf_device_id,
+NwInterface::NwInterface(u_int nf_device_id,
 				       Configuration *_c,
 				       GeoIP *_g) {
   conf = _c, geoip = _g;
@@ -74,7 +74,7 @@ NetfilterInterface::NetfilterInterface(u_int nf_device_id,
 
 /* **************************************************** */
 
-NetfilterInterface::~NetfilterInterface() {
+NwInterface::~NwInterface() {
   if(queueHandle) nfq_destroy_queue(queueHandle);
   if(nfHandle)    nfq_close(nfHandle);
 
@@ -89,7 +89,7 @@ int netfilter_callback(struct nfq_q_handle *qh,
 		       void *data) {
   const u_char *payload;
   struct nfqnl_msg_packet_hdr *ph = nfq_get_msg_packet_hdr(nfa);
-  NetfilterInterface *iface = (NetfilterInterface *)data;
+  NwInterface *iface = (NwInterface *)data;
   u_int payload_len;
   bool pass_verdict = NF_ACCEPT;
   u_int16_t ndpiProto;
@@ -107,14 +107,12 @@ int netfilter_callback(struct nfq_q_handle *qh,
 
   marker = iface->dissectPacket(payload, payload_len);
 
-  trace->traceEvent(TRACE_INFO, "Marker %d", marker);
-
   return(nfq_set_verdict2(qh, id, NF_ACCEPT, marker, 0, NULL));
 }
 
 /* **************************************************** */
 
-void NetfilterInterface::packetPollLoop() {
+void NwInterface::packetPollLoop() {
   struct nfq_handle *h;
   int fd;
 
@@ -156,7 +154,7 @@ void NetfilterInterface::packetPollLoop() {
 
 /* **************************************************** */
 
-Marker NetfilterInterface::dissectPacket(const u_char *payload, u_int payload_len) {
+Marker NwInterface::dissectPacket(const u_char *payload, u_int payload_len) {
   /* We can see only IP addresses */
   u_int16_t ip_offset = 0, vlan_id = 0 /* FIX */;
 
@@ -215,38 +213,51 @@ Marker NetfilterInterface::dissectPacket(const u_char *payload, u_int payload_le
 
 /* **************************************************** */
 
-Marker NetfilterInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
+Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
 				       u_int32_t saddr /* network byte order */,
 				       u_int16_t sport /* network byte order */,
 				       u_int32_t daddr /* network byte order */,
 				       u_int16_t dport /* network byte order */) {
   struct in_addr in;
-  char country_code[3], *host;
+  char country_code[3], *host, src_host[32], dst_host[32], src_cc[3], dst_cc[3];
+  bool pass_local = true;
   Marker m = conf->getDefaultMarker();
-  
+
   in.s_addr = saddr;
-  if(geoip->lookup(host = inet_ntoa(in), country_code, sizeof(country_code), NULL, 0)) {
+  host = inet_ntoa(in);
+  strncpy(src_host, host, sizeof(src_host)-1);
+
+  if(geoip->lookup(host, country_code, sizeof(country_code), NULL, 0)) {
     m = conf->getCountryMarker(country_code);
-
-    trace->traceEvent(TRACE_INFO, "%s:%u (%s) [marker: %d]", host, sport, country_code, m);
-
-    if(m == MARKER_DROP) return(m);
+    strncpy(src_cc, country_code, sizeof(src_cc)-1);
+    pass_local = false;
   } else {
-    // trace->traceEvent(TRACE_ERROR, "%s:%u (%s)", host, sport, country_code);
     /* Unknown or private IP address  */
+    src_cc[0] = '\0';
   }
-  
+
   in.s_addr = daddr;
+  host = inet_ntoa(in);
+  strncpy(dst_host, host, sizeof(dst_host)-1);
+
   if(geoip->lookup(host = inet_ntoa(in), country_code, sizeof(country_code), NULL, 0)) {
     m = conf->getCountryMarker(country_code);
 
-    trace->traceEvent(TRACE_INFO, "%s:%u (%s) [marker: %d]", host, dport, country_code, m);
-    
-    if(m == MARKER_DROP) return(m);
+    strncpy(dst_cc, country_code, sizeof(dst_cc)-1);
+    pass_local = false;
   } else {
-    // trace->traceEvent(TRACE_ERROR, "%s:%u (%s)", host, dport, country_code);
     /* Unknown or private IP address  */
+    dst_cc[0] = '\0';
+  }
+
+  if(pass_local) {
+    /* If both addresses are local let's pass it */
+    m = MARKER_PASS;
   }
   
+  trace->traceEvent(TRACE_INFO, "%s:%u %s -> %s:%u %s [marker: %s]",
+		    src_host, sport, src_cc,
+		    dst_host, dport, dst_cc,
+		    m == MARKER_PASS ? "PASS" : "DROP");
   return(m);
 }

@@ -61,30 +61,32 @@ bool Configuration::readConfigFile(char *path) {
     default_marker = (m == "PASS") ? MARKER_PASS : MARKER_DROP;
   }
 
-  if(root["whitelist"].empty()) {
-    trace->traceEvent(TRACE_ERROR, "Missing %s from %s", "whitelist", path);
-    return(false);
-  } else {
-    for(Json::Value::ArrayIndex i = 0; i != root["whitelist"].size(); i++) {
-      std::string country = root["whitelist"][i].asString();
+  if(!root["countries"].empty()) {
+    if(root["countries"]["whitelist"].empty()) {
+      trace->traceEvent(TRACE_ERROR, "Missing %s from %s", "whitelist", path);
+      return(false);
+    } else {
+      for(Json::Value::ArrayIndex i = 0; i != root["countries"]["whitelist"].size(); i++) {
+	std::string country = root["countries"]["whitelist"][i].asString();
 
-      trace->traceEvent(TRACE_INFO, "Adding %s to whitelist", country.c_str());
-      countries[country2u16((char*)country.c_str())] = MARKER_PASS;
+	trace->traceEvent(TRACE_INFO, "Adding %s to whitelist", country.c_str());
+	countries[country2u16((char*)country.c_str())] = MARKER_PASS;
+      }
+    }
+
+    if(root["countries"]["blacklist"].empty()) {
+      trace->traceEvent(TRACE_ERROR, "Missing %s from %s", "blacklist", path);
+      return(false);
+    } else {
+      for(Json::Value::ArrayIndex i = 0; i != root["countries"]["blacklist"].size(); i++) {
+	std::string country = root["countries"]["blacklist"][i].asString();
+
+	trace->traceEvent(TRACE_INFO, "Adding %s to blacklist", country.c_str());
+	countries[country2u16((char*)country.c_str())] = MARKER_DROP;
+      }
     }
   }
-
-  if(root["blacklist"].empty()) {
-    trace->traceEvent(TRACE_ERROR, "Missing %s from %s", "blacklist", path);
-    return(false);
-  } else {
-    for(Json::Value::ArrayIndex i = 0; i != root["blacklist"].size(); i++) {
-      std::string country = root["blacklist"][i].asString();
-
-      trace->traceEvent(TRACE_INFO, "Adding %s to blacklist", country.c_str());
-      countries[country2u16((char*)country.c_str())] = MARKER_DROP;
-    }
-  }
-
+  
   return(configured = true);
 }
 

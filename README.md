@@ -19,3 +19,7 @@ You also need to configure a configuration file for your rules. We provide [samp
 Supposing the you have configure the firewall as described above, you need to start (as root) the tool as follows
 
 ``ipt_geofence -c config.json -m dbip-country-lite.mmdb``
+
+# Performance
+As only one packet per connection is sent to user-space, you will basically not observe any noticeable performance degradation.
+

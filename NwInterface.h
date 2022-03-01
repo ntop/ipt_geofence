@@ -19,12 +19,12 @@
  *
  */
 
-#ifndef _NETFILTER_NETWORK_INTERFACE_H_
-#define _NETFILTER_NETWORK_INTERFACE_H_
+#ifndef _NETWORK_INTERFACE_H_
+#define _NETWORK_INTERFACE_H_
 
 /* ********************************************** */
 
-class NetfilterInterface {
+class NwInterface {
  private:
   int queueId;
   struct nfq_handle *nfHandle;
@@ -40,8 +40,8 @@ class NetfilterInterface {
 		     u_int32_t daddr, u_int16_t dport);
 
  public:
-  NetfilterInterface(u_int nf_device_id, Configuration *_c, GeoIP *_g);
-  ~NetfilterInterface();
+  NwInterface(u_int nf_device_id, Configuration *_c, GeoIP *_g);
+  ~NwInterface();
 
   inline int getQueueId()                       { return(queueId);                     };
   inline void stopPolling()                     { ifaceRunning = false;                };
@@ -53,5 +53,5 @@ class NetfilterInterface {
   void packetPollLoop();
 };
 
-#endif /* _NETFILTER_NETWORK_INTERFACE_H_ */
+#endif /* _NETWORK_INTERFACE_H_ */
 

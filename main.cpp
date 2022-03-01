@@ -26,7 +26,7 @@ Trace *trace;
 
 const char *version = PACKAGE_VERSION;
 u_int32_t last_modification_time = 0;
-NetfilterInterface *iface;
+NwInterface *iface;
 
 /* ************************************************* */
 
@@ -57,7 +57,7 @@ static void help() {
   printf("-c <config>  | Specify the configuration file\n");
   printf("-m <city>    | Local mmdb_city MMDB file\n");
 
-  printf("\nExample: ipt_geofence -c config.json -m dbip-country-lite.mmdb\n");
+  printf("\nExample: ipt_geofence -c sample_config.json -m dbip-country-lite.mmdb\n");
   
   exit(0);
 }
@@ -100,7 +100,7 @@ int main(int argc, char *argv[]) {
   signal(SIGTERM, sigproc);
 
   try {
-    iface = new NetfilterInterface(config.getQueueId(), &config, &geoip);
+    iface = new NwInterface(config.getQueueId(), &config, &geoip);
     
     iface->packetPollLoop();
     delete iface;

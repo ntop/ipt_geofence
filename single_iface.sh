@@ -42,9 +42,14 @@ iptables -t mangle -A PREROUTING  --match mark --mark 1 -j ACCEPT
 iptables -t mangle -A PREROUTING  --match mark --mark 2 -j DROP
 
 # Send traffic to NFQUEUE
-iptables -t mangle -A PREROUTING  -p tcp --sport 80 --match mark --mark 0 -j NFQUEUE --queue-num $QUEUE_ID --queue-bypass
-iptables -t mangle -A OUTPUT  -p tcp --dport 80 --match mark --mark 0 -j NFQUEUE --queue-num $QUEUE_ID --queue-bypass
+iptables -t mangle -A PREROUTING  -p tcp --match mark --mark 0 -j NFQUEUE --queue-num $QUEUE_ID --queue-bypass
+iptables -t mangle -A OUTPUT      -p tcp --match mark --mark 0 -j NFQUEUE --queue-num $QUEUE_ID --queue-bypass
 
+iptables -t mangle -A PREROUTING  -p udp --match mark --mark 0 -j NFQUEUE --queue-num $QUEUE_ID --queue-bypass
+iptables -t mangle -A OUTPUT      -p udp --match mark --mark 0 -j NFQUEUE --queue-num $QUEUE_ID --queue-bypass
+
+iptables -t mangle -A OUTPUT      -p icmp --match mark --mark 0 -j NFQUEUE --queue-num $QUEUE_ID --queue-bypass
+iptables -t mangle -A OUTPUT      -p icmp --match mark --mark 0 -j NFQUEUE --queue-num $QUEUE_ID --queue-bypass
 
 ###################################################
 

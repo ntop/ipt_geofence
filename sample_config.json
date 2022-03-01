@@ -1,6 +1,8 @@
 {
     "queue_id": 0,
     "default_marker": "DROP",
-    "whitelist": ["IT", "DE", "CH"],
-    "blacklist": ["RU", "BY" ]
+    "countries": {
+       "whitelist": ["IT", "DE", "CH", "NL"],
+       "blacklist": ["RU", "BY" ]
+    }
 }

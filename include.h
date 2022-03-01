@@ -78,6 +78,6 @@ typedef enum {
 #include "Trace.h"
 #include "Configuration.h"
 #include "GeoIP.h"
-#include "NetfilterInterface.h"
+#include "NwInterface.h"
 
 extern Trace *trace;
