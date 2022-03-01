@@ -27,14 +27,15 @@
 class Configuration {
  private:
   std::unordered_map<u_int16_t, Marker> countries;
+  std::unordered_map<u_int16_t, bool>   tcp_ports, udp_ports;
   Marker default_marker;
   unsigned int nfq_queue_id;
-  bool configured;
+  bool configured, all_tcp_ports, all_udp_ports;
   
   u_int16_t country2u16(char *country_code);
   
  public:
-  Configuration() { nfq_queue_id = 0, default_marker = MARKER_PASS; configured = false; }
+  Configuration() { nfq_queue_id = 0, default_marker = MARKER_PASS; configured = false, all_tcp_ports = all_udp_ports = true; }
 
   bool readConfigFile(char *path);
 
@@ -45,6 +46,8 @@ class Configuration {
   inline void setCountryMarker(u_int16_t country, Marker m) { countries[country] = m; }
   inline Marker getDefaultMarker()                          { return(default_marker); }
   Marker getCountryMarker(char *country);
+  inline bool isMonitoredTCPPort(u_int16_t port) { return(all_tcp_ports || (tcp_ports.find(port) != tcp_ports.end())); }
+  inline bool isMonitoredUDPPort(u_int16_t port) { return(all_udp_ports || (udp_ports.find(port) != udp_ports.end())); }
 };
 
 

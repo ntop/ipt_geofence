@@ -1,6 +1,10 @@
 {
     "queue_id": 0,
     "default_marker": "DROP",
+    "monitored_ports": {
+	"tcp": [ 22, 80, 443 ],
+	"udp": [ ]
+    },
     "countries": {
        "whitelist": ["IT", "DE", "CH", "NL"],
        "blacklist": ["RU", "BY" ]

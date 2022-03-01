@@ -91,10 +91,7 @@ int netfilter_callback(struct nfq_q_handle *qh,
   struct nfqnl_msg_packet_hdr *ph = nfq_get_msg_packet_hdr(nfa);
   NwInterface *iface = (NwInterface *)data;
   u_int payload_len;
-  bool pass_verdict = NF_ACCEPT;
-  u_int16_t ndpiProto;
   u_int32_t id = ntohl(ph->packet_id);
-  u_int32_t num_pkts = 0;
   u_int16_t marker;
 
   if(!ph) return(-1);
@@ -167,7 +164,6 @@ Marker NwInterface::dissectPacket(const u_char *payload, u_int payload_len) {
   }
 
   if(payload_len >= ip_offset) {
-    u_int16_t frag_off;
     struct iphdr *iph = (struct iphdr *) &payload[ip_offset];
 
     if(iph->version != 4) {
@@ -214,14 +210,38 @@ Marker NwInterface::dissectPacket(const u_char *payload, u_int payload_len) {
 /* **************************************************** */
 
 Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
-				       u_int32_t saddr /* network byte order */,
-				       u_int16_t sport /* network byte order */,
-				       u_int32_t daddr /* network byte order */,
-				       u_int16_t dport /* network byte order */) {
+				u_int32_t saddr /* network byte order */,
+				u_int16_t sport /* network byte order */,
+				u_int32_t daddr /* network byte order */,
+				u_int16_t dport /* network byte order */) {
   struct in_addr in;
   char country_code[3], *host, src_host[32], dst_host[32], src_cc[3], dst_cc[3];
   bool pass_local = true;
-  Marker m = conf->getDefaultMarker();
+  Marker m;
+
+  sport = ntohs(sport), dport = ntohs(dport);
+  
+  switch(proto) {
+  case IPPROTO_TCP:
+    if((conf->isMonitoredTCPPort(sport)) || conf->isMonitoredTCPPort(dport))
+      ;
+    else {
+      trace->traceEvent(TRACE_INFO, "Ignoring TCP ports %u/%u", sport, dport);
+      return(MARKER_PASS);
+    }
+    break;
+
+  case IPPROTO_UDP:
+    if((!conf->isMonitoredUDPPort(sport)) || conf->isMonitoredUDPPort(dport))
+      ;
+    else {
+      trace->traceEvent(TRACE_INFO, "Ignoring UDP ports %u/%u", sport, dport);
+      return(MARKER_PASS);
+    }
+    break;
+  }
+
+  m = conf->getDefaultMarker();
 
   in.s_addr = saddr;
   host = inet_ntoa(in);
@@ -254,10 +274,11 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
     /* If both addresses are local let's pass it */
     m = MARKER_PASS;
   }
-  
-  trace->traceEvent(TRACE_INFO, "%s:%u %s -> %s:%u %s [marker: %s]",
+
+  trace->traceEvent((m == MARKER_DROP) ? TRACE_WARNING : TRACE_INFO,
+		    "%s:%u %s -> %s:%u %s [marker: %s]",
 		    src_host, sport, src_cc,
 		    dst_host, dport, dst_cc,
-		    m == MARKER_PASS ? "PASS" : "DROP");
+		    (m == MARKER_PASS) ? "PASS" : "DROP");
   return(m);
 }

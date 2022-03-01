@@ -75,7 +75,6 @@ int main(int argc, char *argv[]) {
     /* End of options */
     { NULL,      no_argument,          NULL,  0 }
   };
-  time_t until_then = 0;
   Configuration config;
   GeoIP geoip;
   
