@@ -20,7 +20,7 @@ AC_CHECK_HEADERS([libnetfilter_queue/libnetfilter_queue.h], AC_DEFINE_UNQUOTED(H
 if test "x$ac_cv_header_libnetfilter_queue_libnetfilter_queue_h" = xyes; then :
    LIBS="$LIBS -lnetfilter_queue -lnfnetlink"
 else
-  echo "Please do apt-get install libmaxminddb-dev and try again"
+  echo "Please do apt-get install libnetfilter-queue-dev and try again"
   exit 0
 fi
 
@@ -28,7 +28,7 @@ dnl> GeoIP
 AC_CHECK_LIB([maxminddb], [MMDB_lookup_sockaddr])
 AC_HAVE_HEADERS(maxminddb.h)
 if ! (test ".${ac_cv_lib_maxminddb_MMDB_lookup_sockaddr}" = ".yes" && test ".${ac_cv_header_maxminddb_h}" = ".yes"); then
-  echo "Please do apt-get install libnetfilter-queue-dev and try again"
+  echo "Please do apt-get install libmaxminddb-dev and try again"
   exit 0
 fi
 
