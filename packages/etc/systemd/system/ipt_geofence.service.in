@@ -1,0 +1,17 @@
+[Unit]
+Description=iptabled geofence
+After=network-online.target syslog.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+ExecStartPre=/etc/ipt_geofence/ipt_setup.sh
+ExecStart=/usr/sbin/ipt_geofence -c /etc/ipt_geofence/config.json -m /etc/ipt_geofence/dbip-country-lite.mmdb
+Restart=on-abnormal
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+Alias=

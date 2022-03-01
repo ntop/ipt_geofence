@@ -1,0 +1,54 @@
+AC_INIT([Makefile.in], 1.0)
+
+# NOTE: this file is not actually used. You need to edit configure as well!
+IPT_GEOFENCE_VERSION_SHORT=`grep PACKAGE_VERSION ../../config.h | cut -d '"' -f 2`
+GIT_COMMITS=`git rev-list --count HEAD`
+
+MACHINE=`uname -m`
+SHORT_MACHINE=`uname -m | cut -b1-3`
+
+DEBIAN_VERSION=`cat /etc/debian_version | grep "^8" | wc -l`
+
+EXTRA_DEP="libnetfilter-queue1, libmaxminddb0, libjsoncpp1"
+BUILDPACKAGE_EXTRA=
+
+if test $MACHINE = "x86_64"; then
+   EXTN="amd64"
+else
+  if test $SHORT_MACHINE = "aar"; then
+     EXTN="arm64"
+     EXTRA_DEPS=""
+  else
+    if test $SHORT_MACHINE = "arm"; then
+       EXTN="armhf"
+       EXTRA_DEPS=""
+    else
+       if test $SHORT_MACHINE = "mip"; then
+         EXTN="mips"
+         EXTRA_DEPS=""
+       else	
+         EXTN="i386"
+       fi
+     fi
+  fi
+fi
+
+APP=ipt-geofence
+DATE=`date -R`
+
+AC_SUBST(APP)
+AC_SUBST(BUILDPACKAGE_EXTRA)
+AC_SUBST(MACHINE)
+AC_SUBST(IPT_GEOFENCE_VERSION_SHORT)
+AC_SUBST(EXTN)
+AC_SUBST(DATE)
+AC_SUBST(EXTRA_DEP)
+AC_SUBST(GIT_COMMITS)
+
+AC_CONFIG_FILES(debian/changelog)
+AC_CONFIG_FILES(debian/files)
+AC_CONFIG_FILES(debian/control)
+AC_CONFIG_FILES(debian/rules)
+AC_CONFIG_FILES(../etc/systemd/system/ipt_geofence.service)
+AC_CONFIG_FILES(Makefile)
+AC_OUTPUT

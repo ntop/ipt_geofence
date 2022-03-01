@@ -1,0 +1,16 @@
+#!/bin/sh
+
+set -e
+
+if [ -f /.dockerenv ]; then exit 0; fi
+
+. /usr/share/debconf/confmodule
+
+if [ "$1" = "remove" ]; then
+	deb-systemd-invoke stop ipt_geofence.service
+	deb-systemd-invoke disable ipt_geofence.service
+	systemctl daemon-reload
+	systemctl reset-failed
+fi
+
+exit 0

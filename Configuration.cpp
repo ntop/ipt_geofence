@@ -36,9 +36,9 @@ bool Configuration::readConfigFile(char *path) {
   std::ifstream ifs;
   JSONCPP_STRING errs;
   Json::CharReaderBuilder builder;
-  
+
   ifs.open(path);
- 
+
   builder["collectComments"] = true;
 
   if (!parseFromStream(builder, ifs, &root, &errs)) {
@@ -62,11 +62,11 @@ bool Configuration::readConfigFile(char *path) {
   }
 
   all_tcp_ports = all_udp_ports = true;
-  
+
   if(!root["monitored_ports"].empty()) {
     if(!root["monitored_ports"]["tcp"].empty()) {
       all_tcp_ports = false;
-      
+
       for(Json::Value::ArrayIndex i = 0; i != root["monitored_ports"]["tcp"].size(); i++) {
 	unsigned int port = root["monitored_ports"]["tcp"][i].asUInt();
 
@@ -74,10 +74,10 @@ bool Configuration::readConfigFile(char *path) {
 	tcp_ports[port] = true;
       }
     }
-    
+
     if(!root["monitored_ports"]["udp"].empty()) {
       all_udp_ports = false;
-      
+
       for(Json::Value::ArrayIndex i = 0; i != root["monitored_ports"]["udp"].size(); i++) {
 	unsigned int port = root["monitored_ports"]["udp"][i].asUInt();
 
@@ -89,11 +89,10 @@ bool Configuration::readConfigFile(char *path) {
 
   if(all_tcp_ports) trace->traceEvent(TRACE_INFO, "All TCP ports will be monitored");
   if(all_udp_ports) trace->traceEvent(TRACE_INFO, "All UDP ports will be monitored");
-  
+
   if(!root["countries"].empty()) {
     if(root["countries"]["whitelist"].empty()) {
-      trace->traceEvent(TRACE_ERROR, "Missing %s from %s", "whitelist", path);
-      return(false);
+      trace->traceEvent(TRACE_INFO, "Missing %s from %s", "whitelist", path);
     } else {
       for(Json::Value::ArrayIndex i = 0; i != root["countries"]["whitelist"].size(); i++) {
 	std::string country = root["countries"]["whitelist"][i].asString();
@@ -104,8 +103,7 @@ bool Configuration::readConfigFile(char *path) {
     }
 
     if(root["countries"]["blacklist"].empty()) {
-      trace->traceEvent(TRACE_ERROR, "Missing %s from %s", "blacklist", path);
-      return(false);
+      trace->traceEvent(TRACE_INFO, "Missing %s from %s", "blacklist", path);
     } else {
       for(Json::Value::ArrayIndex i = 0; i != root["countries"]["blacklist"].size(); i++) {
 	std::string country = root["countries"]["blacklist"][i].asString();
@@ -115,7 +113,7 @@ bool Configuration::readConfigFile(char *path) {
       }
     }
   }
-  
+
   return(configured = true);
 }
 
@@ -132,4 +130,3 @@ Marker Configuration::getCountryMarker(char *country) {
 }
 
 /* ******************************************************* */
-

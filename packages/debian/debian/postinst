@@ -1,0 +1,57 @@
+#!/bin/sh -e
+
+case "$1" in
+    configure)
+	# continue below
+    ;;
+
+    abort-upgrade|abort-remove|abort-deconfigure)
+	exit 0
+    ;;
+
+    *)
+	echo "postinst called with unknown argument \`$1'" >&2
+	exit 0
+    ;;
+esac
+
+umask 022
+
+if ! grep -q ipt_geofence /etc/group; then
+    echo 'Creating ipt_geofence group'
+    /usr/sbin/groupadd -r ipt_geofence
+fi
+
+if ! /usr/bin/id -u ipt_geofence > /dev/null 2>&1; then
+    echo "Creating ipt_geofence user..."
+    /usr/sbin/useradd -M -N -g ipt_geofence -r -s /bin/false ipt_geofence
+fi
+
+if [ ! -f /etc/ipt_geofence/config.json ]; then
+    cp /etc/ipt_geofence/config.json.sample /etc/ipt_geofence/config.json
+fi
+
+if [ ! -f /etc/ipt_geofence/ipt_setup.sh ]; then
+    cp /usr/share/doc/ipt_geofence/examples/multichain.sh /etc/ipt_geofence/ipt_setup.sh
+    chmod gou+x /etc/ipt_geofence/ipt_setup.sh
+fi
+
+if [ ! -f /etc/ipt_geofence/dbip-country-lite.mmdb ]; then
+    echo "Missing /etc/ipt_geofence/dbip-country-lite.mmdb"
+    echo "Please download it from https://db-ip.com/db/download/ip-to-country-lite"
+fi
+
+if [ -f /.dockerenv ]; then exit 0; fi
+
+# Start service after upgrade/install
+systemctl daemon-reload
+systemctl reset-failed
+
+# Enable ipt_geofence
+if systemctl -q is-active ipt_geofence; then
+    # only restart ipt_geofence if it's already running
+    echo "Restarting ipt_geofence ipt_geofence..."
+    deb-systemd-invoke restart ipt_geofence
+fi
+
+exit 0

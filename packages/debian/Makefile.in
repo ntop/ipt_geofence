@@ -1,0 +1,36 @@
+#
+# Change it according to your setup
+#
+IPT_GEOFENCE_HOME=$(PWD)/../..
+IPT_GEOFENCE_BUILD=${IPT_GEOFENCE_HOME}/packages/debian/ipt-geofence
+
+all: clean pkg
+
+pkg:
+	cd ../..; make; cd -
+	if test -e "${IPT_GEOFENCE_BUILD}"; then /bin/rm -fr ${IPT_GEOFENCE_BUILD}; fi
+	mkdir -p ${IPT_GEOFENCE_BUILD}/usr/sbin
+	mkdir -p ${IPT_GEOFENCE_BUILD}/usr/share/doc/ipt_geofence/examples
+	install -m755 ../../ipt_geofence ${IPT_GEOFENCE_BUILD}/usr/sbin/
+	install -m644 ../../ipt_config_utils/* ${IPT_GEOFENCE_BUILD}/usr/share/doc/ipt_geofence/examples/
+	@/bin/rm -f ../ipt_geofence*.deb
+	dpkg-buildpackage -rfakeroot -d -us -uc @BUILDPACKAGE_EXTRA@
+	dpkg-sig --sign builder -k D1EB60BE ../ipt-geofence_*deb
+	@\rm -f ../ipt-geofence_*dsc ../ipt-geofence_*.gz ../ipt-geofence_*changes
+	@/bin/mv ../ipt-geofence_*deb .
+	@echo
+	@echo "Package built."
+	@/bin/ls ipt-geofence_*deb
+	@echo "-------------------------------"
+	-dpkg -I ipt-geofence_*deb
+	-dpkg --contents ipt-geofence_*deb
+	@echo "-------------------------------"
+
+distclean:
+	echo "dummy distclean"
+
+install:
+	echo "dummy install"
+
+clean:
+	rm -rf *~ *deb

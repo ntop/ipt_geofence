@@ -1,0 +1,15 @@
+Source: ipt-geofence
+Section: net
+Priority: extra
+Maintainer: Luca Deri <deri@ntop.org>
+Standards-Version: @IPT-GEOFENCE_VERSION_SHORT@
+Build-Depends:
+
+Package: ipt-geofence
+Architecture: @EXTN@
+Suggests: uml-utilities
+Depends: ${shlibs:Depends}, ${misc:Depends} @EXTRA_DEP@
+Conflicts:
+Replaces:
+Description: a Linux iptables module useful for blocking traffic
+ based on geofence.
