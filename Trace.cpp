@@ -47,7 +47,7 @@ void Trace::traceEvent(int eventTraceLevel, const char* _file,
   va_list va_ap;
 
   if((eventTraceLevel <= traceLevel) && (traceLevel > 0)) {
-    char buf[8192], out_buf[8192];
+    char buf[3000], out_buf[8192];
     char theDate[32], *file = (char*)_file, *syslogMsg;
     const char *extra_msg = "";
     time_t theTime = time(NULL);
