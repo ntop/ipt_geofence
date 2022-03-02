@@ -72,7 +72,7 @@ iptables -t mangle -A GEO_OUTPUT      -p tcp --match mark --mark 0 -j NFQUEUE --
 iptables -t mangle -A GEO_PREROUTING  -p udp --match mark --mark 0 -j NFQUEUE --queue-num $QUEUE_ID --queue-bypass
 iptables -t mangle -A GEO_OUTPUT      -p udp --match mark --mark 0 -j NFQUEUE --queue-num $QUEUE_ID --queue-bypass
 
-iptables -t mangle -A GEO_OUTPUT      -p icmp --match mark --mark 0 -j NFQUEUE --queue-num $QUEUE_ID --queue-bypass
+iptables -t mangle -A GEO_PREROUTING  -p icmp --match mark --mark 0 -j NFQUEUE --queue-num $QUEUE_ID --queue-bypass
 iptables -t mangle -A GEO_OUTPUT      -p icmp --match mark --mark 0 -j NFQUEUE --queue-num $QUEUE_ID --queue-bypass
 
 ###################################################
