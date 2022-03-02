@@ -85,6 +85,15 @@ bool Configuration::readConfigFile(char *path) {
 	udp_ports[port] = true;
       }
     }
+
+    if(!root["monitored_ports"]["ignored_ports"].empty()) {
+      for(Json::Value::ArrayIndex i = 0; i != root["monitored_ports"]["ignored_ports"].size(); i++) {
+	unsigned int port = root["monitored_ports"]["ignored_ports"][i].asUInt();
+	
+	trace->traceEvent(TRACE_INFO, "Ignoring TCP/UDP port %u", port);
+	ignored_ports[port] = true;
+      }
+    }
   }
 
   if(all_tcp_ports) trace->traceEvent(TRACE_INFO, "All TCP ports will be monitored");

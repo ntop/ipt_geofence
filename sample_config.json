@@ -3,7 +3,8 @@
     "default_marker": "DROP",
     "monitored_ports": {
 	"tcp": [ 22, 80, 443 ],
-	"udp": [ ]
+	"udp": [ ],
+	"ignored_ports": [ 123 ]
     },
     "countries": {
        "whitelist": ["IT", "DE", "CH", "NL"],

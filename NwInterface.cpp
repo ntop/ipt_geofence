@@ -209,6 +209,17 @@ Marker NwInterface::dissectPacket(const u_char *payload, u_int payload_len) {
 
 /* **************************************************** */
 
+const char* NwInterface::getProtoName(u_int8_t proto) {
+  switch(proto) {
+  case IPPROTO_TCP:  return("TCP");
+  case IPPROTO_UDP:  return("UDP");
+  case IPPROTO_ICMP: return("ICMP");
+  default:           return("???");
+  }
+}
+
+/* **************************************************** */
+
 Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
 				u_int32_t saddr /* network byte order */,
 				u_int16_t sport /* network byte order */,
@@ -216,10 +227,13 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
 				u_int16_t dport /* network byte order */) {
   struct in_addr in;
   char country_code[3], *host, src_host[32], dst_host[32], src_cc[3], dst_cc[3];
+  const char *proto_name = getProtoName(proto);
   bool pass_local = true;
-  Marker m;
-
+  Marker m, src_maker, dst_marker;
+  
   sport = ntohs(sport), dport = ntohs(dport);
+
+  // trace->traceEvent(TRACE_NORMAL, "Processing %u -> %u", sport, dport);
   
   switch(proto) {
   case IPPROTO_TCP:
@@ -241,19 +255,21 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
     break;
   }
 
-  m = conf->getDefaultMarker();
+  src_maker = dst_marker = conf->getDefaultMarker();
 
   in.s_addr = saddr;
   host = inet_ntoa(in);
   strncpy(src_host, host, sizeof(src_host)-1);
 
   if(geoip->lookup(host, country_code, sizeof(country_code), NULL, 0)) {
-    m = conf->getCountryMarker(country_code);
+    src_maker = conf->getCountryMarker(country_code);
+    
     strncpy(src_cc, country_code, sizeof(src_cc)-1);
     pass_local = false;
   } else {
     /* Unknown or private IP address  */
     src_cc[0] = '\0';
+    src_maker = MARKER_PASS;
   }
 
   in.s_addr = daddr;
@@ -261,24 +277,34 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
   strncpy(dst_host, host, sizeof(dst_host)-1);
 
   if(geoip->lookup(host = inet_ntoa(in), country_code, sizeof(country_code), NULL, 0)) {
-    m = conf->getCountryMarker(country_code);
+    dst_marker = conf->getCountryMarker(country_code);
 
     strncpy(dst_cc, country_code, sizeof(dst_cc)-1);
     pass_local = false;
   } else {
     /* Unknown or private IP address  */
     dst_cc[0] = '\0';
+    dst_marker = MARKER_PASS;
   }
 
-  if(pass_local) {
-    /* If both addresses are local let's pass it */
+  if((conf->isIgnoredPort(sport) || conf->isIgnoredPort(dport))
+     || ((src_maker == MARKER_PASS) && (dst_marker == MARKER_PASS))) {
     m = MARKER_PASS;
-  }
+    
+    trace->traceEvent(TRACE_INFO,
+		      "%s %s:%u %s -> %s:%u %s [PASS]",
+		      proto_name,
+		      src_host, sport, src_cc,
+		      dst_host, dport, dst_cc);
+  } else {
+    m = MARKER_DROP;
 
-  trace->traceEvent((m == MARKER_DROP) ? TRACE_WARNING : TRACE_INFO,
-		    "%s:%u %s -> %s:%u %s [marker: %s]",
-		    src_host, sport, src_cc,
-		    dst_host, dport, dst_cc,
-		    (m == MARKER_PASS) ? "PASS" : "DROP");
+    trace->traceEvent(TRACE_WARNING,
+		      "%s %s:%u %s -> %s:%u %s [DROP]",
+		      proto_name,
+		      src_host, sport, src_cc,
+		      dst_host, dport, dst_cc);
+  }
+  
   return(m);
 }

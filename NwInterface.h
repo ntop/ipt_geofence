@@ -38,7 +38,8 @@ class NwInterface {
   Marker makeVerdict(u_int8_t proto, u_int16_t vlanId,
 		     u_int32_t saddr, u_int16_t sport,
 		     u_int32_t daddr, u_int16_t dport);
-
+  const char* getProtoName(u_int8_t proto);
+  
  public:
   NwInterface(u_int nf_device_id, Configuration *_c, GeoIP *_g);
   ~NwInterface();
