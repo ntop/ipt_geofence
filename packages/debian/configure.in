@@ -9,7 +9,7 @@ SHORT_MACHINE=`uname -m | cut -b1-3`
 
 DEBIAN_VERSION=`cat /etc/debian_version | grep "^8" | wc -l`
 
-EXTRA_DEP="libnetfilter-queue1, libmaxminddb0, libjsoncpp1"
+EXTRA_DEP="libnetfilter-queue1, libmaxminddb0, libjsoncpp1, conntrack"
 BUILDPACKAGE_EXTRA=
 
 if test $MACHINE = "x86_64"; then
