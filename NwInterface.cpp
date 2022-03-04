@@ -268,12 +268,8 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
   host = inet_ntoa(in);
   strncpy(src_host, host, sizeof(src_host)-1);
   if(geoip->lookup(host, country_code, sizeof(country_code), countinent_code, sizeof(countinent_code))) {
-<<<<<<< HEAD
     printf("\n=== %s ===\n", countinent_code);
-=======
-    printf("\n\n %s \n\n", countinent_code);
->>>>>>> 1d0419201e4764933745a4bb265c4e78a6378b70
-    
+    printf("\n\n %s \n\n", countinent_code);    
     src_maker = conf->getCountryMarker(country_code);
     if(src_maker == conf->getDefaultMarker())
       src_maker = conf->getContinentMarker(countinent_code);
