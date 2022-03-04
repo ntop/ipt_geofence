@@ -88,18 +88,6 @@ bool Configuration::readConfigFile(char *path) {
   }
 
 
-  //Possibile aggiungere più stati
-  if(!root["continents"].empty()) {
-    //std::string m = root["continents"].asString();
-    //continents[country2u16((char*)m.c_str())]=MARKER_PASS;
-    for(Json::Value::ArrayIndex i = 0; i != root["continents"].size(); i++) 
-    {
-	    std::string c = root["continents"][i].asString();
-	    //trace->traceEvent(TRACE_INFO, "Adding %s to countries whitelist", c.c_str());
-	    continents[country2u16((char*)c.c_str())] = MARKER_PASS;
-    }
-  }
-
   all_tcp_ports = all_udp_ports = true;
 
   if(!root["monitored_ports"].empty()) {

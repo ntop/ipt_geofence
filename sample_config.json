@@ -2,18 +2,16 @@
     "queue_id": 0,
     "default_marker": "Drop",
     "continents": {
-        "whitelist": ["Nor","Eur"],
+		"whitelist": ["Nor","Eur"],
         "blacklist": ["Sou"]
     },
-    "default_marker": "DROP",
-    "continents":["Nor","Sou","Eur"],
     "monitored_ports": {
 	"tcp": [ 22, 80, 443 ],
 	"udp": [ ],
 	"ignored_ports": [ 123 ]
     },
     "countries": {
-       "whitelist": ["IT", "DE", "CH", "NL"],
+       "whitelist": ["AU","IT", "DE", "CH", "NL"],
        "blacklist": ["RU", "BY" ]
     }
 }
