@@ -27,8 +27,7 @@
 class GeoIP {
  private:
   bool loaded;
-  MMDB_s mmdb_country;
-  
+  MMDB_s mmdb_country;  
  public:
   GeoIP() { loaded = false; }
   ~GeoIP();

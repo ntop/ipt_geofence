@@ -60,6 +60,45 @@ bool Configuration::readConfigFile(char *path) {
 
     default_marker = (m == "PASS") ? MARKER_PASS : MARKER_DROP;
   }
+  
+  //Possibile aggiungere più stati
+
+  if(!root["continents"].empty()) {
+    if(root["continents"]["whitelist"].empty()) {
+      //trace->traceEvent(TRACE_INFO, "Missing %s from %s", "whitelist", path);
+    } else {
+      for(Json::Value::ArrayIndex i = 0; i != root["countries"]["whitelist"].size(); i++) {
+	std::string continent = root["continents"]["whitelist"][i].asString();
+
+	trace->traceEvent(TRACE_INFO, "Adding %s to continents whitelist", continent.c_str());
+	continents[country2u16((char*)continent.c_str())] = MARKER_PASS;
+      }
+    }
+
+    if(root["continents"]["blacklist"].empty()) {
+      //trace->traceEvent(TRACE_INFO, "Missing %s from %s", "blacklist", path);
+    } else {
+      for(Json::Value::ArrayIndex i = 0; i != root["continents"]["blacklist"].size(); i++) {
+	std::string continent = root["continents"]["blacklist"][i].asString();
+
+	trace->traceEvent(TRACE_INFO, "Adding %s to continents blacklist", continent.c_str());
+	continents[country2u16((char*)continent.c_str())] = MARKER_DROP;
+      }
+    }
+  }
+
+
+  //Possibile aggiungere più stati
+  if(!root["continents"].empty()) {
+    //std::string m = root["continents"].asString();
+    //continents[country2u16((char*)m.c_str())]=MARKER_PASS;
+    for(Json::Value::ArrayIndex i = 0; i != root["continents"].size(); i++) 
+    {
+	    std::string c = root["continents"][i].asString();
+	    //trace->traceEvent(TRACE_INFO, "Adding %s to countries whitelist", c.c_str());
+	    continents[country2u16((char*)c.c_str())] = MARKER_PASS;
+    }
+  }
 
   all_tcp_ports = all_udp_ports = true;
 
@@ -138,4 +177,16 @@ Marker Configuration::getCountryMarker(char *country) {
     return(it->second);
 }
 
+Marker Configuration::getContinentMarker(char *continent)
+{
+  u_int16_t id = country2u16(continent);
+  std::unordered_map<u_int16_t, Marker>::iterator it = continents.find(id);
+
+  if(it == continents.end())
+    return(default_marker); /* Not found */
+  else
+    return(it->second);
+
+  //if(strcmp())
+}
 /* ******************************************************* */

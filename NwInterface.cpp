@@ -226,15 +226,17 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
 				u_int32_t daddr /* network byte order */,
 				u_int16_t dport /* network byte order */) {
   struct in_addr in;
-  char country_code[3], *host, src_host[32], dst_host[32], src_cc[3], dst_cc[3];
+  char country_code[3],countinent_code[3], *host, src_host[32], dst_host[32], src_cc[3], dst_cc[3];
   const char *proto_name = getProtoName(proto);
   bool pass_local = true;
   Marker m, src_maker, dst_marker;
   
+  //convert values between host and network byte order
   sport = ntohs(sport), dport = ntohs(dport);
 
   // trace->traceEvent(TRACE_NORMAL, "Processing %u -> %u", sport, dport);
   
+  //Valuta se il protocollo è monitorato
   switch(proto) {
   case IPPROTO_TCP:
     if((conf->isMonitoredTCPPort(sport)) || conf->isMonitoredTCPPort(dport))
@@ -255,15 +257,26 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
     break;
   }
 
+  //Prende il default marker (specificato nel JSON)
   src_maker = dst_marker = conf->getDefaultMarker();
 
   in.s_addr = saddr;
+  /*The inet_ntoa() function converts the Internet host address  in,  given
+    in  network  byte  order,  to a string in IPv4 dotted-decimal notation.
+    The string is returned in a statically allocated buffer,  which  subse‐
+    quent calls will overwrite.*/
   host = inet_ntoa(in);
   strncpy(src_host, host, sizeof(src_host)-1);
-
-  if(geoip->lookup(host, country_code, sizeof(country_code), NULL, 0)) {
-    src_maker = conf->getCountryMarker(country_code);
+  if(geoip->lookup(host, country_code, sizeof(country_code), countinent_code, sizeof(countinent_code))) {
+<<<<<<< HEAD
+    printf("\n=== %s ===\n", countinent_code);
+=======
+    printf("\n\n %s \n\n", countinent_code);
+>>>>>>> 1d0419201e4764933745a4bb265c4e78a6378b70
     
+    src_maker = conf->getCountryMarker(country_code);
+    if(src_maker == conf->getDefaultMarker())
+      src_maker = conf->getContinentMarker(countinent_code);
     strncpy(src_cc, country_code, sizeof(src_cc)-1);
     pass_local = false;
   } else {
@@ -276,9 +289,16 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
   host = inet_ntoa(in);
   strncpy(dst_host, host, sizeof(dst_host)-1);
 
-  if(geoip->lookup(host = inet_ntoa(in), country_code, sizeof(country_code), NULL, 0)) {
+  if(geoip->lookup(host = inet_ntoa(in), country_code, sizeof(country_code), countinent_code, sizeof(countinent_code))) {
+<<<<<<< HEAD
+    printf("\n=== %s ===\n", countinent_code);
+=======
+    printf("\n\n %s \n\n", countinent_code);
+>>>>>>> 1d0419201e4764933745a4bb265c4e78a6378b70
+    
     dst_marker = conf->getCountryMarker(country_code);
-
+    if(dst_marker == conf->getDefaultMarker())
+      dst_marker = conf->getContinentMarker(countinent_code);
     strncpy(dst_cc, country_code, sizeof(dst_cc)-1);
     pass_local = false;
   } else {
@@ -297,8 +317,8 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
 		      src_host, sport, src_cc,
 		      dst_host, dport, dst_cc);
   } else {
-    m = MARKER_DROP;
 
+    m = MARKER_DROP;
     trace->traceEvent(TRACE_WARNING,
 		      "%s %s:%u %s -> %s:%u %s [DROP]",
 		      proto_name,
