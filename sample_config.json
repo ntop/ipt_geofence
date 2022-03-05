@@ -7,7 +7,11 @@
 	"ignored_ports": [ 123 ]
     },
     "countries": {
-       "whitelist": ["IT", "DE", "CH", "NL"],
+       "whitelist": ["IT", "DE", "CH", "NL","US"],
        "blacklist": ["RU", "BY" ]
+    },
+    "continents": {
+       "whitelist": ["North America"],
+       "blacklist": ["Africa","Europe","South America"]
     }
 }

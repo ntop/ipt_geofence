@@ -25,7 +25,6 @@
 
 u_int16_t Configuration::country2u16(char *country_code) {
   if(country_code == NULL || strlen(country_code) < 2) return 0;
-
   return ((((u_int16_t) country_code[0]) << 8) | ((u_int16_t) country_code[1]));
 }
 
@@ -123,6 +122,31 @@ bool Configuration::readConfigFile(char *path) {
     }
   }
 
+  /*Parsing Continents*/
+   if(!root["continents"].empty()) {
+      if(root["continents"]["whitelist"].empty()) {
+        trace->traceEvent(TRACE_INFO, "Missing %s from %s", "whitelist", path);
+      } else {
+        for(Json::Value::ArrayIndex i = 0; i != root["continents"]["whitelist"].size(); i++) {
+  	std::string continent = root["continents"]["whitelist"][i].asString();
+    continents[country2u16((char*)continent.c_str())] = MARKER_PASS;
+  	trace->traceEvent(TRACE_INFO, "Adding %s to continents whitelist", continent.c_str());
+
+        }
+      }
+
+      if(root["continents"]["blacklist"].empty()) {
+        trace->traceEvent(TRACE_INFO, "Missing %s from %s", "blacklist", path);
+      } else {
+        for(Json::Value::ArrayIndex i = 0; i != root["continents"]["blacklist"].size(); i++) {
+  	std::string continent = root["continents"]["blacklist"][i].asString();
+    continents[country2u16((char*)continent.c_str())] = MARKER_DROP;
+  	trace->traceEvent(TRACE_INFO, "Adding %s to continents blacklist", continent.c_str());
+
+        }
+      }
+    }
+
   return(configured = true);
 }
 
@@ -139,3 +163,12 @@ Marker Configuration::getCountryMarker(char *country) {
 }
 
 /* ******************************************************* */
+Marker Configuration::getContinentMarker(char *continent) {
+  u_int16_t id = country2u16(continent);
+  std::unordered_map<u_int16_t, Marker>::iterator it = continents.find(id);
+
+  if(it == continents.end())
+    return(default_marker); /* Not found */
+  else
+    return(it->second);
+}
