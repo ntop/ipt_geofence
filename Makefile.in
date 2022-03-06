@@ -4,7 +4,7 @@ PLATFORM = `uname -p`
 HERE=$(shell pwd)
 
 
-CPPFLAGS= -O2 # -g
+CPPFLAGS= -O2 @INCS@ # -g
 TARGET=ipt_geofence
 LIBS=@LIBS@
 OBJECTS = $(patsubst %.cpp, %.o, $(wildcard *.cpp))
