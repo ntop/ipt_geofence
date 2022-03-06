@@ -164,4 +164,14 @@ Marker Configuration::getCountryMarker(char *country) {
     return(it->second);
 }
 
+Marker Configuration::getContinentMarker(char* continent){
+  u_int16_t id = country2u16(continent);
+  std::unordered_map<u_int16_t, Marker>::iterator it = continents.find(id);
+
+  if(it == continents.end())
+    return(default_marker); /* Not found */
+  else
+    return(it->second);
+}
+
 /* ******************************************************* */
