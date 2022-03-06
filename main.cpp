@@ -93,6 +93,9 @@ int main(int argc, char *argv[]) {
       help();
   }
 
+  Blacklists b;
+  b.loadIPsetFromFile((char*)"dshield_7d.netset");
+
   if((!config.isConfigured()) || (!geoip.isLoaded()))
     help();
   

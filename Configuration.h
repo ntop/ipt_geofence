@@ -29,6 +29,7 @@ class Configuration {
   std::unordered_map<u_int16_t, Marker> countries;
   std::unordered_map<u_int16_t, bool>   tcp_ports, udp_ports, ignored_ports;
   Marker default_marker;
+  Blacklists blacklists;
   unsigned int nfq_queue_id;
   bool configured, all_tcp_ports, all_udp_ports;
   
