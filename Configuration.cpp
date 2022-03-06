@@ -101,7 +101,7 @@ bool Configuration::readConfigFile(char *path) {
 
   if(!root["countries"].empty()) {
     if(root["countries"]["whitelist"].empty()) {
-      trace->traceEvent(TRACE_INFO, "Missing %s from %s", "whitelist", path);
+      trace->traceEvent(TRACE_INFO, "Missing %s from %s", "countries whitelist", path);
     } else {
       for(Json::Value::ArrayIndex i = 0; i != root["countries"]["whitelist"].size(); i++) {
 	std::string country = root["countries"]["whitelist"][i].asString();
@@ -119,6 +119,32 @@ bool Configuration::readConfigFile(char *path) {
 
 	trace->traceEvent(TRACE_INFO, "Adding %s to countries blacklist", country.c_str());
 	countries[country2u16((char*)country.c_str())] = MARKER_DROP;
+      }
+    }
+  }
+
+  if(!root["continents"].empty()){
+    if(root["continents"]["whitelist"].empty()){
+      trace->traceEvent(TRACE_INFO, "Missing %s from %s", "continents whitelist", path);
+    }
+    else{
+      for(Json::Value::ArrayIndex i = 0; i != root["continents"]["whitelist"].size(); i++){
+        std::string continent = root["continents"]["whitelist"][i].asString();
+
+        trace->traceEvent(TRACE_INFO, "Adding %s to continents whitelist", continent.c_str());
+        continents[country2u16((char*)continent.c_str())] = MARKER_PASS;
+      }
+    }
+
+    if(root["continents"]["blacklist"].empty()){
+      trace->traceEvent(TRACE_INFO, "Missing %s from %s", "continents blacklist", path);
+    }
+    else{
+      for(Json::Value::ArrayIndex i = 0; i != root["continents"]["blacklist"].size(); i++){
+        std::string continent = root["continents"]["blacklist"][i].asString();
+
+        trace->traceEvent(TRACE_INFO, "Adding %s to continents blacklist", continent.c_str());
+        continents[country2u16((char*)continent.c_str())] = MARKER_DROP;
       }
     }
   }

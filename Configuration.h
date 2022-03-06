@@ -27,6 +27,7 @@
 class Configuration {
  private:
   std::unordered_map<u_int16_t, Marker> countries;
+  std::unordered_map<u_int16_t, Marker> continents;
   std::unordered_map<u_int16_t, bool>   tcp_ports, udp_ports, ignored_ports;
   Marker default_marker;
   unsigned int nfq_queue_id;
