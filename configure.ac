@@ -15,6 +15,12 @@ MACHINE=`uname -m`
 
 AC_LANG_CPLUSPLUS
 
+AC_CHECK_LIB([curl], [curl_easy_perform], [LIBS="${LIBS} -lcurl"])
+if test ${ac_cv_lib_curl_curl_easy_perform} = "no"; then
+  echo "Please do apt-get install libcurl4-openssl-dev (http://curl.haxx.se/)"
+  exit 1
+fi
+
 AC_CHECK_HEADERS([libnetfilter_queue/libnetfilter_queue.h], AC_DEFINE_UNQUOTED(HAVE_NETFILTER, 1, [nfq is present]))
 
 if test "x$ac_cv_header_libnetfilter_queue_libnetfilter_queue_h" = xyes; then :

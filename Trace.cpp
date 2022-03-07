@@ -25,6 +25,7 @@
 
 Trace::Trace() {
   traceLevel = TRACE_LEVEL_NORMAL;
+  syslogOnly = false;
 };
 
 /* ******************************* */
@@ -80,16 +81,18 @@ void Trace::traceEvent(int eventTraceLevel, const char* _file,
 
     while(buf[strlen(buf)-1] == '\n') buf[strlen(buf)-1] = '\0';
 
-    snprintf(out_buf, sizeof(out_buf), "%s [%s:%d] %s%s", theDate, file, line, extra_msg, buf);
-    printf("%s\n", out_buf);
-    fflush(stdout);
-
-    syslogMsg = &out_buf[strlen(theDate)+1];
-    if(eventTraceLevel == 0 /* TRACE_ERROR */)
-      syslog(LOG_ERR, "%s", syslogMsg);
-    else if(eventTraceLevel == 1 /* TRACE_WARNING */)
-      syslog(LOG_WARNING, "%s", syslogMsg);
-
+    if(!syslogOnly) {
+      snprintf(out_buf, sizeof(out_buf), "%s [%s:%d] %s%s", theDate, file, line, extra_msg, buf);
+      printf("%s\n", out_buf);
+      fflush(stdout);
+    } else {    
+      syslogMsg = &out_buf[strlen(theDate)+1];
+      if(eventTraceLevel == 0 /* TRACE_ERROR */)
+	syslog(LOG_ERR, "%s", syslogMsg);
+      else if(eventTraceLevel == 1 /* TRACE_WARNING */)
+	syslog(LOG_WARNING, "%s", syslogMsg);
+    }
+    
     va_end(va_ap);
   }
 }

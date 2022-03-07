@@ -89,7 +89,7 @@ bool Configuration::readConfigFile(char *path) {
     if(!root["monitored_ports"]["ignored_ports"].empty()) {
       for(Json::Value::ArrayIndex i = 0; i != root["monitored_ports"]["ignored_ports"].size(); i++) {
 	unsigned int port = root["monitored_ports"]["ignored_ports"][i].asUInt();
-	
+
 	trace->traceEvent(TRACE_INFO, "Ignoring TCP/UDP port %u", port);
 	ignored_ports[port] = true;
       }
@@ -120,6 +120,14 @@ bool Configuration::readConfigFile(char *path) {
 	trace->traceEvent(TRACE_INFO, "Adding %s to countries blacklist", country.c_str());
 	countries[country2u16((char*)country.c_str())] = MARKER_DROP;
       }
+    }
+  }
+
+  if(!root["blacklists"].empty()) {
+    for(Json::Value::ArrayIndex i = 0; i != root["blacklists"].size(); i++) {
+      std::string url = root["blacklists"][i].asString();
+
+      blacklists.loadIPsetFromURL(url.c_str());
     }
   }
 

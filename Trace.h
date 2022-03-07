@@ -44,7 +44,8 @@
 class Trace {
  private:
   u_int8_t traceLevel;
-
+  bool syslogOnly;
+  
 #ifdef WIN32
   VOID AddToMessageLog(LPTSTR lpszMsg);
 #endif
@@ -57,6 +58,7 @@ class Trace {
   void set_trace_level(u_int8_t id);
   inline u_int8_t get_trace_level() { return(traceLevel); };
   void traceEvent(int eventTraceLevel, const char* file, const int line, const char * format, ...);
+  void traceToSyslogOnly() { syslogOnly = true; }
 };
 
 

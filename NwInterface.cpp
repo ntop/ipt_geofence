@@ -40,7 +40,7 @@ NwInterface::NwInterface(u_int nf_device_id,
   }
 
   if(nfq_unbind_pf(nfHandle, AF_INET) < 0) {
-    trace->traceEvent(TRACE_ERROR, "Unable to unbind [queueId=%d]", queueId);
+    trace->traceEvent(TRACE_ERROR, "Unable to unbind [queueId=%d]: are you root ?", queueId);
     throw 1;
   }
 
@@ -190,11 +190,11 @@ Marker NwInterface::dissectPacket(const u_char *payload, u_int payload_len) {
 
       case IPPROTO_UDP:
 	udph = (struct udphdr *)l4;
-	src_port = udph->source,  dst_port = udph->dest;
+	src_port = udph->source, dst_port = udph->dest;
 	break;
 
       default:
-	return(MARKER_PASS);
+	src_port = dst_port = 0;
 	break;
       }
 
@@ -220,16 +220,65 @@ const char* NwInterface::getProtoName(u_int8_t proto) {
 
 /* **************************************************** */
 
+bool NwInterface::isPrivateIPv4(u_int32_t addr /* network byte order */) {
+  u_int32_t a = ntohl(addr);
+  
+  if(((a & 0xFF000000) == 0x0A000000 /* 10.0.0.0/8 */)
+     || ((a & 0xFFF00000) == 0xAC100000 /* 172.16.0.0/12 */)
+     || ((a & 0xFFFF0000) == 0xC0A80000 /* 192.168.0.0/16 */)
+     || ((a & 0xFF000000) == 0x7F000000 /* 127.0.0.0/8 */)
+     || ((a & 0xFFFF0000) == 0xA9FE0000 /* 169.254.0.0/16 Link-Local communication rfc3927 */)
+     || (a == 0xFFFFFFFF /* 255.255.255.255 */)
+     || (a == 0x0        /* 0.0.0.0 */)
+     || ((a & 0xF0000000) == 0xE0000000 /* 224.0.0.0/4 */))
+    return(true);
+  else
+    return(false);
+}
+
+/* **************************************************** */
+
 Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
 				u_int32_t saddr /* network byte order */,
 				u_int16_t sport /* network byte order */,
 				u_int32_t daddr /* network byte order */,
 				u_int16_t dport /* network byte order */) {
   struct in_addr in;
-  char country_code[3], *host, src_host[32], dst_host[32], src_cc[3], dst_cc[3];
+  char country_code[3], *host, src_host[32], dst_host[32], src_cc[3] = { '\0' }, dst_cc[3] = { '\0' };
   const char *proto_name = getProtoName(proto);
-  bool pass_local = true;
+  bool pass_local = true, saddr_private = isPrivateIPv4(saddr), daddr_private = isPrivateIPv4(daddr);;
   Marker m, src_maker, dst_marker;
+  struct in_addr addr;
+
+  in.s_addr = saddr;
+  host = inet_ntoa(in);
+  strncpy(src_host, host, sizeof(src_host)-1);
+
+  in.s_addr = daddr;
+  host = inet_ntoa(in);
+  strncpy(dst_host, host, sizeof(dst_host)-1);
+
+  /* Check if sender/recipient are blacklisted */
+  addr.s_addr = saddr;
+  if((!saddr_private) && conf->isBlacklistedIPv4(&addr)) {
+    trace->traceEvent(TRACE_WARNING,
+		      "%s %s:%u (Blacklist) -> %s:%u [DROP]",
+		      proto_name,
+		      src_host, sport,
+		      dst_host, dport);
+
+    return(MARKER_DROP);
+  }
+
+  addr.s_addr = daddr;
+  if((!daddr_private) && conf->isBlacklistedIPv4(&addr)) {
+    trace->traceEvent(TRACE_WARNING,
+		      "%s %s:%u -> %s:%u (Blacklist) [DROP]",
+		      proto_name,
+		      src_host, sport,
+		      dst_host, dport);
+    return(MARKER_DROP);
+  }
   
   sport = ntohs(sport), dport = ntohs(dport);
 
@@ -257,33 +306,25 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
 
   src_maker = dst_marker = conf->getDefaultMarker();
 
-  in.s_addr = saddr;
-  host = inet_ntoa(in);
-  strncpy(src_host, host, sizeof(src_host)-1);
-
-  if(geoip->lookup(host, country_code, sizeof(country_code), NULL, 0)) {
+  if((!saddr_private)
+     && geoip->lookup(host, country_code, sizeof(country_code), NULL, 0)) {
     src_maker = conf->getCountryMarker(country_code);
     
     strncpy(src_cc, country_code, sizeof(src_cc)-1);
     pass_local = false;
   } else {
     /* Unknown or private IP address  */
-    src_cc[0] = '\0';
     src_maker = MARKER_PASS;
   }
 
-  in.s_addr = daddr;
-  host = inet_ntoa(in);
-  strncpy(dst_host, host, sizeof(dst_host)-1);
-
-  if(geoip->lookup(host = inet_ntoa(in), country_code, sizeof(country_code), NULL, 0)) {
+  if((!daddr_private)
+     && geoip->lookup(host = inet_ntoa(in), country_code, sizeof(country_code), NULL, 0)) {
     dst_marker = conf->getCountryMarker(country_code);
 
     strncpy(dst_cc, country_code, sizeof(dst_cc)-1);
     pass_local = false;
   } else {
     /* Unknown or private IP address  */
-    dst_cc[0] = '\0';
     dst_marker = MARKER_PASS;
   }
 

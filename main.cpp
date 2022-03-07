@@ -51,9 +51,10 @@ static void help() {
   printf("Copyright 2021-22 ntop.org\n");
   
   printf("\nUsage:\n");
-  printf("ipt_geofence [-h][-v] -c <config file> -m <city>\n\n");
+  printf("ipt_geofence [-h][-v][-s] -c <config file> -m <city>\n\n");
   printf("-h           | Print this help\n");
   printf("-v           | Verbose\n");
+  printf("-s           | Log to syslog\n");
   printf("-c <config>  | Specify the configuration file\n");
   printf("-m <city>    | Local mmdb_city MMDB file\n");
 
@@ -68,36 +69,53 @@ static void help() {
 int main(int argc, char *argv[]) {
   u_char c;
   const struct option long_options[] = {
-    { "config",  required_argument,    NULL, 'c' },
-    { "mmdb_city",  required_argument, NULL, 'm' },
-    { "help",    no_argument,          NULL, 'h' },
-    { "verbose", no_argument,          NULL, 'v' },
+    { "config",      required_argument,    NULL, 'c' },
+    { "mmdb_city",   required_argument,    NULL, 'm' },
+    { "help",        no_argument,          NULL, 'h' },
+    { "syslog",      no_argument,          NULL, 's' },
+    { "verbose",     no_argument,          NULL, 'v' },
     /* End of options */
-    { NULL,      no_argument,          NULL,  0 }
+    { NULL,          no_argument,          NULL,  0 }
   };
   Configuration config;
   GeoIP geoip;
   
   trace = new Trace();
 
-  while((c = getopt_long(argc, argv, "c:u:l:m:vVh", long_options, NULL)) != '?') {
-    if(c == 255)
-      break;
-    else if(c == 'c')
+  while((c = getopt_long(argc, argv, "c:u:l:m:svVh", long_options, NULL)) != 255) {
+    switch(c) {
+    case 'c':
       config.readConfigFile(optarg);
-    else if(c == 'm')
+      break;
+      
+    case 'm':
       geoip.loadCountry(optarg);
-    else if(c == 'v')
+      break;
+      
+    case 's':
+      trace->traceToSyslogOnly();
+      break;
+
+    case 'v':
       trace->set_trace_level(6);
-    else
-      help();
+      break;
+
+    default:
+      trace->traceEvent(TRACE_WARNING, "Unknown command line option -%c", c);
+      help();      
+    }
   }
 
   Blacklists b;
   b.loadIPsetFromFile((char*)"dshield_7d.netset");
 
-  if((!config.isConfigured()) || (!geoip.isLoaded()))
+  if(!config.isConfigured()) {
+    trace->traceEvent(TRACE_ERROR, "Please check the JSON configuration file");
     help();
+  } else if(!geoip.isLoaded()) {
+    trace->traceEvent(TRACE_ERROR, "Please check the GeoIP configuration");
+    help();
+  }
   
   signal(SIGTERM, sigproc);
 
@@ -107,7 +125,7 @@ int main(int argc, char *argv[]) {
     iface->packetPollLoop();
     delete iface;
   } catch(int err) {
-    trace->traceEvent(TRACE_ERROR, "Interface creation error (%d)", err);
+    trace->traceEvent(TRACE_ERROR, "Interface creation error: please fix the reported errors and try again");
   }
     
   return(0);

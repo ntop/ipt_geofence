@@ -62,6 +62,32 @@ void Blacklists::addAddress(int family, void *addr, int bits) {
 
 /* ****************************************** */
 
+bool Blacklists::isBlacklistedIPv4(struct in_addr *addr) {
+  ndpi_prefix_t prefix;
+
+  ndpi_fill_prefix_v4(&prefix, addr, 32, ptree_v4->maxbits);
+
+  if(ndpi_patricia_search_best(ptree_v4, &prefix) != NULL)
+    return(true);
+  else
+    return(false);
+}
+
+/* ****************************************** */
+
+bool Blacklists::isBlacklistedIPv6(struct in6_addr *addr6) {
+  ndpi_prefix_t prefix;
+
+  ndpi_fill_prefix_v6(&prefix, addr6, 128, ptree_v6->maxbits);
+
+  if(ndpi_patricia_search_best(ptree_v6, &prefix) != NULL)
+    return(true);
+  else
+    return(false);
+}
+
+/* ****************************************** */
+
 bool Blacklists::findAddress(char *addr) {
   ndpi_prefix_t prefix;
   ndpi_patricia_node_t *node;
@@ -71,20 +97,15 @@ bool Blacklists::findAddress(char *addr) {
     struct in6_addr addr6;
 
     if(inet_pton(AF_INET6, addr, &addr6))
-      tree = ptree_v6,ndpi_fill_prefix_v6(&prefix, &addr6, 128, tree->maxbits);
+      return(isBlacklistedIPv6(&addr6));
     else
-      return(false);
+      return(false); /* Conversion failed */
   } else {
     struct in_addr pin;
 
     inet_aton(addr, &pin);
-    tree = ptree_v4, ndpi_fill_prefix_v4(&prefix, &pin, 32, tree->maxbits);
+    return(isBlacklistedIPv4(&pin));
   }
-
-  if(ndpi_patricia_search_best(tree, &prefix) != NULL)
-    return(true);
-  else
-    return(false);
 }
 
 /* ****************************************** */
@@ -115,7 +136,7 @@ void Blacklists::addAddress(char *net) {
 
 /* ****************************************** */
 
-bool Blacklists::loadIPsetFromFile(char *path) {
+bool Blacklists::loadIPsetFromFile(const char *path) {
   std::ifstream infile(path);
   std::string line;
 
@@ -126,11 +147,57 @@ bool Blacklists::loadIPsetFromFile(char *path) {
     if((line[0] == '#') || (line[0] == '\0'))
       continue;
 
-    trace->traceEvent(TRACE_INFO, "Adding %s", line);
+    // trace->traceEvent(TRACE_INFO, "Adding %s", line.c_str());
+
     addAddress((char*)line.c_str());
   }
 
   infile.close();
 
   return(true);
+}
+
+/* ****************************************** */
+
+bool Blacklists::loadIPsetFromURL(const char *url) {
+  CURL *curl = curl_easy_init();
+  FILE *fd;
+  CURLcode res;
+  char tmp_filename[64] = "/tmp/ipset_tempfile-XXXXXX";
+  bool rc;
+
+  if(!curl) {
+    trace->traceEvent(TRACE_ERROR, "Unable to init curl");
+    return(false);
+  }
+
+  if((fd = fopen(tmp_filename, "w")) == NULL) {
+    trace->traceEvent(TRACE_ERROR, "Unable to open temporary file %s", tmp_filename);
+    return(false);
+  }
+
+  trace->traceEvent(TRACE_NORMAL, "Downloading %s...", url);
+
+  curl_easy_setopt(curl, CURLOPT_URL, url);
+  curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, NULL);
+  curl_easy_setopt(curl, CURLOPT_WRITEDATA, fd);
+  res = curl_easy_perform(curl);
+  curl_easy_cleanup(curl);
+  fclose(fd);
+
+  if(res == CURLE_OK) {
+    rc = loadIPsetFromFile(tmp_filename);
+  } else {
+    trace->traceEvent(TRACE_ERROR, "Error while downloading %s", url);
+    rc = false;
+  }
+
+  unlink(tmp_filename); // Delete temporary file
+
+#ifdef TEST
+  trace->traceEvent(TRACE_WARNING, "=>> %s",
+		    findAddress((char*)"2.57.121.1") ? "DROP" : "PASS");
+#endif
+
+  return(rc);
 }
