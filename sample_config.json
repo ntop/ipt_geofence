@@ -7,7 +7,8 @@
 	"ignored_ports": [ 123 ]
     },
     "countries": {
-       "whitelist": ["IT", "DE", "CH", "NL"],
+       "whitelist": ["IT", "DE", "CH", "NL",
+                     "AF", "AS", "EU", "NA", "OC", "SA", "AN"],
        "blacklist": ["RU", "BY" ]
     },
     "blacklists": [
