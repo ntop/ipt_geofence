@@ -12,6 +12,7 @@ pkg:
 	mkdir -p ${IPT_GEOFENCE_BUILD}/usr/sbin
 	mkdir -p ${IPT_GEOFENCE_BUILD}/usr/share/doc/ipt_geofence/examples
 	install -m755 ../../ipt_geofence ${IPT_GEOFENCE_BUILD}/usr/sbin/
+	strip ${IPT_GEOFENCE_BUILD}/usr/sbin/ipt_geofence
 	install -m644 ../../ipt_config_utils/* ${IPT_GEOFENCE_BUILD}/usr/share/doc/ipt_geofence/examples/
 	@/bin/rm -f ../ipt_geofence*.deb
 	dpkg-buildpackage -rfakeroot -d -us -uc @BUILDPACKAGE_EXTRA@
@@ -33,4 +34,4 @@ install:
 	echo "dummy install"
 
 clean:
-	rm -rf *~ *deb
+	rm -rf *~ ipt-geofence_*
