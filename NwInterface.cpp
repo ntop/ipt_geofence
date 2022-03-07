@@ -306,22 +306,20 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
 
   src_maker = dst_marker = conf->getDefaultMarker();
 
+  in.s_addr = saddr;
   if((!saddr_private)
-     && geoip->lookup(host, country_code, sizeof(country_code), NULL, 0)) {
-    src_maker = conf->getCountryMarker(country_code);
-    
-    strncpy(src_cc, country_code, sizeof(src_cc)-1);
+     && geoip->lookup(inet_ntoa(in), src_cc, sizeof(src_cc), NULL, 0)) {
+    src_maker = conf->getCountryMarker(src_cc);
     pass_local = false;
   } else {
     /* Unknown or private IP address  */
     src_maker = MARKER_PASS;
   }
 
+  in.s_addr = daddr;
   if((!daddr_private)
-     && geoip->lookup(host = inet_ntoa(in), country_code, sizeof(country_code), NULL, 0)) {
-    dst_marker = conf->getCountryMarker(country_code);
-
-    strncpy(dst_cc, country_code, sizeof(dst_cc)-1);
+     && geoip->lookup(inet_ntoa(in), dst_cc, sizeof(dst_cc), NULL, 0)) {
+    dst_marker = conf->getCountryMarker(dst_cc);
     pass_local = false;
   } else {
     /* Unknown or private IP address  */

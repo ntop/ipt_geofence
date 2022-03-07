@@ -49,7 +49,7 @@ void Trace::traceEvent(int eventTraceLevel, const char* _file,
 
   if((eventTraceLevel <= traceLevel) && (traceLevel > 0)) {
     char buf[3000], out_buf[8192];
-    char theDate[32], *file = (char*)_file, *syslogMsg;
+    char theDate[32], *file = (char*)_file;
     const char *extra_msg = "";
     time_t theTime = time(NULL);
     char filebuf[PATH_MAX];
@@ -79,18 +79,19 @@ void Trace::traceEvent(int eventTraceLevel, const char* _file,
     else if(eventTraceLevel == 1 /* TRACE_WARNING */)
       extra_msg = "WARNING: ";
 
-    while(buf[strlen(buf)-1] == '\n') buf[strlen(buf)-1] = '\0';
-
+    while(buf[strlen(buf)-1] == '\n') buf[strlen(buf)-1] = '\0';   
+    
     if(!syslogOnly) {
       snprintf(out_buf, sizeof(out_buf), "%s [%s:%d] %s%s", theDate, file, line, extra_msg, buf);
       printf("%s\n", out_buf);
       fflush(stdout);
-    } else {    
-      syslogMsg = &out_buf[strlen(theDate)+1];
+    } else {
+      snprintf(out_buf, sizeof(out_buf), "%s%s", extra_msg, buf);
+      
       if(eventTraceLevel == 0 /* TRACE_ERROR */)
-	syslog(LOG_ERR, "%s", syslogMsg);
+	syslog(LOG_ERR, "%s", out_buf);
       else if(eventTraceLevel == 1 /* TRACE_WARNING */)
-	syslog(LOG_WARNING, "%s", syslogMsg);
+	syslog(LOG_WARNING, "%s", out_buf);
     }
     
     va_end(va_ap);
