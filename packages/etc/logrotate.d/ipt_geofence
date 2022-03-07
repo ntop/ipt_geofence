@@ -1,0 +1,8 @@
+/var/log/ipt_geofence.log {
+	daily
+	missingok
+	rotate 4
+	copytruncate
+}
+
+
