@@ -11,7 +11,7 @@
        "blacklist": ["RU", "BY"]
     },
     "continents":{
-        "whitelist": ["Europe"],
-        "blacklist": ["North America", "South America"]
+        "whitelist": ["Europ"],
+        "blacklist": ["North", "South"]
     }
 }
