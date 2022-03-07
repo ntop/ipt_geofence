@@ -83,7 +83,7 @@ bool GeoIP::lookup(char *ip,
       status = MMDB_get_value(&result.entry, &entry_data, "continent", "names", "en", NULL);
 
       if((status != MMDB_SUCCESS) || (!entry_data.has_data))
-	continent[0] = '\0';
+	        continent[0] = '\0';
       else {
 	int str_len = min(entry_data.data_size, continent_len);
 

@@ -107,7 +107,7 @@ bool Configuration::readConfigFile(char *path) {
 	std::string country = root["countries"]["whitelist"][i].asString();
 
 	trace->traceEvent(TRACE_INFO, "Adding %s to countries whitelist", country.c_str());
-	countries[country2u16((char*)country.c_str())] = MARKER_PASS;
+	count_conts[country2u16((char*)country.c_str())] = MARKER_PASS;
       }
     }
 
@@ -118,7 +118,7 @@ bool Configuration::readConfigFile(char *path) {
 	std::string country = root["countries"]["blacklist"][i].asString();
 
 	trace->traceEvent(TRACE_INFO, "Adding %s to countries blacklist", country.c_str());
-	countries[country2u16((char*)country.c_str())] = MARKER_DROP;
+	count_conts[country2u16((char*)country.c_str())] = MARKER_DROP;
       }
     }
   }
@@ -132,7 +132,7 @@ bool Configuration::readConfigFile(char *path) {
         std::string continent = root["continents"]["whitelist"][i].asString();
 
         trace->traceEvent(TRACE_INFO, "Adding %s to continents whitelist", continent.c_str());
-        continents[country2u16((char*)continent.c_str())] = MARKER_PASS;
+        count_conts[country2u16((char*)continent.c_str())] = MARKER_PASS;
       }
     }
 
@@ -144,7 +144,7 @@ bool Configuration::readConfigFile(char *path) {
         std::string continent = root["continents"]["blacklist"][i].asString();
 
         trace->traceEvent(TRACE_INFO, "Adding %s to continents blacklist", continent.c_str());
-        continents[country2u16((char*)continent.c_str())] = MARKER_DROP;
+        count_conts[country2u16((char*)continent.c_str())] = MARKER_DROP;
       }
     }
   }
@@ -154,24 +154,13 @@ bool Configuration::readConfigFile(char *path) {
 
 /* ******************************************************* */
 
-Marker Configuration::getCountryMarker(char *country) {
+Marker Configuration::getMarker(char *country) {
   u_int16_t id = country2u16(country);
-  std::unordered_map<u_int16_t, Marker>::iterator it = countries.find(id);
+  std::unordered_map<u_int16_t, Marker>::iterator it = count_conts.find(id);
 
-  if(it == countries.end())
+  if(it == count_conts.end())
     return(default_marker); /* Not found */
   else
     return(it->second);
 }
-
-Marker Configuration::getContinentMarker(char* continent){
-  u_int16_t id = country2u16(continent);
-  std::unordered_map<u_int16_t, Marker>::iterator it = continents.find(id);
-
-  if(it == continents.end())
-    return(default_marker); /* Not found */
-  else
-    return(it->second);
-}
-
 /* ******************************************************* */

@@ -226,7 +226,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
 				u_int32_t daddr /* network byte order */,
 				u_int16_t dport /* network byte order */) {
   struct in_addr in;
-  char country_code[3], *host, src_host[32], dst_host[32], src_cc[3], dst_cc[3];
+  char country_code[3], continent_code[5], *host, src_host[32], dst_host[32], src_cc[3], dst_cc[3], src_con[5], dst_con[5];
   const char *proto_name = getProtoName(proto);
   bool pass_local = true;
   Marker m, src_maker, dst_marker;
@@ -259,16 +259,20 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
 
   in.s_addr = saddr;
   host = inet_ntoa(in);
-  strncpy(src_host, host, sizeof(src_host)-1);
+  strncpy(src_host, host, sizeof(src_host)-1);  
 
-  if(geoip->lookup(host, country_code, sizeof(country_code), NULL, 0)) {
-    src_maker = conf->getCountryMarker(country_code);
-    
+  if(geoip->lookup(host, country_code, sizeof(country_code), continent_code, sizeof(continent_code))) {
+    src_maker = conf->getMarker(continent_code);
+    if(src_maker != MARKER_PASS)
+       src_maker = conf->getMarker(country_code);
+
     strncpy(src_cc, country_code, sizeof(src_cc)-1);
+    strncpy(src_con, continent_code, sizeof(src_con)-1);
     pass_local = false;
   } else {
     /* Unknown or private IP address  */
     src_cc[0] = '\0';
+    src_con[0] = '\0';
     src_maker = MARKER_PASS;
   }
 
@@ -276,14 +280,18 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
   host = inet_ntoa(in);
   strncpy(dst_host, host, sizeof(dst_host)-1);
 
-  if(geoip->lookup(host = inet_ntoa(in), country_code, sizeof(country_code), NULL, 0)) {
-    dst_marker = conf->getCountryMarker(country_code);
+  if(geoip->lookup(host = inet_ntoa(in), country_code, sizeof(country_code), continent_code, sizeof(continent_code))) {
+    dst_marker = conf->getMarker(continent_code);
+    if(dst_marker != MARKER_PASS)
+       dst_marker = conf->getMarker(country_code);
 
     strncpy(dst_cc, country_code, sizeof(dst_cc)-1);
+    strncpy(dst_con, continent_code, sizeof(dst_con)-1);
     pass_local = false;
   } else {
     /* Unknown or private IP address  */
     dst_cc[0] = '\0';
+    dst_con[0] = '\0';
     dst_marker = MARKER_PASS;
   }
 
@@ -292,18 +300,18 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
     m = MARKER_PASS;
     
     trace->traceEvent(TRACE_INFO,
-		      "%s %s:%u %s -> %s:%u %s [PASS]",
+		      "%s %s:%u %s %s -> %s:%u %s %s [PASS]",
 		      proto_name,
-		      src_host, sport, src_cc,
-		      dst_host, dport, dst_cc);
+		      src_host, sport, src_cc, src_con,
+		      dst_host, dport, dst_cc, dst_con);
   } else {
     m = MARKER_DROP;
 
     trace->traceEvent(TRACE_WARNING,
-		      "%s %s:%u %s -> %s:%u %s [DROP]",
+		      "%s %s:%u %s %s -> %s:%u %s %s [DROP]",
 		      proto_name,
-		      src_host, sport, src_cc,
-		      dst_host, dport, dst_cc);
+		      src_host, sport, src_cc, src_con,
+		      dst_host, dport, dst_cc, dst_con);
   }
   
   return(m);
