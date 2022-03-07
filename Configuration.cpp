@@ -136,14 +136,23 @@ bool Configuration::readConfigFile(char *path) {
 
 /* ******************************************************* */
 
-Marker Configuration::getCountryMarker(char *country) {
+Marker Configuration::getCountryMarker(char *country, char *continent) {
   u_int16_t id = country2u16(country);
   std::unordered_map<u_int16_t, Marker>::iterator it = countries.find(id);
 
-  if(it == countries.end())
-    return(default_marker); /* Not found */
-  else
+  if(it != countries.end())
     return(it->second);
+
+  /* if country not found check continent */
+
+  id = country2u16(continent);
+  it = countries.find(id);
+
+  if(it != countries.end())
+    return(it->second);
+
+  return(default_marker); /* country and continent Not found */
+  
 }
 
 /* ******************************************************* */

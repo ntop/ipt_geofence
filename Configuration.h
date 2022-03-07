@@ -46,7 +46,7 @@ class Configuration {
   inline void setQueueId(int nfq_id)                        { nfq_queue_id = nfq_id;  }
   inline void setCountryMarker(u_int16_t country, Marker m) { countries[country] = m; }
   inline Marker getDefaultMarker()                          { return(default_marker); }
-  Marker getCountryMarker(char *country);
+  Marker getCountryMarker(char *country, char *continent);
   inline bool isIgnoredPort(u_int16_t port)      { return(ignored_ports.find(port) != ignored_ports.end());            }
   inline bool isMonitoredTCPPort(u_int16_t port) { return(all_tcp_ports || (tcp_ports.find(port) != tcp_ports.end())); }
   inline bool isMonitoredUDPPort(u_int16_t port) { return(all_udp_ports || (udp_ports.find(port) != udp_ports.end())); }

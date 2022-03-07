@@ -244,7 +244,9 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
 				u_int32_t daddr /* network byte order */,
 				u_int16_t dport /* network byte order */) {
   struct in_addr in;
-  char country_code[3], *host, src_host[32], dst_host[32], src_cc[3] = { '\0' }, dst_cc[3] = { '\0' };
+  char *host, src_host[32], dst_host[32], 
+  src_country_c[3] = { '\0' }, dst_country_c[3] = { '\0' },
+  src_continent_c[3] = { '\0' }, dst_continent_c[3] = { '\0' };
   const char *proto_name = getProtoName(proto);
   bool pass_local = true, saddr_private = isPrivateIPv4(saddr), daddr_private = isPrivateIPv4(daddr);;
   Marker m, src_maker, dst_marker;
@@ -308,8 +310,8 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
 
   in.s_addr = saddr;
   if((!saddr_private)
-     && geoip->lookup(inet_ntoa(in), src_cc, sizeof(src_cc), NULL, 0)) {
-    src_maker = conf->getCountryMarker(src_cc);
+     && geoip->lookup(inet_ntoa(in), src_country_c, sizeof(src_country_c), src_continent_c, sizeof(src_continent_c))) {
+    src_maker = conf->getCountryMarker(src_country_c, src_continent_c);
     pass_local = false;
   } else {
     /* Unknown or private IP address  */
@@ -318,8 +320,8 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
 
   in.s_addr = daddr;
   if((!daddr_private)
-     && geoip->lookup(inet_ntoa(in), dst_cc, sizeof(dst_cc), NULL, 0)) {
-    dst_marker = conf->getCountryMarker(dst_cc);
+     && geoip->lookup(inet_ntoa(in), dst_country_c, sizeof(dst_country_c), dst_continent_c, sizeof(dst_continent_c))) {
+    dst_marker = conf->getCountryMarker(dst_country_c,dst_continent_c);
     pass_local = false;
   } else {
     /* Unknown or private IP address  */
@@ -331,18 +333,18 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
     m = MARKER_PASS;
     
     trace->traceEvent(TRACE_INFO,
-		      "%s %s:%u %s -> %s:%u %s [PASS]",
+		      "%s %s:%u %s %s -> %s:%u %s %s [PASS]",
 		      proto_name,
-		      src_host, sport, src_cc,
-		      dst_host, dport, dst_cc);
+		      src_host, sport, src_country_c, src_continent_c,
+		      dst_host, dport, dst_country_c,dst_continent_c);
   } else {
     m = MARKER_DROP;
 
     trace->traceEvent(TRACE_WARNING,
-		      "%s %s:%u %s -> %s:%u %s [DROP]",
+		      "%s %s:%u %s %s -> %s:%u %s %s [DROP]",
 		      proto_name,
-		      src_host, sport, src_cc,
-		      dst_host, dport, dst_cc);
+		      src_host, sport, src_country_c, src_continent_c,
+		      dst_host, dport, dst_country_c,dst_continent_c);
   }
   
   return(m);
