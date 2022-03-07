@@ -229,7 +229,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
   char country_code[3], continent_code[5], *host, src_host[32], dst_host[32], src_cc[3], dst_cc[3], src_con[5], dst_con[5];
   const char *proto_name = getProtoName(proto);
   bool pass_local = true;
-  Marker m, src_maker, dst_marker;
+  Marker m, src_maker, dst_marker, default_marker;
   
   sport = ntohs(sport), dport = ntohs(dport);
 
@@ -255,7 +255,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
     break;
   }
 
-  src_maker = dst_marker = conf->getDefaultMarker();
+  src_maker = dst_marker = default_marker = conf->getDefaultMarker();
 
   in.s_addr = saddr;
   host = inet_ntoa(in);
@@ -263,7 +263,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
 
   if(geoip->lookup(host, country_code, sizeof(country_code), continent_code, sizeof(continent_code))) {
     src_maker = conf->getMarker(continent_code);
-    if(src_maker != MARKER_PASS)
+    if(src_maker == default_marker)
        src_maker = conf->getMarker(country_code);
 
     strncpy(src_cc, country_code, sizeof(src_cc)-1);
@@ -282,7 +282,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
 
   if(geoip->lookup(host = inet_ntoa(in), country_code, sizeof(country_code), continent_code, sizeof(continent_code))) {
     dst_marker = conf->getMarker(continent_code);
-    if(dst_marker != MARKER_PASS)
+    if(dst_marker == default_marker)
        dst_marker = conf->getMarker(country_code);
 
     strncpy(dst_cc, country_code, sizeof(dst_cc)-1);
