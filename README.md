@@ -16,7 +16,7 @@ This tool uses NFQUEUE to receive packets from kernel and analyze them in user-s
 You also need to configure a configuration file for your rules. We provide [sample_config.json](sample_config.json) as a configuration example.
 
 # Binary Packages
-Under [packages/debian])=(packages/debian) you can build a binary package for easy install on Debian/Ubuntu-based systems.
+Under [packages/debian](packages/debian) you can build a binary package for easy install on Debian/Ubuntu-based systems.
 
 # Usage
 Supposing the you have configure the firewall as described above, you need to start (as root) the tool as follows
