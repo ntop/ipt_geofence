@@ -9,5 +9,9 @@
     "countries": {
        "whitelist": ["IT", "DE", "CH", "NL"],
        "blacklist": ["RU", "BY" ]
+    },
+    "continents": {
+       "whitelist": ["NA" ],
+       "blacklist": ["EU" ]
     }
 }

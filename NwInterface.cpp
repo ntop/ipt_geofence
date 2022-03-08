@@ -226,7 +226,8 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
 				u_int32_t daddr /* network byte order */,
 				u_int16_t dport /* network byte order */) {
   struct in_addr in;
-  char country_code[3], *host, src_host[32], dst_host[32], src_cc[3], dst_cc[3];
+  char *host, src_host[32], dst_host[32], src_ctry[3]={'\0'}, dst_ctry[3]={'\0'},
+   src_cont[3]={'\0'}, dst_cont[3]={'\0'} ;
   const char *proto_name = getProtoName(proto);
   bool pass_local = true;
   Marker m, src_maker, dst_marker;
@@ -261,14 +262,12 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
   host = inet_ntoa(in);
   strncpy(src_host, host, sizeof(src_host)-1);
 
-  if(geoip->lookup(host, country_code, sizeof(country_code), NULL, 0)) {
-    src_maker = conf->getCountryMarker(country_code);
-    
-    strncpy(src_cc, country_code, sizeof(src_cc)-1);
+  if(geoip->lookup(host, src_ctry, sizeof(src_ctry), src_cont, sizeof(src_cont))) {
+    src_maker = conf->getMarker(src_ctry,src_cont);
     pass_local = false;
   } else {
     /* Unknown or private IP address  */
-    src_cc[0] = '\0';
+    src_ctry[0] = '\0';
     src_maker = MARKER_PASS;
   }
 
@@ -276,14 +275,12 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
   host = inet_ntoa(in);
   strncpy(dst_host, host, sizeof(dst_host)-1);
 
-  if(geoip->lookup(host = inet_ntoa(in), country_code, sizeof(country_code), NULL, 0)) {
-    dst_marker = conf->getCountryMarker(country_code);
-
-    strncpy(dst_cc, country_code, sizeof(dst_cc)-1);
+  if(geoip->lookup(host = inet_ntoa(in), dst_ctry, sizeof(dst_ctry), NULL, 0)) {
+    dst_marker = conf->getMarker(dst_ctry, dst_cont);
     pass_local = false;
   } else {
     /* Unknown or private IP address  */
-    dst_cc[0] = '\0';
+    dst_ctry[0] = '\0';
     dst_marker = MARKER_PASS;
   }
 
@@ -292,18 +289,18 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
     m = MARKER_PASS;
     
     trace->traceEvent(TRACE_INFO,
-		      "%s %s:%u %s -> %s:%u %s [PASS]",
+		      "%s %s:%u %s %s -> %s:%u %s %s [PASS]",
 		      proto_name,
-		      src_host, sport, src_cc,
-		      dst_host, dport, dst_cc);
+		      src_host, sport, src_ctry, src_cont,
+		      dst_host, dport, dst_ctry, dst_cont);
   } else {
     m = MARKER_DROP;
 
     trace->traceEvent(TRACE_WARNING,
-		      "%s %s:%u %s -> %s:%u %s [DROP]",
+		      "%s %s:%u %s %s -> %s:%u %s %s [DROP]",
 		      proto_name,
-		      src_host, sport, src_cc,
-		      dst_host, dport, dst_cc);
+		      src_host, sport, src_ctry, src_cont,
+		      dst_host, dport, dst_ctry, dst_cont);
   }
   
   return(m);
