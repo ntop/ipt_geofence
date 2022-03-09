@@ -30,9 +30,10 @@
 bool GeoIP::loadCountry(const char *ip_country_data) {
   int status;
 
-  if((status = MMDB_open(ip_country_data, MMDB_MODE_MMAP, &mmdb_country)) != MMDB_SUCCESS)
+  if((status = MMDB_open(ip_country_data, MMDB_MODE_MMAP, &mmdb_country)) != MMDB_SUCCESS) {
+    trace->traceEvent(TRACE_ERROR, "Unable to load %s", ip_country_data);
     return(false);
-  else
+  } else
     trace->traceEvent(TRACE_NORMAL, "Successfully loaded %s", ip_country_data);
 
   loaded = true;

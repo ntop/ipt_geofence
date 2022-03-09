@@ -15,6 +15,12 @@ MACHINE=`uname -m`
 
 AC_LANG_CPLUSPLUS
 
+AC_CHECK_LIB([curl], [curl_easy_perform], [LIBS="${LIBS} -lcurl"])
+if test ${ac_cv_lib_curl_curl_easy_perform} = "no"; then
+  echo "Please do apt-get install libcurl4-openssl-dev (http://curl.haxx.se/)"
+  exit 1
+fi
+
 AC_CHECK_HEADERS([libnetfilter_queue/libnetfilter_queue.h], AC_DEFINE_UNQUOTED(HAVE_NETFILTER, 1, [nfq is present]))
 
 if test "x$ac_cv_header_libnetfilter_queue_libnetfilter_queue_h" = xyes; then :
@@ -39,7 +45,22 @@ if ! test ".${ac_cv_lib_jsoncpp_main}" = ".yes"; then
   exit 0
 fi
 
- LIBS="$LIBS -lpthread"
+dnl nDPI
+if ! test -f "$HOME/nDPI/src/lib/libndpi.a"; then :
+  echo "nDPI missing. Please do:"
+  echo "- cd $HOME"
+  echo "- git clone https://github.com/ntop/nDPI.git"
+  echo "- ./autogen.sh"
+  echo "- make"
+  echo ""
+  echo "And run this configure again"  
+  exit 0
+else
+  LIBS="$LIBS $HOME/nDPI/src/lib/libndpi.a"
+  INCS="$INCS -I $HOME/nDPI/src/include"
+fi
+
+LIBS="$LIBS -lpthread"
 
 EXTN=
 if test $MACHINE = "x86_64"; then
@@ -61,6 +82,8 @@ AC_SUBST(GIT_BRANCH)
 AC_SUBST(GIT_HASH)
 AC_SUBST(DATE)
 AC_SUBST(EXTN)
+AC_SUBST(LIBS)
+AC_SUBST(INCS)
 
 AC_CONFIG_HEADERS(config.h)
 AC_CONFIG_FILES(Makefile)

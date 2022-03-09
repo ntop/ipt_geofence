@@ -50,6 +50,8 @@
 #include <libnetfilter_queue/libnetfilter_queue.h>
 #include <jsoncpp/json/json.h>
 #include <maxminddb.h>
+#include <ndpi_api.h>
+#include <curl/curl.h>
 
 #include <unordered_map>
 #include <fstream>
@@ -76,6 +78,7 @@ typedef enum {
 /* ********************************************** */
 
 #include "Trace.h"
+#include "Blacklists.h"
 #include "Configuration.h"
 #include "GeoIP.h"
 #include "NwInterface.h"

@@ -89,7 +89,7 @@ bool Configuration::readConfigFile(char *path) {
     if(!root["monitored_ports"]["ignored_ports"].empty()) {
       for(Json::Value::ArrayIndex i = 0; i != root["monitored_ports"]["ignored_ports"].size(); i++) {
 	unsigned int port = root["monitored_ports"]["ignored_ports"][i].asUInt();
-	
+
 	trace->traceEvent(TRACE_INFO, "Ignoring TCP/UDP port %u", port);
 	ignored_ports[port] = true;
       }
@@ -127,6 +127,14 @@ bool Configuration::readConfigFile(char *path) {
     }
   }
   } while(counter--);
+
+  if(!root["blacklists"].empty()) {
+    for(Json::Value::ArrayIndex i = 0; i != root["blacklists"].size(); i++) {
+      std::string url = root["blacklists"][i].asString();
+
+      blacklists.loadIPsetFromURL(url.c_str());
+    }
+  }
 
   return(configured = true);
 }
