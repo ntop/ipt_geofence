@@ -248,7 +248,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
    src_cont[3]={'\0'}, dst_cont[3]={'\0'} ;
   const char *proto_name = getProtoName(proto);
   bool pass_local = true, saddr_private = isPrivateIPv4(saddr), daddr_private = isPrivateIPv4(daddr);;
-  Marker m, src_maker, dst_marker;
+  Marker m, src_marker, dst_marker;
   struct in_addr addr;
 
   in.s_addr = saddr;
@@ -305,19 +305,19 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
     break;
   }
 
-  src_maker = dst_marker = conf->getDefaultMarker();
+  src_marker = dst_marker = conf->getDefaultMarker();
 
   in.s_addr = saddr;
   host = inet_ntoa(in);
   strncpy(src_host, host, sizeof(src_host)-1);
 
   if((!saddr_private) && (geoip->lookup(host, src_ctry, sizeof(src_ctry), src_cont, sizeof(src_cont)))) {
-    src_maker = conf->getMarker(src_ctry,src_cont);
+    src_marker = conf->getMarker(src_ctry,src_cont);
     pass_local = false;
   } else {
     /* Unknown or private IP address  */
 
-    src_maker = MARKER_PASS;
+    src_marker = MARKER_PASS;
   }
 
   in.s_addr = daddr;
@@ -333,7 +333,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
   }
 
   if((conf->isIgnoredPort(sport) || conf->isIgnoredPort(dport))
-     || ((src_maker == MARKER_PASS) && (dst_marker == MARKER_PASS))) {
+     || ((src_marker == MARKER_PASS) && (dst_marker == MARKER_PASS))) {
     m = MARKER_PASS;
     
     trace->traceEvent(TRACE_INFO,

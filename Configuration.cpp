@@ -126,7 +126,7 @@ bool Configuration::readConfigFile(char *path) {
       }
     }
   }
-  } while(counter--);
+  } while(--counter);
 
   if(!root["blacklists"].empty()) {
     for(Json::Value::ArrayIndex i = 0; i != root["blacklists"].size(); i++) {
