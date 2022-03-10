@@ -110,7 +110,7 @@ bool Configuration::readConfigFile(char *path) {
       for(Json::Value::ArrayIndex i = 0; i != root[json_value_str]["whitelist"].size(); i++) {
 	std::string ctry_cont = root[json_value_str]["whitelist"][i].asString();
 
-	trace->traceEvent(TRACE_INFO, "Adding %s to %s whitelist", ctry_cont.c_str(), json_value_str);
+	trace->traceEvent(TRACE_INFO, "Adding %s to %s whitelist", ctry_cont.c_str(), json_value_str.c_str());
 	ctrs_conts[ctry_cont2u16((char*)ctry_cont.c_str())] = MARKER_PASS;
       }
     }
@@ -121,7 +121,7 @@ bool Configuration::readConfigFile(char *path) {
       for(Json::Value::ArrayIndex i = 0; i != root[json_value_str]["blacklist"].size(); i++) {
 	std::string ctry_cont = root[json_value_str]["blacklist"][i].asString();
 
-	trace->traceEvent(TRACE_INFO, "Adding %s to %s blacklist", ctry_cont.c_str(), json_value_str);
+	trace->traceEvent(TRACE_INFO, "Adding %s to %s blacklist", ctry_cont.c_str(), json_value_str.c_str());
 	ctrs_conts[ctry_cont2u16((char*)ctry_cont.c_str())] = MARKER_DROP;
       }
     }

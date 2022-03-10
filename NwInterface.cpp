@@ -324,7 +324,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
   host = inet_ntoa(in);
   strncpy(dst_host, host, sizeof(dst_host)-1);
 
-  if((!daddr_private) && (geoip->lookup(host = inet_ntoa(in), dst_ctry, sizeof(dst_ctry), dst_cont, sizeof(dst_cont))) {
+  if((!daddr_private) && (geoip->lookup(host = inet_ntoa(in), dst_ctry, sizeof(dst_ctry), dst_cont, sizeof(dst_cont)))) {
     dst_marker = conf->getMarker(dst_ctry, dst_cont);
     pass_local = false;
   } else {
