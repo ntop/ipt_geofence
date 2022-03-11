@@ -23,10 +23,10 @@
 
 /* ******************************************************* */
 
-u_int16_t Configuration::country2u16(char *country_code) {
-  if(country_code == NULL || strlen(country_code) < 2) return 0;
+u_int16_t Configuration::ctry_cont2u16(char *ctry_cont_code) {
+  if(ctry_cont_code == NULL || strlen(ctry_cont_code) < 2) return 0;
 
-  return ((((u_int16_t) country_code[0]) << 8) | ((u_int16_t) country_code[1]));
+  return ((((u_int16_t) ctry_cont_code[0]) << 8) | ((u_int16_t) ctry_cont_code[1]));
 }
 
 /* ******************************************************* */
@@ -99,29 +99,34 @@ bool Configuration::readConfigFile(char *path) {
   if(all_tcp_ports) trace->traceEvent(TRACE_INFO, "All TCP ports will be monitored");
   if(all_udp_ports) trace->traceEvent(TRACE_INFO, "All UDP ports will be monitored");
 
-  if(!root["countries"].empty()) {
-    if(root["countries"]["whitelist"].empty()) {
+
+  int counter = 2;
+  do {
+  std::string json_value_str = counter == 2 ? "countries" : "continents";
+  if(!root[json_value_str].empty()) {
+    if(root[json_value_str]["whitelist"].empty()) {
       trace->traceEvent(TRACE_INFO, "Missing %s from %s", "whitelist", path);
     } else {
-      for(Json::Value::ArrayIndex i = 0; i != root["countries"]["whitelist"].size(); i++) {
-	std::string country = root["countries"]["whitelist"][i].asString();
+      for(Json::Value::ArrayIndex i = 0; i != root[json_value_str]["whitelist"].size(); i++) {
+	std::string ctry_cont = root[json_value_str]["whitelist"][i].asString();
 
-	trace->traceEvent(TRACE_INFO, "Adding %s to countries whitelist", country.c_str());
-	countries[country2u16((char*)country.c_str())] = MARKER_PASS;
+	trace->traceEvent(TRACE_INFO, "Adding %s to %s whitelist", ctry_cont.c_str(), json_value_str.c_str());
+	ctrs_conts[ctry_cont2u16((char*)ctry_cont.c_str())] = MARKER_PASS;
       }
     }
 
-    if(root["countries"]["blacklist"].empty()) {
+    if(root[json_value_str]["blacklist"].empty()) {
       trace->traceEvent(TRACE_INFO, "Missing %s from %s", "blacklist", path);
     } else {
-      for(Json::Value::ArrayIndex i = 0; i != root["countries"]["blacklist"].size(); i++) {
-	std::string country = root["countries"]["blacklist"][i].asString();
+      for(Json::Value::ArrayIndex i = 0; i != root[json_value_str]["blacklist"].size(); i++) {
+	std::string ctry_cont = root[json_value_str]["blacklist"][i].asString();
 
-	trace->traceEvent(TRACE_INFO, "Adding %s to countries blacklist", country.c_str());
-	countries[country2u16((char*)country.c_str())] = MARKER_DROP;
+	trace->traceEvent(TRACE_INFO, "Adding %s to %s blacklist", ctry_cont.c_str(), json_value_str.c_str());
+	ctrs_conts[ctry_cont2u16((char*)ctry_cont.c_str())] = MARKER_DROP;
       }
     }
   }
+  } while(--counter);
 
   if(!root["blacklists"].empty()) {
     for(Json::Value::ArrayIndex i = 0; i != root["blacklists"].size(); i++) {
@@ -136,23 +141,19 @@ bool Configuration::readConfigFile(char *path) {
 
 /* ******************************************************* */
 
-Marker Configuration::getCountryMarker(char *country, char *continent) {
-  u_int16_t id = country2u16(country);
-  std::unordered_map<u_int16_t, Marker>::iterator it = countries.find(id);
+Marker Configuration::getMarker(char *country, char *continent) {
+  u_int16_t id = ctry_cont2u16(country);
+  std::unordered_map<u_int16_t, Marker>::iterator it = ctrs_conts.find(id);
 
-  if(it != countries.end())
-    return(it->second);
+  if(it != ctrs_conts.end()) 
+    return(it->second); // country found
 
-  /* if country not found check continent */
-
-  id = country2u16(continent);
-  it = countries.find(id);
-
-  if(it != countries.end())
-    return(it->second);
-
-  return(default_marker); /* country and continent Not found */
+  id = ctry_cont2u16(continent);
+  it = ctrs_conts.find(id);
+  if(it != ctrs_conts.end()) 
+    return(it->second); // continent found
   
+  return(default_marker);
 }
 
 /* ******************************************************* */
