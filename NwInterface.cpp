@@ -244,10 +244,11 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
 				u_int32_t daddr /* network byte order */,
 				u_int16_t dport /* network byte order */) {
   struct in_addr in;
-  char country_code[3], *host, src_host[32], dst_host[32], src_cc[3] = { '\0' }, dst_cc[3] = { '\0' };
+  char *host, src_host[32], dst_host[32], src_ctry[3]={'\0'}, dst_ctry[3]={'\0'},
+   src_cont[3]={'\0'}, dst_cont[3]={'\0'} ;
   const char *proto_name = getProtoName(proto);
   bool pass_local = true, saddr_private = isPrivateIPv4(saddr), daddr_private = isPrivateIPv4(daddr);;
-  Marker m, src_maker, dst_marker;
+  Marker m, src_marker, dst_marker;
   struct in_addr addr;
 
   in.s_addr = saddr;
@@ -304,22 +305,27 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
     break;
   }
 
-  src_maker = dst_marker = conf->getDefaultMarker();
+  src_marker = dst_marker = conf->getDefaultMarker();
 
   in.s_addr = saddr;
-  if((!saddr_private)
-     && geoip->lookup(inet_ntoa(in), src_cc, sizeof(src_cc), NULL, 0)) {
-    src_maker = conf->getCountryMarker(src_cc);
+  host = inet_ntoa(in);
+  strncpy(src_host, host, sizeof(src_host)-1);
+
+  if((!saddr_private) && (geoip->lookup(host, src_ctry, sizeof(src_ctry), src_cont, sizeof(src_cont)))) {
+    src_marker = conf->getMarker(src_ctry,src_cont);
     pass_local = false;
   } else {
     /* Unknown or private IP address  */
-    src_maker = MARKER_PASS;
+
+    src_marker = MARKER_PASS;
   }
 
   in.s_addr = daddr;
-  if((!daddr_private)
-     && geoip->lookup(inet_ntoa(in), dst_cc, sizeof(dst_cc), NULL, 0)) {
-    dst_marker = conf->getCountryMarker(dst_cc);
+  host = inet_ntoa(in);
+  strncpy(dst_host, host, sizeof(dst_host)-1);
+
+  if((!daddr_private) && (geoip->lookup(host = inet_ntoa(in), dst_ctry, sizeof(dst_ctry), dst_cont, sizeof(dst_cont)))) {
+    dst_marker = conf->getMarker(dst_ctry, dst_cont);
     pass_local = false;
   } else {
     /* Unknown or private IP address  */
@@ -327,22 +333,22 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
   }
 
   if((conf->isIgnoredPort(sport) || conf->isIgnoredPort(dport))
-     || ((src_maker == MARKER_PASS) && (dst_marker == MARKER_PASS))) {
+     || ((src_marker == MARKER_PASS) && (dst_marker == MARKER_PASS))) {
     m = MARKER_PASS;
     
     trace->traceEvent(TRACE_INFO,
-		      "%s %s:%u %s -> %s:%u %s [PASS]",
+		      "%s %s:%u %s %s -> %s:%u %s %s [PASS]",
 		      proto_name,
-		      src_host, sport, src_cc,
-		      dst_host, dport, dst_cc);
+		      src_host, sport, src_ctry, src_cont,
+		      dst_host, dport, dst_ctry, dst_cont);
   } else {
     m = MARKER_DROP;
 
     trace->traceEvent(TRACE_WARNING,
-		      "%s %s:%u %s -> %s:%u %s [DROP]",
+		      "%s %s:%u %s %s -> %s:%u %s %s [DROP]",
 		      proto_name,
-		      src_host, sport, src_cc,
-		      dst_host, dport, dst_cc);
+		      src_host, sport, src_ctry, src_cont,
+		      dst_host, dport, dst_ctry, dst_cont);
   }
   
   return(m);
