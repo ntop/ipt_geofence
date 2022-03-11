@@ -259,7 +259,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
   host = inet_ntoa(in);
   strncpy(dst_host, host, sizeof(dst_host)-1);
 
-  /* Check if sender/recipient are blacklisted */
+  /* Step 1 - For all ports/protocols, check if sender/recipient are blacklisted and if so, block this flow */
   addr.s_addr = saddr;
   if((!saddr_private) && conf->isBlacklistedIPv4(&addr)) {
     trace->traceEvent(TRACE_WARNING,
@@ -283,8 +283,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
   
   sport = ntohs(sport), dport = ntohs(dport);
 
-  // trace->traceEvent(TRACE_NORMAL, "Processing %u -> %u", sport, dport);
-  
+  /* Step 2 - For TCP/UDP ignore traffic for non-monitored ports */
   switch(proto) {
   case IPPROTO_TCP:
     if((conf->isMonitoredTCPPort(sport)) || conf->isMonitoredTCPPort(dport))
@@ -307,6 +306,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
 
   src_marker = dst_marker = conf->getDefaultMarker();
 
+  /* Step 3 - For monitored TCP/UDP ports (and ICMP) check the country blacklist */
   in.s_addr = saddr;
   host = inet_ntoa(in);
   strncpy(src_host, host, sizeof(src_host)-1);
@@ -332,6 +332,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
     dst_marker = MARKER_PASS;
   }
 
+  /* Final step: compute the flow verdict */
   if((conf->isIgnoredPort(sport) || conf->isIgnoredPort(dport))
      || ((src_marker == MARKER_PASS) && (dst_marker == MARKER_PASS))) {
     m = MARKER_PASS;

@@ -7,12 +7,12 @@
 	"ignored_ports": [ 123 ]
     },
     "countries": {
-       "whitelist": ["IT", "DE", "CH", "NL"],
-       "blacklist": ["RU", "BY" ]
+       "whitelist": [ "IT", "DE", "CH", "NL" ],
+       "blacklist": [ "RU", "BY" ]
     },
     "continents": {
-       "whitelist": ["NA" ],
-       "blacklist": ["EU" ]
+       "whitelist": [ "NA" ],
+       "blacklist": [ "EU" ]
     },
     "blacklists": [
 	"https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/dshield_7d.netset",
