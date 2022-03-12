@@ -100,41 +100,25 @@ bool Configuration::readConfigFile(char *path) {
   if(all_tcp_ports) trace->traceEvent(TRACE_INFO, "All TCP ports will be monitored");
   if(all_udp_ports) trace->traceEvent(TRACE_INFO, "All UDP ports will be monitored");
 
-
   std::string json_policy_str = default_policy == MARKER_DROP ? "drop" : "pass";
 
   if(!root["policy"].empty() && !root["policy"][json_policy_str].empty()) {
 
       Json::Value json_policy_obj = root["policy"][json_policy_str];
+      std::string json_list_str = json_policy_str == "drop" ? "_whitelist" : "_blacklist";
       int counter = 2;
-      do {
+      do { 
         std::string json_value_str = counter == 2 ? "countries" : "continents";
-        
-        if(json_policy_str == "drop") { /* parsing only whitelists */
-          
-          if(json_policy_obj[json_value_str+"_whitelist"].empty()) {
-            trace->traceEvent(TRACE_INFO, "Missing %s whitelist from %s", json_value_str.c_str(), path);
-          } else {
-            for(Json::Value::ArrayIndex i = 0; i != json_policy_obj[json_value_str+"_whitelist"].size(); i++) {
-        std::string ctry_cont = json_policy_obj[json_value_str+"_whitelist"][i].asString();
+        if(json_policy_obj[json_value_str+json_list_str].empty()) {
+          trace->traceEvent(TRACE_INFO, "Missing %s from %s", (json_value_str+json_list_str).c_str(), path);
+        } else {
+          for(Json::Value::ArrayIndex i = 0; i != json_policy_obj[json_value_str+json_list_str].size(); i++) {
+            std::string ctry_cont = json_policy_obj[json_value_str+json_list_str][i].asString();
 
-        trace->traceEvent(TRACE_INFO, "Adding %s to %s whitelist", ctry_cont.c_str(), json_value_str.c_str());
-        ctrs_conts[ctry_cont2u16((char*)ctry_cont.c_str())] = MARKER_PASS;
-            }
-          }
-        } else { /* parsing only blacklists */
-          if(json_policy_obj[json_value_str+"_blacklist"].empty()) {
-            trace->traceEvent(TRACE_INFO, "Missing %s blacklist from %s", json_value_str.c_str(), path);
-          } else {
-            for(Json::Value::ArrayIndex i = 0; i != json_policy_obj[json_value_str+"_blacklist"].size(); i++) {
-        std::string ctry_cont = json_policy_obj[json_value_str+"_blacklist"][i].asString();
-
-        trace->traceEvent(TRACE_INFO, "Adding %s to %s blacklist", ctry_cont.c_str(), json_value_str.c_str());
-        ctrs_conts[ctry_cont2u16((char*)ctry_cont.c_str())] = MARKER_DROP;
-            }
+            trace->traceEvent(TRACE_INFO, "Adding %s to %s", ctry_cont.c_str(), (json_value_str+json_list_str).c_str());
+            ctrs_conts[ctry_cont2u16((char*)ctry_cont.c_str())] = json_policy_str == "drop" ? MARKER_PASS : MARKER_DROP;
           }
         }
-
       }while(--counter);
   }
 
