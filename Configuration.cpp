@@ -129,8 +129,12 @@ bool Configuration::readConfigFile(char *path) {
         if(!root["policy"][drop_or_pass][wb_list].empty()){
             for(Json::Value::ArrayIndex i = 0; i != root["policy"][drop_or_pass][wb_list].size(); i++){
               std::string ctry_cont = root["policy"][drop_or_pass][wb_list][i].asString();
+              ctrs_conts[ctry_cont2u16((char*)ctry_cont.c_str())] = marker;
+
+               trace->traceEvent(TRACE_INFO, "Adding %s to %s", ctry_cont, wb_list);
             }
         }else {
+          trace->traceEvent(TRACE_INFO, "Missing %s from %s", wb_list, path);
         }
       } 
     }
