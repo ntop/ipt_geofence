@@ -100,33 +100,41 @@ bool Configuration::readConfigFile(char *path) {
   if(all_udp_ports) trace->traceEvent(TRACE_INFO, "All UDP ports will be monitored");
 
 
-  int counter = 2;
+  int counter = 4;
   do {
-  std::string json_value_str = counter == 2 ? "countries" : "continents";
-  if(!root[json_value_str].empty()) {
-    if(root[json_value_str]["whitelist"].empty()) {
-      trace->traceEvent(TRACE_INFO, "Missing %s from %s", "whitelist", path);
-    } else {
-      for(Json::Value::ArrayIndex i = 0; i != root[json_value_str]["whitelist"].size(); i++) {
-	std::string ctry_cont = root[json_value_str]["whitelist"][i].asString();
+    std::string drop_or_pass; //drop or pass
+    std::string wb_list; //the value can be one of the lists(black or white)
+    int marker; 
 
-	trace->traceEvent(TRACE_INFO, "Adding %s to %s whitelist", ctry_cont.c_str(), json_value_str.c_str());
-	ctrs_conts[ctry_cont2u16((char*)ctry_cont.c_str())] = MARKER_PASS;
-      }
+    if(!(counter%2)){ 
+      drop_or_pass = "drop";
+      marker = MARKER_PASS;
+      if(counter == 4)
+        wb_list = "countries_whitelist";
+      else
+        wb_list = "continents_whitelist";
+    }
+    else{
+      drop_or_pass = "pass";
+      marker = MARKER_DROP;
+      if(counter == 3)
+        wb_list = "countries_blacklist";
+      else
+        wb_list = "continents_blacklist";
     }
 
-    if(root[json_value_str]["blacklist"].empty()) {
-      trace->traceEvent(TRACE_INFO, "Missing %s from %s", "blacklist", path);
-    } else {
-      for(Json::Value::ArrayIndex i = 0; i != root[json_value_str]["blacklist"].size(); i++) {
-	std::string ctry_cont = root[json_value_str]["blacklist"][i].asString();
 
-	trace->traceEvent(TRACE_INFO, "Adding %s to %s blacklist", ctry_cont.c_str(), json_value_str.c_str());
-	ctrs_conts[ctry_cont2u16((char*)ctry_cont.c_str())] = MARKER_DROP;
-      }
+    if(!root["policy"].empty()) {
+      if(!root["policy"][drop_or_pass].empty()) {
+        if(!root["policy"][drop_or_pass][wb_list].empty()){
+            for(Json::Value::ArrayIndex i = 0; i != root["policy"][drop_or_pass][wb_list].size(); i++){
+              std::string ctry_cont = root["policy"][drop_or_pass][wb_list][i].asString();
+            }
+        }else {
+        }
+      } 
     }
-  }
-  } while(--counter);
+  } while(--counter);  
 
   if(!root["blacklists"].empty()) {
     for(Json::Value::ArrayIndex i = 0; i != root["blacklists"].size(); i++) {
