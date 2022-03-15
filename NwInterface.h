@@ -36,9 +36,9 @@ class NwInterface {
   GeoIP *geoip;
   
   Marker makeVerdict(u_int8_t proto, u_int16_t vlanId,
-		     u_int32_t saddr, u_int16_t sport,
-		     u_int32_t daddr, u_int16_t dport
-         const char *src, const char *dst,
+		     u_int16_t sport,
+		     u_int16_t dport,
+         char *src, char *dst,
          bool ipv4, bool ipv6);
   const char* getProtoName(u_int8_t proto);
   bool isPrivateIPv4(u_int32_t addr /* network byte order */);
