@@ -37,9 +37,12 @@ class NwInterface {
   
   Marker makeVerdict(u_int8_t proto, u_int16_t vlanId,
 		     u_int32_t saddr, u_int16_t sport,
-		     u_int32_t daddr, u_int16_t dport);
+		     u_int32_t daddr, u_int16_t dport
+         const char *src, const char *dst,
+         bool ipv4, bool ipv6);
   const char* getProtoName(u_int8_t proto);
   bool isPrivateIPv4(u_int32_t addr /* network byte order */);
+  bool isPrivateIPv6(const char *ip6addr);
   
  public:
   NwInterface(u_int nf_device_id, Configuration *_c, GeoIP *_g);

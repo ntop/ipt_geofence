@@ -151,9 +151,6 @@ void NwInterface::packetPollLoop() {
 
 /* **************************************************** */
 
-#include <inttypes.h>
-#include <netinet/ip6.h>
-
 Marker NwInterface::dissectPacket(const u_char *payload, u_int payload_len) {
   /* We can see only IP addresses */
   u_int16_t ip_offset = 0, vlan_id = 0 /* FIX */;
@@ -255,24 +252,12 @@ bool NwInterface::isPrivateIPv4(u_int32_t addr /* network byte order */) {
     return(false);
 }
 
-// Marker NwInterface::parseIP6(
-//   in6_addr saddr, u_int16_t sport,
-//   in6_addr daddr, u_int16_t dport){
+bool NwInterface::isPrivateIPv6(const char *ip6addr) {
+  in6_addr a = inet6_rth_getaddr(ip6addr,0);
+  bool isUniqueLocal = a.s6_addr == (u_int8_t)253 || a.s6_addr == (u_int8_t)252;
+  return isUniqueLocal || IN6_IS_ADDR_LINKLOCAL(ip6addr);
+}
 
-//   // ipv6 addresses stringification
-//   char src[INET6_ADDRSTRLEN], dst[INET6_ADDRSTRLEN];
-//   inet_ntop(AF_INET6, &(saddr),src,INET6_ADDRSTRLEN); // TODO any '\0' i should worry about?
-//   inet_ntop(AF_INET6, &(daddr),dst,INET6_ADDRSTRLEN);
-
-//   // TODO check if src|dst is Blacklisted
-  
-//   bool src_private = false, dst_private = false;
-//   // src_private = isPrivateIPv6(src); // TODO
-//   // dst_private = isPrivateIPv6(dst); // TODO
-
-//   return makeVerdict
-
-// }
 
 /* **************************************************** */
 
@@ -280,24 +265,21 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
 				u_int32_t saddr /* network byte order */,
 				u_int16_t sport /* network byte order */,
 				u_int32_t daddr /* network byte order */,
-				u_int16_t dport /* network byte order */) {
+				u_int16_t dport /* network byte order */,
+        const char *src_host, const char *dst_host,
+        bool ipv4, bool ipv6) {
   struct in_addr in;
   char *host, src_host[32], dst_host[32], src_ctry[3]={'\0'}, dst_ctry[3]={'\0'},
    src_cont[3]={'\0'}, dst_cont[3]={'\0'} ;
   const char *proto_name = getProtoName(proto);
-  bool pass_local = true, saddr_private = isPrivateIPv4(saddr), daddr_private = isPrivateIPv4(daddr);;
+  bool pass_local = true,
+    saddr_private = ipv4 ? isPrivateIPv4(saddr) : (ipv6 ? isPrivateIPv6(src) : false),
+    daddr_private = ipv4 ? isPrivateIPv4(saddr) : (ipv6 ? isPrivateIPv6(dst) : false);
   Marker m, src_marker, dst_marker;
   struct in_addr addr;
 
-  in.s_addr = saddr;
-  host = inet_ntoa(in);
-  strncpy(src_host, host, sizeof(src_host)-1);
-
-  in.s_addr = daddr;
-  host = inet_ntoa(in);
-  strncpy(dst_host, host, sizeof(dst_host)-1);
-
   /* Check if sender/recipient are blacklisted */
+  if (ipv4){
   addr.s_addr = saddr;
   if((!saddr_private) && conf->isBlacklistedIPv4(&addr)) {
     trace->traceEvent(TRACE_WARNING,
@@ -317,6 +299,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
 		      src_host, sport,
 		      dst_host, dport);
     return(MARKER_DROP);
+  }
   }
   
   sport = ntohs(sport), dport = ntohs(dport);
