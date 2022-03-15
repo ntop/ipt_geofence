@@ -151,29 +151,48 @@ void NwInterface::packetPollLoop() {
 
 /* **************************************************** */
 
+#include <inttypes.h>
+#include <netinet/ip6.h>
+
 Marker NwInterface::dissectPacket(const u_char *payload, u_int payload_len) {
   /* We can see only IP addresses */
   u_int16_t ip_offset = 0, vlan_id = 0 /* FIX */;
 
-  switch((payload[ip_offset] & 0xf0) >> 4) {
-  case 4:
-    /* OK */
-    break;
-  default:
-    return(MARKER_PASS); /* Pass */
-  }
 
   if(payload_len >= ip_offset) {
     struct iphdr *iph = (struct iphdr *) &payload[ip_offset];
 
-    if(iph->version != 4) {
-      /* This is not IPv4 */
+    struct tcphdr *tcph = NULL;
+    struct udphdr *udph = NULL;
+    u_int16_t src_port, dst_port, ip_payload_offset = 40 /* ipv6 is 40B long */;
+    
+    if(iph->version == 6) {
+
+      struct ip6_hdr *iph = (struct ip6_hdr *) &payload[ip_offset];
+      switch (iph->ip6_nxt) {
+        case IPPROTO_UDP: 
+          tcph = (struct tcphdr*)(iph + ip_payload_offset);
+          src_port = tcph->source, dst_port = tcph->dest;
+          break;
+        case IPPROTO_TCP:
+          udph = (struct udphdr*)(iph + ip_payload_offset);
+          src_port = udph->source, dst_port = udph->dest;
+          break;
+        default:
+          // we do not care about ports in other protocols
+          src_port = dst_port = 0;
+      }
+
+      // ipv6 address stringification
+      char src[INET6_ADDRSTRLEN], dst[INET6_ADDRSTRLEN];
+      inet_ntop(AF_INET6, &(iph->ip6_src),src,INET6_ADDRSTRLEN);
+      inet_ntop(AF_INET6, &(iph->ip6_src),dst,INET6_ADDRSTRLEN);
+      trace->traceEvent (TRACE_DEBUG, "\t%s : %u\t%s : %u", src , src_port, dst, dst_port);
+      
       return(MARKER_PASS); /* TODO */
-    } else {
+    } 
+    else if (iph->version == 4) {
       u_int8_t *l4;
-      struct tcphdr *tcph;
-      struct udphdr *udph;
-      u_int16_t src_port, dst_port;
       u_int8_t l4_proto, frag_off = ntohs(iph->frag_off);
 
       if((iph->protocol == IPPROTO_UDP) && ((frag_off & 0x3FFF /* IP_MF | IP_OFFSET */ ) != 0))
@@ -203,7 +222,7 @@ Marker NwInterface::dissectPacket(const u_char *payload, u_int payload_len) {
 			 iph->daddr, dst_port));
     }
   }
-
+  // else
   return(MARKER_PASS);
 }
 
@@ -235,6 +254,25 @@ bool NwInterface::isPrivateIPv4(u_int32_t addr /* network byte order */) {
   else
     return(false);
 }
+
+// Marker NwInterface::parseIP6(
+//   in6_addr saddr, u_int16_t sport,
+//   in6_addr daddr, u_int16_t dport){
+
+//   // ipv6 addresses stringification
+//   char src[INET6_ADDRSTRLEN], dst[INET6_ADDRSTRLEN];
+//   inet_ntop(AF_INET6, &(saddr),src,INET6_ADDRSTRLEN); // TODO any '\0' i should worry about?
+//   inet_ntop(AF_INET6, &(daddr),dst,INET6_ADDRSTRLEN);
+
+//   // TODO check if src|dst is Blacklisted
+  
+//   bool src_private = false, dst_private = false;
+//   // src_private = isPrivateIPv6(src); // TODO
+//   // dst_private = isPrivateIPv6(dst); // TODO
+
+//   return makeVerdict
+
+// }
 
 /* **************************************************** */
 
@@ -324,7 +362,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
   host = inet_ntoa(in);
   strncpy(dst_host, host, sizeof(dst_host)-1);
 
-  if((!daddr_private) && (geoip->lookup(host = inet_ntoa(in), dst_ctry, sizeof(dst_ctry), dst_cont, sizeof(dst_cont)))) {
+  if((!daddr_private) && (geoip->lookup(host, dst_ctry, sizeof(dst_ctry), dst_cont, sizeof(dst_cont)))) {
     dst_marker = conf->getMarker(dst_ctry, dst_cont);
     pass_local = false;
   } else {
