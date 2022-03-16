@@ -247,13 +247,14 @@ bool NwInterface::isPrivateIPv6(const char *ip6addr) {
   struct in6_addr a;
   inet_pton(AF_INET6,ip6addr,&a);
 
-  for(size_t l=0; l < 8; l++) // change byte ordering
-      a.s6_addr16[l] = ntohs(a.s6_addr16[l]);
+  // We use only the 32bit structure
+  for(size_t l=0; l < 4; l++){ // change byte ordering
+      a.s6_addr32[l] = ntohl(a.s6_addr32[l]);
+  }
   
-  bool is_link_local = (a.s6_addr32[0] & (0xffc00000)) == (0xfe800000);
-  bool is_unique_local = a.s6_addr[0] == (u_int8_t)253 || a.s6_addr[0] == (u_int8_t)252;
-  if (is_unique_local || is_link_local) 
-    trace->traceEvent(TRACE_WARNING,"Address %s is private", ip6addr);
+  bool is_link_local = (a.s6_addr32[0] & (0xffc00000)) == (0xfe800000); // check the first 10 bits
+  bool is_unique_local = (a.s6_addr32[0] & (0xfe000000)) == (0xfc000000); // check the first 7 bits 
+  
   return is_unique_local || is_link_local;
 }
 
@@ -344,8 +345,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
     /* Unknown or private IP address  */
     // dst_marker = MARKER_PASS;
   }
-  // trace->traceEvent(TRACE_WARNING,"%u %u",dst_marker,src_marker); // TODO remove this
-  trace->traceEvent(TRACE_WARNING,"%u %u",saddr_private,daddr_private); // TODO remove this
+  
   if((conf->isIgnoredPort(sport) || conf->isIgnoredPort(dport))
      || ((src_marker == MARKER_PASS) && (dst_marker == MARKER_PASS))) {
     m = MARKER_PASS;
