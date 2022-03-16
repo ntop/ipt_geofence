@@ -306,8 +306,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
   
   sport = ntohs(sport), dport = ntohs(dport);
 
-  // trace->traceEvent(TRACE_NORMAL, "Processing %u -> %u", sport, dport);
-  
+  /* Step 2 - For TCP/UDP ignore traffic for non-monitored ports */
   switch(proto) {
   case IPPROTO_TCP:
     if((conf->isMonitoredTCPPort(sport)) || conf->isMonitoredTCPPort(dport))
@@ -335,7 +334,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
     pass_local = false;
   } else {
     /* Unknown or private IP address  */
-    // src_marker = MARKER_PASS;
+    src_marker = MARKER_PASS;
   }
 
   if((!daddr_private) && (geoip->lookup(dst_host, dst_ctry, sizeof(dst_ctry), dst_cont, sizeof(dst_cont)))) {
@@ -343,9 +342,11 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
     pass_local = false;
   } else {
     /* Unknown or private IP address  */
-    // dst_marker = MARKER_PASS;
+    dst_marker = MARKER_PASS;
   }
-  
+
+  /* Final step: compute the flow verdict */
+
   if((conf->isIgnoredPort(sport) || conf->isIgnoredPort(dport))
      || ((src_marker == MARKER_PASS) && (dst_marker == MARKER_PASS))) {
     m = MARKER_PASS;
