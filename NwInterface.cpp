@@ -246,10 +246,15 @@ bool NwInterface::isPrivateIPv4(u_int32_t addr /* network byte order */) {
 bool NwInterface::isPrivateIPv6(const char *ip6addr) {
   struct in6_addr a;
   inet_pton(AF_INET6,ip6addr,&a);
-  bool isUniqueLocal = a.s6_addr[0] == (u_int8_t)253 || a.s6_addr[0] == (u_int8_t)252;
-  if (isUniqueLocal || IN6_IS_ADDR_LINKLOCAL(ip6addr)) 
+
+  for(size_t l=0; l < 8; l++) // change byte ordering
+      a.s6_addr16[l] = ntohs(a.s6_addr16[l]);
+  
+  bool is_link_local = (a.s6_addr32[0] & (0xffc00000)) == (0xfe800000);
+  bool is_unique_local = a.s6_addr[0] == (u_int8_t)253 || a.s6_addr[0] == (u_int8_t)252;
+  if (is_unique_local || is_link_local) 
     trace->traceEvent(TRACE_WARNING,"Address %s is private", ip6addr);
-  return isUniqueLocal || IN6_IS_ADDR_LINKLOCAL(ip6addr);
+  return is_unique_local || is_link_local;
 }
 
 
