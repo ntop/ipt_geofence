@@ -104,7 +104,7 @@ bool Configuration::readConfigFile(char *path) {
   do {
     std::string drop_or_pass; //drop or pass
     std::string wb_list; //the value can be one of the lists(black or white)
-    int marker; 
+    Marker marker; 
 
     if(!(counter%2)){ 
       drop_or_pass = "drop";
