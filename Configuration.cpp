@@ -52,8 +52,8 @@ bool Configuration::readConfigFile(char *path) {
   } else
     nfq_queue_id = root["queue_id"].asUInt();
 
-  if(root["default_marker"].empty()) {
-    trace->traceEvent(TRACE_ERROR, "Missing %s from %s", "default_marker", path);
+  if(root["default_policy"].empty()) {
+    trace->traceEvent(TRACE_ERROR, "Missing %s from %s", "default_policy", path);
     return(false);
   } else {
     std::string m = root["default_marker"].asString();
@@ -123,7 +123,6 @@ bool Configuration::readConfigFile(char *path) {
         wb_list = "continents_blacklist";
     }
 
-
     if(!root["policy"].empty()) {
       if(!root["policy"][drop_or_pass].empty()) {
         if(!root["policy"][drop_or_pass][wb_list].empty()){
@@ -131,10 +130,10 @@ bool Configuration::readConfigFile(char *path) {
               std::string ctry_cont = root["policy"][drop_or_pass][wb_list][i].asString();
               ctrs_conts[ctry_cont2u16((char*)ctry_cont.c_str())] = marker;
 
-               trace->traceEvent(TRACE_INFO, "Adding %s to %s", ctry_cont, wb_list);
+               trace->traceEvent(TRACE_INFO, "Adding %s to %s", ctry_cont.c_str(), wb_list.c_str());
             }
         }else {
-          trace->traceEvent(TRACE_INFO, "Missing %s from %s", wb_list, path);
+          trace->traceEvent(TRACE_INFO, "Missing %s from %s", wb_list.c_str(), path);
         }
       } 
     }
