@@ -1,25 +1,27 @@
 {
-    "queue_id": 0,
-    "default_marker": "DROP",
-    "monitored_ports": {
-	"tcp": [ 22, 80, 443 ],
-	"udp": [ ],
-	"ignored_ports": [ 123 ]
-    },
-    "countries": {
-       "whitelist": [ "IT", "DE", "CH", "NL" ],
-       "blacklist": [ "RU", "BY" ]
-    },
-    "continents": {
-       "whitelist": [ "NA" ],
-       "blacklist": [ "EU" ]
-    },
-    "blacklists": [
-	"https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/dshield_7d.netset",
-	"https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/alienvault_reputation.ipset",
-	"https://feodotracker.abuse.ch/downloads/ipblocklist_recommended.txt",
-	"https://rules.emergingthreats.net/fwrules/emerging-Block-IPs.txt",
-	"https://feodotracker.abuse.ch/downloads/ipblocklist.txt",
-	"https://sslbl.abuse.ch/blacklist/sslipblacklist.txt"
-    ]
+	"queue_id": 0,
+	"default_policy": "DROP",
+	"monitored_ports": {
+		"tcp": [22, 80, 443],
+		"udp": [],
+		"ignored_ports": [123]
+	},
+	"policy": {
+		"drop": {
+			"countries_whitelist": ["IT", "DE", "CH", "NL"],
+			"continents_whitelist": ["NA"]
+		},
+		"pass": {
+			"countries_blacklist": ["RU", "BY"],
+			"continents_blacklist": ["EU"]
+		}
+	},
+	"blacklists": [
+		"https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/dshield_7d.netset",
+		"https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/alienvault_reputation.ipset",
+		"https://feodotracker.abuse.ch/downloads/ipblocklist_recommended.txt",
+		"https://rules.emergingthreats.net/fwrules/emerging-Block-IPs.txt",
+		"https://feodotracker.abuse.ch/downloads/ipblocklist.txt",
+		"https://sslbl.abuse.ch/blacklist/sslipblacklist.txt"
+	]
 }
