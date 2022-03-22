@@ -31,16 +31,21 @@ class NwInterface {
   struct nfq_q_handle *queueHandle;
   int nf_fd;
   pthread_t pollLoop;
-  bool ifaceRunning; 
+  bool ifaceRunning;
   Configuration *conf;
   GeoIP *geoip;
-  
+
   Marker makeVerdict(u_int8_t proto, u_int16_t vlanId,
 		     u_int32_t saddr, u_int16_t sport,
 		     u_int32_t daddr, u_int16_t dport);
   const char* getProtoName(u_int8_t proto);
+  void logFlow(const char *proto_name,
+	       char *src_host, u_int16_t sport, char *src_country, char *src_continent, bool src_blacklisted,
+	       char *dst_host, u_int16_t dport, char *dst_country, char *dst_continent, bool dst_blacklisted,
+	       bool pass_verdict);
+
   bool isPrivateIPv4(u_int32_t addr /* network byte order */);
-  
+
  public:
   NwInterface(u_int nf_device_id, Configuration *_c, GeoIP *_g);
   ~NwInterface();
@@ -56,4 +61,3 @@ class NwInterface {
 };
 
 #endif /* _NETWORK_INTERFACE_H_ */
-
