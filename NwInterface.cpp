@@ -278,7 +278,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
 				u_int32_t daddr /* network byte order */,
 				u_int16_t dport /* network byte order */) {
   struct in_addr in;
-  char *host, src_host[32], dst_host[32], src_ctry[3]={'\0'}, dst_ctry[3]={'\0'},
+  char *host, src_host[32], dst_host[32], src_country[3]={'\0'}, dst_country[3]={'\0'},
    src_cont[3]={'\0'}, dst_cont[3]={'\0'} ;
   const char *proto_name = getProtoName(proto);
   bool pass_local = true, saddr_private = isPrivateIPv4(saddr), daddr_private = isPrivateIPv4(daddr);;
@@ -297,8 +297,8 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
   addr.s_addr = saddr;
   if((!saddr_private) && conf->isBlacklistedIPv4(&addr)) {
     logFlow(proto_name,
-	    src_host, sport, src_ctry, src_cont, true,
-	    dst_host, dport, dst_ctry, dst_cont, false,
+	    src_host, sport, src_country, src_cont, true,
+	    dst_host, dport, dst_country, dst_cont, false,
 	    false /* drop */);
 
     return(MARKER_DROP);
@@ -307,8 +307,8 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
   addr.s_addr = daddr;
   if((!daddr_private) && conf->isBlacklistedIPv4(&addr)) {
     logFlow(proto_name,
-	    src_host, sport, src_ctry, src_cont, false,
-	    dst_host, dport, dst_ctry, dst_cont, true,
+	    src_host, sport, src_country, src_cont, false,
+	    dst_host, dport, dst_country, dst_cont, true,
 	    false /* drop */);
 
     return(MARKER_DROP);
@@ -344,8 +344,8 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
   host = inet_ntoa(in);
   strncpy(src_host, host, sizeof(src_host)-1);
 
-  if((!saddr_private) && (geoip->lookup(host, src_ctry, sizeof(src_ctry), src_cont, sizeof(src_cont)))) {
-    src_marker = conf->getMarker(src_ctry,src_cont);
+  if((!saddr_private) && (geoip->lookup(host, src_country, sizeof(src_country), src_cont, sizeof(src_cont)))) {
+    src_marker = conf->getMarker(src_country, src_cont);
     pass_local = false;
   } else {
     /* Unknown or private IP address  */
@@ -357,8 +357,8 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
   host = inet_ntoa(in);
   strncpy(dst_host, host, sizeof(dst_host)-1);
 
-  if((!daddr_private) && (geoip->lookup(host = inet_ntoa(in), dst_ctry, sizeof(dst_ctry), dst_cont, sizeof(dst_cont)))) {
-    dst_marker = conf->getMarker(dst_ctry, dst_cont);
+  if((!daddr_private) && (geoip->lookup(host = inet_ntoa(in), dst_country, sizeof(dst_country), dst_cont, sizeof(dst_cont)))) {
+    dst_marker = conf->getMarker(dst_country, dst_cont);
     pass_local = false;
   } else {
     /* Unknown or private IP address  */
@@ -371,15 +371,15 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
     m = MARKER_PASS;
 
     logFlow(proto_name,
-	    src_host, sport, src_ctry, src_cont, false,
-	    dst_host, dport, dst_ctry, dst_cont, false,
+	    src_host, sport, src_country, src_cont, false,
+	    dst_host, dport, dst_country, dst_cont, false,
 	    true /* pass */);
   } else {
     m = MARKER_DROP;
 
     logFlow(proto_name,
-	    src_host, sport, src_ctry, src_cont, false,
-	    dst_host, dport, dst_ctry, dst_cont, false,
+	    src_host, sport, src_country, src_cont, false,
+	    dst_host, dport, dst_country, dst_cont, false,
 	    false /* drop */);
   }
 

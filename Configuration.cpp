@@ -107,7 +107,7 @@ bool Configuration::readConfigFile(char *path) {
       Json::Value json_policy_obj = root["policy"][json_policy_str];
       std::string json_list_str = json_policy_str == "drop" ? "_whitelist" : "_blacklist";
       int counter = 2;
-      do { 
+      do {
         std::string json_value_str = counter == 2 ? "countries" : "continents";
         if(json_policy_obj[json_value_str+json_list_str].empty()) {
           trace->traceEvent(TRACE_INFO, "Missing %s from %s", (json_value_str+json_list_str).c_str(), path);
@@ -139,14 +139,15 @@ Marker Configuration::getMarker(char *country, char *continent) {
   u_int16_t id = ctry_cont2u16(country);
   std::unordered_map<u_int16_t, Marker>::iterator it = ctrs_conts.find(id);
 
-  if(it != ctrs_conts.end()) 
+  if(it != ctrs_conts.end())
     return(it->second); // country found
 
   id = ctry_cont2u16(continent);
   it = ctrs_conts.find(id);
-  if(it != ctrs_conts.end()) 
+
+  if(it != ctrs_conts.end())
     return(it->second); // continent found
-  
+
   return(default_policy);
 }
 
