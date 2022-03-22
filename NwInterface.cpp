@@ -304,7 +304,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
     break;
   }
 
-  src_marker = dst_marker = conf->getDefaultMarker();
+  src_marker = dst_marker = conf->getDefaultPolicy();
 
   /* Step 3 - For monitored TCP/UDP ports (and ICMP) check the country blacklist */
   in.s_addr = saddr;
