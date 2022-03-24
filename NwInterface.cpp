@@ -229,7 +229,7 @@ const char* NwInterface::getProtoName(u_int8_t proto) {
 
 bool NwInterface::isPrivateIPv4(u_int32_t addr /* network byte order */) {
   u_int32_t a = ntohl(addr);
-  
+
   if(((a & 0xFF000000) == 0x0A000000 /* 10.0.0.0/8 */)
      || ((a & 0xFFF00000) == 0xAC100000 /* 172.16.0.0/12 */)
      || ((a & 0xFFFF0000) == 0xC0A80000 /* 192.168.0.0/16 */)
@@ -261,6 +261,40 @@ bool NwInterface::isPrivateIPv6(const char *ip6addr) {
 
 /* **************************************************** */
 
+void NwInterface::logFlow(const char *proto_name,
+			  char *src_host, u_int16_t sport, char *src_country, char *src_continent, bool src_blacklisted,
+			  char *dst_host, u_int16_t dport, char *dst_country, char *dst_continent, bool dst_blacklisted,
+			  bool pass_verdict) {
+  Json::Value root;
+  std::string json_txt;
+  Json::FastWriter writer;
+  
+  root["proto"] = proto_name;
+
+  root["src"]["host"] = src_host;
+  root["src"]["port"] = sport;
+  if(src_country && (src_country[0] != '\0')) root["src"]["country"] = src_country;
+  if(src_continent && (src_continent[0] != '\0')) root["src"]["continent"] = src_continent;
+  if(src_blacklisted) root["src"]["blacklisted"] = src_blacklisted;
+
+  root["dst"]["host"] = dst_host;
+  root["dst"]["port"] = dport;
+  if(dst_country && (dst_country[0] != '\0')) root["dst"]["country"] = dst_country;
+  if(dst_continent && (dst_continent[0] != '\0')) root["dst"]["continent"] = dst_continent;
+  if(dst_blacklisted) root["dst"]["blacklisted"] = dst_blacklisted;
+  
+  root["verdict"] = pass_verdict ? "pass" : "drop";
+
+  json_txt = writer.write(root);
+
+  if(pass_verdict)
+    trace->traceEvent(TRACE_INFO, "%s", json_txt.c_str());
+  else
+    trace->traceEvent(TRACE_WARNING, "%s", json_txt.c_str());
+}
+
+/* **************************************************** */
+
 Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
 				u_int16_t sport /* network byte order */,
 				u_int16_t dport /* network byte order */,
@@ -283,27 +317,27 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
   /* Check if sender/recipient are blacklisted */
   if (ipv4){
   in.s_addr = saddr;
+  /* Step 1 - For all ports/protocols, check if sender/recipient are blacklisted and if so, block this flow */
   if((!saddr_private) && conf->isBlacklistedIPv4(&in)) {
-    trace->traceEvent(TRACE_WARNING,
-		      "%s %s :%u (Blacklist) -> %s :%u [DROP]",
-		      proto_name,
-		      src_host, sport,
-		      dst_host, dport);
+    logFlow(proto_name,
+	    src_host, sport, src_country, src_cont, true,
+	    dst_host, dport, dst_country, dst_cont, false,
+	    false /* drop */);
 
     return(MARKER_DROP);
   }
 
   in.s_addr = daddr;
   if((!daddr_private) && conf->isBlacklistedIPv4(&in)) {
-    trace->traceEvent(TRACE_WARNING,
-		      "%s %s :%u -> %s :%u (Blacklist) [DROP]",
-		      proto_name,
-		      src_host, sport,
-		      dst_host, dport);
+    logFlow(proto_name,
+	    src_host, sport, src_country, src_cont, false,
+	    dst_host, dport, dst_country, dst_cont, true,
+	    false /* drop */);
+
     return(MARKER_DROP);
   }
   }
-  
+
   sport = ntohs(sport), dport = ntohs(dport);
 
   /* Step 2 - For TCP/UDP ignore traffic for non-monitored ports */
@@ -327,8 +361,9 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
     break;
   }
 
-  m = src_marker = dst_marker = conf->getDefaultMarker();
+  m = src_marker = dst_marker = conf->getDefaultPolicy();
 
+  /* Step 3 - For monitored TCP/UDP ports (and ICMP) check the country blacklist */
   if((!saddr_private) && (geoip->lookup(src_host, src_ctry, sizeof(src_ctry), src_cont, sizeof(src_cont)))) {
     src_marker = conf->getMarker(src_ctry,src_cont);
     pass_local = false;
@@ -350,21 +385,19 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
   if((conf->isIgnoredPort(sport) || conf->isIgnoredPort(dport))
      || ((src_marker == MARKER_PASS) && (dst_marker == MARKER_PASS))) {
     m = MARKER_PASS;
-    
-    trace->traceEvent(TRACE_INFO,
-		      "%s %s :%u %s %s -> %s :%u %s %s [PASS]",
-		      proto_name,
-		      src_host, sport, src_ctry, src_cont,
-		      dst_host, dport, dst_ctry, dst_cont);
+
+    logFlow(proto_name,
+	    src_host, sport, src_country, src_cont, false,
+	    dst_host, dport, dst_country, dst_cont, false,
+	    true /* pass */);
   } else {
     m = MARKER_DROP;
 
-    trace->traceEvent(TRACE_WARNING,
-		      "%s %s :%u %s %s -> %s :%u %s %s [DROP]",
-		      proto_name,
-		      src_host, sport, src_ctry, src_cont,
-		      dst_host, dport, dst_ctry, dst_cont);
+    logFlow(proto_name,
+	    src_host, sport, src_country, src_cont, false,
+	    dst_host, dport, dst_country, dst_cont, false,
+	    false /* drop */);
   }
-  
+
   return(m);
 }
