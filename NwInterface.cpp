@@ -161,8 +161,8 @@ Marker NwInterface::dissectPacket(const u_char *payload, u_int payload_len) {
 
     struct tcphdr *tcph = NULL;
     struct udphdr *udph = NULL;
-    u_int16_t src_port, dst_port, ip_payload_offset = 40 /* ipv6 is 40B long */;
-    u_int8_t proto;
+    u_int16_t src_port, dst_port;
+    u_int8_t proto, ip_payload_offset = 40 /* ipv6 is 40B long */;
     char src[INET6_ADDRSTRLEN] = {}, dst[INET6_ADDRSTRLEN] = {};
 
     if (iph->version == 6) {
@@ -173,9 +173,7 @@ Marker NwInterface::dissectPacket(const u_char *payload, u_int payload_len) {
       // ipv6 address stringification
       inet_ntop(AF_INET6, &(ip6h->ip6_src), src, sizeof(src));
       inet_ntop(AF_INET6, &(ip6h->ip6_src), dst, sizeof(dst));
-      // trace->traceEvent(TRACE_DEBUG, "\t%s : %u\t%s : %u", src, src_port, dst, dst_port);
 
-      // return (MARKER_PASS); /* TODO */
     } else if (iph->version == 4) {
       ipv4 = true;
       u_int8_t frag_off = ntohs(iph->frag_off);
@@ -194,13 +192,15 @@ Marker NwInterface::dissectPacket(const u_char *payload, u_int payload_len) {
       return (MARKER_PASS);
     }
 
+    u_int8_t *nxt = ((u_int8_t *)iph + ip_payload_offset);
+
     switch (proto) {
-      case IPPROTO_UDP:
-        tcph = (struct tcphdr *)(iph + ip_payload_offset);
+      case IPPROTO_TCP:
+        tcph = (struct tcphdr *)(nxt);
         src_port = tcph->source, dst_port = tcph->dest;
         break;
-      case IPPROTO_TCP:
-        udph = (struct udphdr *)(iph + ip_payload_offset);
+      case IPPROTO_UDP:
+        udph = (struct udphdr *)(nxt);
         src_port = udph->source, dst_port = udph->dest;
         break;
       default:
@@ -315,6 +315,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
     saddr_private = (ipv4 ? isPrivateIPv4(saddr) : isPrivateIPv6(src_host)),
     daddr_private = (ipv4 ? isPrivateIPv4(saddr) : isPrivateIPv6(dst_host));
   Marker m, src_marker, dst_marker;
+  sport = ntohs(sport), dport = ntohs(dport);
 
   /* Check if sender/recipient are blacklisted */
   if (ipv4){
@@ -340,7 +341,6 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
   }
   }
 
-  sport = ntohs(sport), dport = ntohs(dport);
 
   /* Step 2 - For TCP/UDP ignore traffic for non-monitored ports */
   switch(proto) {
