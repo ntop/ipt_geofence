@@ -1,7 +1,8 @@
 /var/log/ipt_geofence.log {
+        su root adm
 	daily
 	missingok
-	rotate 4
+	rotate 7
 	copytruncate
 }
 

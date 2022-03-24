@@ -1,6 +1,6 @@
 {
 	"queue_id": 0,
-	"default_policy": "PASS",
+	"default_policy": "DROP",
 	"monitored_ports": {
 		"tcp": [22, 80, 443],
 		"udp": [],
@@ -13,7 +13,7 @@
 		},
 		"pass": {
 			"countries_blacklist": ["RU", "BY"],
-			"continents_blacklist": ["EU"]
+			"continents_blacklist": []
 		}
 	},
 	"blacklists": [
