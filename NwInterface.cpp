@@ -228,16 +228,15 @@ const char* NwInterface::getProtoName(u_int8_t proto) {
 /* **************************************************** */
 
 bool NwInterface::isPrivateIPv4(u_int32_t addr /* network byte order */) {
-  u_int32_t a = ntohl(addr);
 
-  if(((a & 0xFF000000) == 0x0A000000 /* 10.0.0.0/8 */)
-     || ((a & 0xFFF00000) == 0xAC100000 /* 172.16.0.0/12 */)
-     || ((a & 0xFFFF0000) == 0xC0A80000 /* 192.168.0.0/16 */)
-     || ((a & 0xFF000000) == 0x7F000000 /* 127.0.0.0/8 */)
-     || ((a & 0xFFFF0000) == 0xA9FE0000 /* 169.254.0.0/16 Link-Local communication rfc3927 */)
-     || (a == 0xFFFFFFFF /* 255.255.255.255 */)
-     || (a == 0x0        /* 0.0.0.0 */)
-     || ((a & 0xF0000000) == 0xE0000000 /* 224.0.0.0/4 */))
+  if(((addr & 0xFF000000) == 0x0A000000 /* 10.0.0.0/8 */)
+     || ((addr & 0xFFF00000) == 0xAC100000 /* 172.16.0.0/12 */)
+     || ((addr & 0xFFFF0000) == 0xC0A80000 /* 192.168.0.0/16 */)
+     || ((addr & 0xFF000000) == 0x7F000000 /* 127.0.0.0/8 */)
+     || ((addr & 0xFFFF0000) == 0xA9FE0000 /* 169.254.0.0/16 Link-Local communication rfc3927 */)
+     || (addr == 0xFFFFFFFF /* 255.255.255.255 */)
+     || (addr == 0x0        /* 0.0.0.0 */)
+     || ((addr & 0xF0000000) == 0xE0000000 /* 224.0.0.0/4 */))
     return(true);
   else
     return(false);
@@ -300,6 +299,9 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
 				u_int16_t dport /* network byte order */,
         char *src_host, char *dst_host,
         bool ipv4, bool ipv6) {
+  // Step 0 - Check ip protocol
+  if (!(ipv4 || ipv6)) return (conf->getDefaultPolicy());
+
   struct in_addr in;
   char src_ctry[3]={}, dst_ctry[3]={}, src_cont[3]={}, dst_cont[3]={} ;
   const char *proto_name = getProtoName(proto);
@@ -310,8 +312,8 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
   u_int32_t saddr = ipv4 ? inet_addr(src_host) : 0;
   u_int32_t daddr = ipv4 ? inet_addr(dst_host) : 0;
   bool pass_local = true,
-    saddr_private = (ipv4 ? isPrivateIPv4(saddr) : (ipv6 ? isPrivateIPv6(src_host) : false)),
-    daddr_private = (ipv4 ? isPrivateIPv4(saddr) : (ipv6 ? isPrivateIPv6(dst_host) : false));
+    saddr_private = (ipv4 ? isPrivateIPv4(saddr) : isPrivateIPv6(src_host)),
+    daddr_private = (ipv4 ? isPrivateIPv4(saddr) : isPrivateIPv6(dst_host));
   Marker m, src_marker, dst_marker;
 
   /* Check if sender/recipient are blacklisted */
