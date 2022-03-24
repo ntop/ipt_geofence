@@ -57,4 +57,4 @@ iptables -t mangle -A OUTPUT      -p icmp --match mark --mark 0 -j NFQUEUE --que
 iptables -nvL -t mangle
 
 # Flush conntrack
-conntrack -F
+#conntrack -F
