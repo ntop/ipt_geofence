@@ -318,7 +318,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
     break;
 
   case IPPROTO_UDP:
-    if((!conf->isMonitoredUDPPort(sport)) || conf->isMonitoredUDPPort(dport))
+    if((conf->isMonitoredUDPPort(sport)) || conf->isMonitoredUDPPort(dport))
       ;
     else {
       trace->traceEvent(TRACE_INFO, "Ignoring UDP ports %u/%u", sport, dport);
