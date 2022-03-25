@@ -25,12 +25,12 @@ echo 1 > /proc/sys/net/ipv4/ip_forward
 echo 1 > /proc/sys/net/ipv6/conf/all/forwarding 
 
 IPTABLES="iptables"
+# We will execute this code using "ip6tables" instead of "iptables" the second time
+for i in {1,2}; do
+
 $IPTABLES -F
 $IPTABLES -t nat -F
 $IPTABLES -t mangle -F
-
-# We will execute this code using "ip6tables" instead of "iptables" the second time
-for i in {1,2}; do
 
 # Read CONNMARK and set it in mark
 # (A) For incoming packets
