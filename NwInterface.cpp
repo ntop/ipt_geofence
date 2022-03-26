@@ -172,7 +172,7 @@ Marker NwInterface::dissectPacket(const u_char *payload, u_int payload_len) {
 
       // ipv6 address stringification
       inet_ntop(AF_INET6, &(ip6h->ip6_src), src, sizeof(src));
-      inet_ntop(AF_INET6, &(ip6h->ip6_src), dst, sizeof(dst));
+      inet_ntop(AF_INET6, &(ip6h->ip6_dst), dst, sizeof(dst));
 
     } else if (iph->version == 4) {
       ipv4 = true;
