@@ -8,6 +8,7 @@
 # Locally generated packets: OUTPUT -> POSTROUTING
 #
 
+
 QUEUE_ID=0
 
 # Enable connection tracking in the kernel
@@ -21,40 +22,49 @@ conntrack -U --mark 0 > /dev/null 2>&1
 
 # Routing needed by DNAT (DNS)
 echo 1 > /proc/sys/net/ipv4/ip_forward
+echo 1 > /proc/sys/net/ipv6/conf/all/forwarding 
 
-iptables -F
-iptables -t nat -F
-iptables -t mangle -F
+IPTABLES="iptables"
+# We will execute this code using "ip6tables" instead of "iptables" the second time
+for i in {1,2}; do
+
+$IPTABLES -F
+$IPTABLES -t nat -F
+$IPTABLES -t mangle -F
 
 # Read CONNMARK and set it in mark
 # (A) For incoming packets
-iptables -t mangle -A PREROUTING -j CONNMARK --restore-mark
+$IPTABLES -t mangle -A PREROUTING -j CONNMARK --restore-mark
 # (B) For locally generated packets
-iptables -t mangle -A OUTPUT -j CONNMARK --restore-mark
+$IPTABLES -t mangle -A OUTPUT -j CONNMARK --restore-mark
 
 # Save CONNMARK (1st rule of POSTROUTING)
-iptables -t mangle -A POSTROUTING -j CONNMARK --save-mark
+$IPTABLES -t mangle -A POSTROUTING -j CONNMARK --save-mark
 
 # PASS (1)
-iptables -t mangle -A PREROUTING  --match mark --mark 1 -j ACCEPT
+$IPTABLES -t mangle -A PREROUTING  --match mark --mark 1 -j ACCEPT
 
 # DROP (2)
-iptables -t mangle -A PREROUTING  --match mark --mark 2 -j DROP
+$IPTABLES -t mangle -A PREROUTING  --match mark --mark 2 -j DROP
 
 # Send traffic to NFQUEUE
-iptables -t mangle -A PREROUTING  -p tcp --match mark --mark 0 -j NFQUEUE --queue-num $QUEUE_ID --queue-bypass
-iptables -t mangle -A OUTPUT      -p tcp --match mark --mark 0 -j NFQUEUE --queue-num $QUEUE_ID --queue-bypass
+$IPTABLES -t mangle -A PREROUTING  -p tcp --match mark --mark 0 -j NFQUEUE --queue-num $QUEUE_ID --queue-bypass
+$IPTABLES -t mangle -A OUTPUT      -p tcp --match mark --mark 0 -j NFQUEUE --queue-num $QUEUE_ID --queue-bypass
 
-iptables -t mangle -A PREROUTING  -p udp --match mark --mark 0 -j NFQUEUE --queue-num $QUEUE_ID --queue-bypass
-iptables -t mangle -A OUTPUT      -p udp --match mark --mark 0 -j NFQUEUE --queue-num $QUEUE_ID --queue-bypass
+$IPTABLES -t mangle -A PREROUTING  -p udp --match mark --mark 0 -j NFQUEUE --queue-num $QUEUE_ID --queue-bypass
+$IPTABLES -t mangle -A OUTPUT      -p udp --match mark --mark 0 -j NFQUEUE --queue-num $QUEUE_ID --queue-bypass
 
-iptables -t mangle -A OUTPUT      -p icmp --match mark --mark 0 -j NFQUEUE --queue-num $QUEUE_ID --queue-bypass
-iptables -t mangle -A OUTPUT      -p icmp --match mark --mark 0 -j NFQUEUE --queue-num $QUEUE_ID --queue-bypass
+$IPTABLES -t mangle -A OUTPUT      -p icmp --match mark --mark 0 -j NFQUEUE --queue-num $QUEUE_ID --queue-bypass
+$IPTABLES -t mangle -A OUTPUT      -p icmp --match mark --mark 0 -j NFQUEUE --queue-num $QUEUE_ID --queue-bypass
 
 ###################################################
 
 # Show all
-iptables -nvL -t mangle
+$IPTABLES -nvL -t mangle
+
+# Same code but using IPv6
+IPTABLES="ip6tables"
+done
 
 # Flush conntrack
 #conntrack -F

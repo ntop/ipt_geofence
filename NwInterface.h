@@ -36,8 +36,10 @@ class NwInterface {
   GeoIP *geoip;
 
   Marker makeVerdict(u_int8_t proto, u_int16_t vlanId,
-		     u_int32_t saddr, u_int16_t sport,
-		     u_int32_t daddr, u_int16_t dport);
+		     u_int16_t sport,
+		     u_int16_t dport,
+         char *src, char *dst,
+         bool ipv4, bool ipv6);
   const char* getProtoName(u_int8_t proto);
   void logFlow(const char *proto_name,
 	       char *src_host, u_int16_t sport, char *src_country, char *src_continent, bool src_blacklisted,
@@ -45,6 +47,7 @@ class NwInterface {
 	       bool pass_verdict);
 
   bool isPrivateIPv4(u_int32_t addr /* network byte order */);
+  bool isPrivateIPv6(const char *ip6addr);
 
  public:
   NwInterface(u_int nf_device_id, Configuration *_c, GeoIP *_g);

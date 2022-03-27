@@ -53,6 +53,9 @@
 #include <ndpi_api.h>
 #include <curl/curl.h>
 
+#include <inttypes.h>
+#include <netinet/ip6.h>
+
 #include <unordered_map>
 #include <fstream>
 #include <iostream>

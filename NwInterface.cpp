@@ -155,56 +155,63 @@ Marker NwInterface::dissectPacket(const u_char *payload, u_int payload_len) {
   /* We can see only IP addresses */
   u_int16_t ip_offset = 0, vlan_id = 0 /* FIX */;
 
-  switch((payload[ip_offset] & 0xf0) >> 4) {
-  case 4:
-    /* OK */
-    break;
-  default:
-    return(MARKER_PASS); /* Pass */
-  }
+  if (payload_len >= ip_offset) {
+    struct iphdr *iph = (struct iphdr *)&payload[ip_offset];
+    bool ipv4 = false, ipv6 = false;
 
-  if(payload_len >= ip_offset) {
-    struct iphdr *iph = (struct iphdr *) &payload[ip_offset];
+    struct tcphdr *tcph = NULL;
+    struct udphdr *udph = NULL;
+    u_int16_t src_port, dst_port;
+    u_int8_t proto, ip_payload_offset = 40 /* ipv6 is 40B long */;
+    char src[INET6_ADDRSTRLEN] = {}, dst[INET6_ADDRSTRLEN] = {};
 
-    if(iph->version != 4) {
-      /* This is not IPv4 */
-      return(MARKER_PASS); /* TODO */
-    } else {
-      u_int8_t *l4;
-      struct tcphdr *tcph;
-      struct udphdr *udph;
-      u_int16_t src_port, dst_port;
-      u_int8_t l4_proto, frag_off = ntohs(iph->frag_off);
+    if (iph->version == 6) {
+      ipv6 = true;
+      struct ip6_hdr *ip6h = (struct ip6_hdr *)&payload[ip_offset];
+      proto = ip6h->ip6_nxt;
 
-      if((iph->protocol == IPPROTO_UDP) && ((frag_off & 0x3FFF /* IP_MF | IP_OFFSET */ ) != 0))
-	return(MARKER_UNKNOWN); /* Don't block it */
+      // ipv6 address stringification
+      inet_ntop(AF_INET6, &(ip6h->ip6_src), src, sizeof(src));
+      inet_ntop(AF_INET6, &(ip6h->ip6_dst), dst, sizeof(dst));
 
-      l4_proto = iph->protocol;
-      l4 = ((u_int8_t *) iph + iph->ihl * 4);
+    } else if (iph->version == 4) {
+      ipv4 = true;
+      u_int8_t frag_off = ntohs(iph->frag_off);
+      struct in_addr a;
 
-      switch(l4_proto) {
-      case IPPROTO_TCP:
-	tcph = (struct tcphdr *)l4;
-	src_port = tcph->source, dst_port = tcph->dest;
-	break;
+      if ((iph->protocol == IPPROTO_UDP) && ((frag_off & 0x3FFF /* IP_MF | IP_OFFSET */) != 0))
+        return (MARKER_UNKNOWN); /* Don't block it */
 
-      case IPPROTO_UDP:
-	udph = (struct udphdr *)l4;
-	src_port = udph->source, dst_port = udph->dest;
-	break;
-
-      default:
-	src_port = dst_port = 0;
-	break;
-      }
-
-      return(makeVerdict(l4_proto, vlan_id,
-			 iph->saddr, src_port,
-			 iph->daddr, dst_port));
+      // get protocol and offset
+      proto = iph->protocol;
+      ip_payload_offset = iph->ihl * 4;
+      // ipv4 address stringification
+      a.s_addr = iph->saddr, inet_ntop(AF_INET, &a, src, sizeof(src));
+      a.s_addr = iph->daddr, inet_ntop(AF_INET, &a, dst, sizeof(dst));
+    } else { // Neither ipv4 or ipv6...unlikely to be evaluated
+      return (MARKER_PASS);
     }
-  }
 
-  return(MARKER_PASS);
+    u_int8_t *nxt = ((u_int8_t *)iph + ip_payload_offset);
+
+    switch (proto) {
+      case IPPROTO_TCP:
+        tcph = (struct tcphdr *)(nxt);
+        src_port = tcph->source, dst_port = tcph->dest;
+        break;
+      case IPPROTO_UDP:
+        udph = (struct udphdr *)(nxt);
+        src_port = udph->source, dst_port = udph->dest;
+        break;
+      default:
+        // we do not care about ports in other protocols
+        src_port = dst_port = 0;
+    }
+    return (makeVerdict(proto, vlan_id,
+                        src_port, dst_port,
+                        src,dst, ipv4,ipv6));
+  }
+  return (MARKER_PASS);
 }
 
 /* **************************************************** */
@@ -221,20 +228,35 @@ const char* NwInterface::getProtoName(u_int8_t proto) {
 /* **************************************************** */
 
 bool NwInterface::isPrivateIPv4(u_int32_t addr /* network byte order */) {
-  u_int32_t a = ntohl(addr);
 
-  if(((a & 0xFF000000) == 0x0A000000 /* 10.0.0.0/8 */)
-     || ((a & 0xFFF00000) == 0xAC100000 /* 172.16.0.0/12 */)
-     || ((a & 0xFFFF0000) == 0xC0A80000 /* 192.168.0.0/16 */)
-     || ((a & 0xFF000000) == 0x7F000000 /* 127.0.0.0/8 */)
-     || ((a & 0xFFFF0000) == 0xA9FE0000 /* 169.254.0.0/16 Link-Local communication rfc3927 */)
-     || (a == 0xFFFFFFFF /* 255.255.255.255 */)
-     || (a == 0x0        /* 0.0.0.0 */)
-     || ((a & 0xF0000000) == 0xE0000000 /* 224.0.0.0/4 */))
+  if(((addr & 0xFF000000) == 0x0A000000 /* 10.0.0.0/8 */)
+     || ((addr & 0xFFF00000) == 0xAC100000 /* 172.16.0.0/12 */)
+     || ((addr & 0xFFFF0000) == 0xC0A80000 /* 192.168.0.0/16 */)
+     || ((addr & 0xFF000000) == 0x7F000000 /* 127.0.0.0/8 */)
+     || ((addr & 0xFFFF0000) == 0xA9FE0000 /* 169.254.0.0/16 Link-Local communication rfc3927 */)
+     || (addr == 0xFFFFFFFF /* 255.255.255.255 */)
+     || (addr == 0x0        /* 0.0.0.0 */)
+     || ((addr & 0xF0000000) == 0xE0000000 /* 224.0.0.0/4 */))
     return(true);
   else
     return(false);
 }
+
+bool NwInterface::isPrivateIPv6(const char *ip6addr) {
+  struct in6_addr a;
+  inet_pton(AF_INET6,ip6addr,&a);
+
+  // We use only the 32bit structure
+  for(size_t l=0; l < 4; l++){ // change byte ordering
+      a.s6_addr32[l] = ntohl(a.s6_addr32[l]);
+  }
+  
+  bool is_link_local = (a.s6_addr32[0] & (0xffc00000)) == (0xfe800000); // check the first 10 bits
+  bool is_unique_local = (a.s6_addr32[0] & (0xfe000000)) == (0xfc000000); // check the first 7 bits 
+  
+  return is_unique_local || is_link_local;
+}
+
 
 /* **************************************************** */
 
@@ -273,48 +295,52 @@ void NwInterface::logFlow(const char *proto_name,
 /* **************************************************** */
 
 Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
-				u_int32_t saddr /* network byte order */,
 				u_int16_t sport /* network byte order */,
-				u_int32_t daddr /* network byte order */,
-				u_int16_t dport /* network byte order */) {
-  struct in_addr in;
-  char *host, src_host[32], dst_host[32], src_country[3]={'\0'}, dst_country[3]={'\0'},
-   src_cont[3]={'\0'}, dst_cont[3]={'\0'} ;
-  const char *proto_name = getProtoName(proto);
-  bool pass_local = true, saddr_private = isPrivateIPv4(saddr), daddr_private = isPrivateIPv4(daddr);;
-  Marker m, src_marker, dst_marker;
-  struct in_addr addr;
+				u_int16_t dport /* network byte order */,
+        char *src_host, char *dst_host,
+        bool ipv4, bool ipv6) {
+  // Step 0 - Check ip protocol
+  if (!(ipv4 || ipv6)) return (conf->getDefaultPolicy());
 
+  struct in_addr in;
+  char src_ctry[3]={}, dst_ctry[3]={}, src_cont[3]={}, dst_cont[3]={} ;
+  const char *proto_name = getProtoName(proto);
+
+  // trace->traceEvent(TRACE_DEBUG, "%s %s %s : %u -> %s : %u",ipv4 ? "IPv4" : (ipv6 ? "IPv6" : "???"),
+  //   proto_name, src_host, sport, dst_host, dport);
+
+  u_int32_t saddr = ipv4 ? inet_addr(src_host) : 0;
+  u_int32_t daddr = ipv4 ? inet_addr(dst_host) : 0;
+  bool pass_local = true,
+    saddr_private = (ipv4 ? isPrivateIPv4(saddr) : isPrivateIPv6(src_host)),
+    daddr_private = (ipv4 ? isPrivateIPv4(saddr) : isPrivateIPv6(dst_host));
+  Marker m, src_marker, dst_marker;
+  sport = ntohs(sport), dport = ntohs(dport);
+
+  /* Check if sender/recipient are blacklisted */
+  if (ipv4){
   in.s_addr = saddr;
-  host = inet_ntoa(in);
-  strncpy(src_host, host, sizeof(src_host)-1);
+  /* Step 1 - For all ports/protocols, check if sender/recipient are blacklisted and if so, block this flow */
+  if((!saddr_private) && conf->isBlacklistedIPv4(&in)) {
+    logFlow(proto_name,
+	    src_host, sport, src_ctry, src_cont, true,
+	    dst_host, dport, dst_ctry, dst_cont, false,
+	    false /* drop */);
+
+    return(MARKER_DROP);
+  }
 
   in.s_addr = daddr;
-  host = inet_ntoa(in);
-  strncpy(dst_host, host, sizeof(dst_host)-1);
-
-  /* Step 1 - For all ports/protocols, check if sender/recipient are blacklisted and if so, block this flow */
-  addr.s_addr = saddr;
-  if((!saddr_private) && conf->isBlacklistedIPv4(&addr)) {
+  if((!daddr_private) && conf->isBlacklistedIPv4(&in)) {
     logFlow(proto_name,
-	    src_host, sport, src_country, src_cont, true,
-	    dst_host, dport, dst_country, dst_cont, false,
+	    src_host, sport, src_ctry, src_cont, false,
+	    dst_host, dport, dst_ctry, dst_cont, true,
 	    false /* drop */);
 
     return(MARKER_DROP);
   }
-
-  addr.s_addr = daddr;
-  if((!daddr_private) && conf->isBlacklistedIPv4(&addr)) {
-    logFlow(proto_name,
-	    src_host, sport, src_country, src_cont, false,
-	    dst_host, dport, dst_country, dst_cont, true,
-	    false /* drop */);
-
-    return(MARKER_DROP);
   }
 
-  sport = ntohs(sport), dport = ntohs(dport);
 
   /* Step 2 - For TCP/UDP ignore traffic for non-monitored ports */
   switch(proto) {
@@ -328,7 +354,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
     break;
 
   case IPPROTO_UDP:
-    if((!conf->isMonitoredUDPPort(sport)) || conf->isMonitoredUDPPort(dport))
+    if((conf->isMonitoredUDPPort(sport)) || conf->isMonitoredUDPPort(dport))
       ;
     else {
       trace->traceEvent(TRACE_INFO, "Ignoring UDP ports %u/%u", sport, dport);
@@ -337,28 +363,19 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
     break;
   }
 
-  src_marker = dst_marker = conf->getDefaultPolicy();
+  m = src_marker = dst_marker = conf->getDefaultPolicy();
 
   /* Step 3 - For monitored TCP/UDP ports (and ICMP) check the country blacklist */
-  in.s_addr = saddr;
-  host = inet_ntoa(in);
-  strncpy(src_host, host, sizeof(src_host)-1);
-
-  if((!saddr_private) && (geoip->lookup(host, src_country, sizeof(src_country), src_cont, sizeof(src_cont)))) {
-    src_marker = conf->getMarker(src_country, src_cont);
+  if((!saddr_private) && (geoip->lookup(src_host, src_ctry, sizeof(src_ctry), src_cont, sizeof(src_cont)))) {
+    src_marker = conf->getMarker(src_ctry,src_cont);
     pass_local = false;
   } else {
     /* Unknown or private IP address  */
-
     src_marker = MARKER_PASS;
   }
 
-  in.s_addr = daddr;
-  host = inet_ntoa(in);
-  strncpy(dst_host, host, sizeof(dst_host)-1);
-
-  if((!daddr_private) && (geoip->lookup(host = inet_ntoa(in), dst_country, sizeof(dst_country), dst_cont, sizeof(dst_cont)))) {
-    dst_marker = conf->getMarker(dst_country, dst_cont);
+  if((!daddr_private) && (geoip->lookup(dst_host, dst_ctry, sizeof(dst_ctry), dst_cont, sizeof(dst_cont)))) {
+    dst_marker = conf->getMarker(dst_ctry, dst_cont);
     pass_local = false;
   } else {
     /* Unknown or private IP address  */
@@ -366,20 +383,21 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
   }
 
   /* Final step: compute the flow verdict */
+
   if((conf->isIgnoredPort(sport) || conf->isIgnoredPort(dport))
      || ((src_marker == MARKER_PASS) && (dst_marker == MARKER_PASS))) {
     m = MARKER_PASS;
 
     logFlow(proto_name,
-	    src_host, sport, src_country, src_cont, false,
-	    dst_host, dport, dst_country, dst_cont, false,
+	    src_host, sport, src_ctry, src_cont, false,
+	    dst_host, dport, dst_ctry, dst_cont, false,
 	    true /* pass */);
   } else {
     m = MARKER_DROP;
 
     logFlow(proto_name,
-	    src_host, sport, src_country, src_cont, false,
-	    dst_host, dport, dst_country, dst_cont, false,
+	    src_host, sport, src_ctry, src_cont, false,
+	    dst_host, dport, dst_ctry, dst_cont, false,
 	    false /* drop */);
   }
 
