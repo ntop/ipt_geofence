@@ -99,4 +99,4 @@ iptables -t mangle -L GEO_POSTROUTING
 iptables -t mangle -L GEO_OUTPUT
 
 # Flush conntrack
-conntrack -F
+#conntrack -F
