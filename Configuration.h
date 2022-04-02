@@ -52,6 +52,8 @@ class Configuration {
   inline bool isMonitoredUDPPort(u_int16_t port) { return(all_udp_ports || (udp_ports.find(port) != udp_ports.end())); }
   inline bool isBlacklistedIPv4(struct in_addr *addr)                   {  return(blacklists.isBlacklistedIPv4(addr)); }
   inline bool isBlacklistedIPv6(struct in6_addr *addr6)                 { return(blacklists.isBlacklistedIPv6(addr6)); }
+  inline void addAddressToBlacklist(char *net) { blacklists.addAddress(net);  }    
+
   
 };
 

@@ -395,6 +395,8 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
   } else {
     m = MARKER_DROP;
 
+    if(src_marker == MARKER_DROP) conf->addAddressToBlacklist(src_host);
+    if(dst_marker == MARKER_DROP) conf->addAddressToBlacklist(dst_host);
     logFlow(proto_name,
 	    src_host, sport, src_ctry, src_cont, false,
 	    dst_host, dport, dst_ctry, dst_cont, false,
