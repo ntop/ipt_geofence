@@ -123,11 +123,15 @@ bool Configuration::readConfigFile(char *path) {
   }
 
   if(!root["blacklists"].empty()) {
+    size_t n_urls = root["blacklists"].size();
+    // printf("JSON SIZE %ld \n", n_urls);
+    std::string *urls = (std::string*) calloc (n_urls, sizeof(std::string));
     for(Json::Value::ArrayIndex i = 0; i != root["blacklists"].size(); i++) {
-      std::string url = root["blacklists"][i].asString();
-
+      std::string url (root["blacklists"][i].asString());
+      urls[i] = url;
       blacklists.loadIPsetFromURL(url.c_str());
     }
+    blacklists.spawnReloader(urls, n_urls);
   }
 
   return(configured = true);
