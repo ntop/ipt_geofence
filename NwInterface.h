@@ -52,8 +52,6 @@ class NwInterface {
   bool isPrivateIPv6(const char *ip6addr);
   void reloadConf();
 
-
-
  public:
   NwInterface(u_int nf_device_id, Configuration *_c, GeoIP *_g, std::string c_path);
   ~NwInterface();

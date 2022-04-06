@@ -67,4 +67,4 @@ IPTABLES="ip6tables"
 done
 
 # Flush conntrack
-conntrack -F
+#conntrack -F

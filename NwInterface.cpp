@@ -246,6 +246,7 @@ const char* NwInterface::getProtoName(u_int8_t proto) {
 
 bool NwInterface::isPrivateIPv4(u_int32_t addr /* network byte order */) {
   addr = ntohl(addr);
+  
   if(((addr & 0xFF000000) == 0x0A000000 /* 10.0.0.0/8 */)
      || ((addr & 0xFFF00000) == 0xAC100000 /* 172.16.0.0/12 */)
      || ((addr & 0xFFFF0000) == 0xC0A80000 /* 192.168.0.0/16 */)
