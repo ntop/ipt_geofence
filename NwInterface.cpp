@@ -138,7 +138,7 @@ void NwInterface::packetPollLoop() {
         this->reloader = NULL; 
       }
       // check if reload time has elapsed
-      else if (this->reloader == NULL && (time(NULL),time_zero) >= confReloadTimeout){
+      else if (this->reloader == NULL && difftime(time(NULL),time_zero) >= confReloadTimeout){
         this->reloader = new std::thread(&NwInterface::reloadConf, this);
         // this->reloader.detach();
       }
@@ -354,7 +354,28 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
     return(MARKER_DROP);
   }
   }
+  if (ipv6) {
+    struct in6_addr a;
+    inet_pton(AF_INET6, src_host, &a);
+    if ((!saddr_private) && conf->isBlacklistedIPv4(&a)) {
+      logFlow(proto_name,
+              src_host, sport, src_ctry, src_cont, true,
+              dst_host, dport, dst_ctry, dst_cont, false,
+              false /* drop */);
 
+      return (MARKER_DROP);
+    }
+
+    inet_pton(AF_INET6, dst_host, &a);
+    if ((!daddr_private) && conf->isBlacklistedIPv4(&a)) {
+      logFlow(proto_name,
+              src_host, sport, src_ctry, src_cont, false,
+              dst_host, dport, dst_ctry, dst_cont, true,
+              false /* drop */);
+
+      return (MARKER_DROP);
+    }
+  }
 
   /* Step 2 - For TCP/UDP ignore traffic for non-monitored ports */
   switch(proto) {
