@@ -357,7 +357,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
   if (ipv6) {
     struct in6_addr a;
     inet_pton(AF_INET6, src_host, &a);
-    if ((!saddr_private) && conf->isBlacklistedIPv4(&a)) {
+    if ((!saddr_private) && conf->isBlacklistedIPv6(&a)) {
       logFlow(proto_name,
               src_host, sport, src_ctry, src_cont, true,
               dst_host, dport, dst_ctry, dst_cont, false,
@@ -367,7 +367,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
     }
 
     inet_pton(AF_INET6, dst_host, &a);
-    if ((!daddr_private) && conf->isBlacklistedIPv4(&a)) {
+    if ((!daddr_private) && conf->isBlacklistedIPv6(&a)) {
       logFlow(proto_name,
               src_host, sport, src_ctry, src_cont, false,
               dst_host, dport, dst_ctry, dst_cont, true,
