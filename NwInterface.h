@@ -32,8 +32,10 @@ class NwInterface {
   int nf_fd;
   pthread_t pollLoop;
   bool ifaceRunning;
-  Configuration *conf;
+  Configuration *conf, *shadowConf = NULL;
   GeoIP *geoip;
+  double confReloadTimeout = 5.00;
+  std::thread *reloader;
 
   Marker makeVerdict(u_int8_t proto, u_int16_t vlanId,
 		     u_int16_t sport,
@@ -48,9 +50,12 @@ class NwInterface {
 
   bool isPrivateIPv4(u_int32_t addr /* network byte order */);
   bool isPrivateIPv6(const char *ip6addr);
+  void reloadConf();
+
+
 
  public:
-  NwInterface(u_int nf_device_id, Configuration *_c, GeoIP *_g);
+  NwInterface(u_int nf_device_id, Configuration *_c, GeoIP *_g, std::string c_path);
   ~NwInterface();
 
   inline int getQueueId()                       { return(queueId);                     };
@@ -61,6 +66,7 @@ class NwInterface {
   inline struct nfq_handle*   get_nfHandle()    { return(nfHandle);                    };
   inline struct nfq_q_handle* get_queueHandle() { return(queueHandle);                 };
   void packetPollLoop();
+  std::string confPath;
 };
 
 #endif /* _NETWORK_INTERFACE_H_ */

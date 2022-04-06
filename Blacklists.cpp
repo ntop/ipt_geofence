@@ -201,26 +201,3 @@ bool Blacklists::loadIPsetFromURL(const char *url) {
 
   return(rc);
 }
-
-void Blacklists::threadReloader(std::string *urls, size_t len){
-  // std::string toRefresh[len];
-  // for (size_t i = 0; i < len; i++)
-  // {
-  //   toRefresh[i] = urls[i];
-  // }
-  
-  reloadRunning = true;
-  trace->traceEvent(TRACE_INFO,"RELOADER RUNNING");
-  // printf("BLACKLIST DIM = %ld\n", len);
-  while(isRunning()){
-    sleep(10); // sleep for 5 mins
-    trace->traceEvent(TRACE_INFO,"Refreshing blacklists...");
-    for(size_t i = 0; i < len; i++)
-      loadIPsetFromURL(urls[i].c_str());
-  }
-  free(urls);
-}
-
-void Blacklists::spawnReloader(std::string blacklistUrls[], size_t len){
-  this->reloader = new std::thread (&Blacklists::threadReloader, this, blacklistUrls, len);
-}

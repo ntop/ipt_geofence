@@ -27,12 +27,9 @@
 class Blacklists {
  private:
   ndpi_patricia_tree_t *ptree_v4, *ptree_v6;
-  std::thread* reloader;
   
   void addAddress(int family, void *addr, int bits);
   bool findAddress(int family, struct in_addr *addr, int bits);
-  bool reloadRunning;
-  void threadReloader(std::string urls[], size_t len);
 
  public:
   Blacklists();
@@ -45,9 +42,7 @@ class Blacklists {
 
   bool isBlacklistedIPv4(struct in_addr *pin);
   bool isBlacklistedIPv6(struct in6_addr *addr6);
-  inline bool isRunning() { return (reloadRunning);}
-  void spawnReloader(std::string blacklistUrls[], size_t len);
-  inline void stopReloading() {reloadRunning = false; (*reloader).join();}
+  std::string *urls_Blacklist = NULL;
 };
 
 

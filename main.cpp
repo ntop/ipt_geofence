@@ -68,6 +68,7 @@ static void help() {
 
 int main(int argc, char *argv[]) {
   u_char c;
+  std::string confPath = "";
   const struct option long_options[] = {
     { "config",      required_argument,    NULL, 'c' },
     { "mmdb_city",   required_argument,    NULL, 'm' },
@@ -85,7 +86,8 @@ int main(int argc, char *argv[]) {
   while((c = getopt_long(argc, argv, "c:u:l:m:svVh", long_options, NULL)) != 255) {
     switch(c) {
     case 'c':
-      config.readConfigFile(optarg);
+      confPath = (optarg);
+      config.readConfigFile(confPath.c_str());
       break;
       
     case 'm':
@@ -120,7 +122,7 @@ int main(int argc, char *argv[]) {
   signal(SIGTERM, sigproc);
 
   try {
-    iface = new NwInterface(config.getQueueId(), &config, &geoip);
+    iface = new NwInterface(config.getQueueId(), &config, &geoip, confPath);
     
     iface->packetPollLoop();
     delete iface;

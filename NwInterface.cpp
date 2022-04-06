@@ -29,8 +29,8 @@ int netfilter_callback(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg,
 
 NwInterface::NwInterface(u_int nf_device_id,
 				       Configuration *_c,
-				       GeoIP *_g) {
-  conf = _c, geoip = _g;
+				       GeoIP *_g, std::string c_path) {
+  conf = _c, geoip = _g, confPath = c_path; 
 
   queueId = nf_device_id, nfHandle = nfq_open();
 
@@ -118,6 +118,7 @@ void NwInterface::packetPollLoop() {
   h = get_nfHandle();
   fd = get_fd();
 
+  time_t time_zero = time(NULL);
   while(isRunning()) {
     fd_set mask;
     struct timeval wait_time;
@@ -127,6 +128,20 @@ void NwInterface::packetPollLoop() {
     wait_time.tv_sec = 1, wait_time.tv_usec = 0;
 
     if(select(fd+1, &mask, 0, 0, &wait_time) > 0) {
+      // check if an updated config is available
+      if (shadowConf != NULL){
+        // free(conf); // TODO ?
+        // delete(conf);
+        conf = shadowConf;
+        shadowConf = NULL;
+        this->reloader->join();
+        this->reloader = NULL; 
+      }
+      // check if reload time has elapsed
+      else if (this->reloader == NULL && (time(NULL),time_zero) >= confReloadTimeout){
+        this->reloader = new std::thread(&NwInterface::reloadConf, this);
+        // this->reloader.detach();
+      }
       char pktBuf[8192] __attribute__ ((aligned));
       int len = recv(fd, pktBuf, sizeof(pktBuf), 0);
 
@@ -145,7 +160,6 @@ void NwInterface::packetPollLoop() {
   }
 
   trace->traceEvent(TRACE_NORMAL, "Leaving netfilter packet poll loop");
-
   ifaceRunning = false;
 }
 
@@ -402,4 +416,16 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
   }
 
   return(m);
+}
+
+void NwInterface::reloadConf(){
+  trace->traceEvent(TRACE_INFO,"Reloading config file");
+  Configuration newConf;
+  newConf.readConfigFile(this->confPath.c_str());
+  if(newConf.isConfigured()) {
+    this->shadowConf = &newConf;
+  }
+  else{
+    trace->traceEvent(TRACE_ERROR, "Please check the JSON configuration file");
+  }
 }
