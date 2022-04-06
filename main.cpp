@@ -78,7 +78,7 @@ int main(int argc, char *argv[]) {
     /* End of options */
     { NULL,          no_argument,          NULL,  0 }
   };
-  Configuration config;
+  Configuration *config = new Configuration();
   GeoIP geoip;
   
   trace = new Trace();
@@ -87,7 +87,7 @@ int main(int argc, char *argv[]) {
     switch(c) {
     case 'c':
       confPath = (optarg);
-      config.readConfigFile(confPath.c_str());
+      config->readConfigFile(confPath.c_str());
       break;
       
     case 'm':
@@ -111,7 +111,7 @@ int main(int argc, char *argv[]) {
   Blacklists b;
   b.loadIPsetFromFile((char*)"dshield_7d.netset");
 
-  if(!config.isConfigured()) {
+  if(!config->isConfigured()) {
     trace->traceEvent(TRACE_ERROR, "Please check the JSON configuration file");
     help();
   } else if(!geoip.isLoaded()) {
@@ -122,10 +122,11 @@ int main(int argc, char *argv[]) {
   signal(SIGTERM, sigproc);
 
   try {
-    iface = new NwInterface(config.getQueueId(), &config, &geoip, confPath);
+    iface = new NwInterface(config->getQueueId(), config, &geoip, confPath);
     
     iface->packetPollLoop();
     delete iface;
+    delete config;
   } catch(int err) {
     trace->traceEvent(TRACE_ERROR, "Interface creation error: please fix the reported errors and try again");
   }

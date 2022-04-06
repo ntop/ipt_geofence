@@ -77,6 +77,7 @@ NwInterface::NwInterface(u_int nf_device_id,
 NwInterface::~NwInterface() {
   if(queueHandle) nfq_destroy_queue(queueHandle);
   if(nfHandle)    nfq_close(nfHandle);
+  if(conf)        delete conf;
 
   nf_fd = 0;
 }
@@ -131,11 +132,11 @@ void NwInterface::packetPollLoop() {
     if(select(fd+1, &mask, 0, 0, &wait_time) > 0) {
       // check if an updated config is available
       if (shadowConf != NULL){ // reloader thread has finished
-        // free(conf); // TODO ?
-        // delete(conf);
+        delete conf;
         conf = shadowConf;
         shadowConf = NULL;
         this->reloader->join();
+        delete this->reloader;
         this->reloader = NULL; 
         time_zero = time(NULL); // reset time zero
         trace->traceEvent(TRACE_INFO,"Configuration updated");
