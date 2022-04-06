@@ -119,6 +119,7 @@ void NwInterface::packetPollLoop() {
   fd = get_fd();
 
   time_t time_zero = time(NULL);
+  shadowConf = NULL;
   while(isRunning()) {
     fd_set mask;
     struct timeval wait_time;
@@ -129,18 +130,19 @@ void NwInterface::packetPollLoop() {
 
     if(select(fd+1, &mask, 0, 0, &wait_time) > 0) {
       // check if an updated config is available
-      if (shadowConf != NULL){
+      if (shadowConf != NULL){ // reloader thread has finished
         // free(conf); // TODO ?
         // delete(conf);
         conf = shadowConf;
         shadowConf = NULL;
         this->reloader->join();
         this->reloader = NULL; 
+        time_zero = time(NULL); // reset time zero
+        trace->traceEvent(TRACE_INFO,"Configuration updated");
       }
-      // check if reload time has elapsed
+      // check the config isn't being updated and if reload time has elapsed
       else if (this->reloader == NULL && difftime(time(NULL),time_zero) >= confReloadTimeout){
-        this->reloader = new std::thread(&NwInterface::reloadConf, this);
-        // this->reloader.detach();
+        this->reloader = new std::thread(&NwInterface::reloadConf, this); // reload config in background
       }
       char pktBuf[8192] __attribute__ ((aligned));
       int len = recv(fd, pktBuf, sizeof(pktBuf), 0);
@@ -242,7 +244,7 @@ const char* NwInterface::getProtoName(u_int8_t proto) {
 /* **************************************************** */
 
 bool NwInterface::isPrivateIPv4(u_int32_t addr /* network byte order */) {
-
+  addr = ntohl(addr);
   if(((addr & 0xFF000000) == 0x0A000000 /* 10.0.0.0/8 */)
      || ((addr & 0xFFF00000) == 0xAC100000 /* 172.16.0.0/12 */)
      || ((addr & 0xFFFF0000) == 0xC0A80000 /* 192.168.0.0/16 */)
@@ -327,7 +329,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
   u_int32_t daddr = ipv4 ? inet_addr(dst_host) : 0;
   bool pass_local = true,
     saddr_private = (ipv4 ? isPrivateIPv4(saddr) : isPrivateIPv6(src_host)),
-    daddr_private = (ipv4 ? isPrivateIPv4(saddr) : isPrivateIPv6(dst_host));
+    daddr_private = (ipv4 ? isPrivateIPv4(daddr) : isPrivateIPv6(dst_host));
   Marker m, src_marker, dst_marker;
   sport = ntohs(sport), dport = ntohs(dport);
 
@@ -441,10 +443,10 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
 
 void NwInterface::reloadConf(){
   trace->traceEvent(TRACE_INFO,"Reloading config file");
-  Configuration newConf;
-  newConf.readConfigFile(this->confPath.c_str());
-  if(newConf.isConfigured()) {
-    this->shadowConf = &newConf;
+  Configuration *newConf = new Configuration();
+  newConf->readConfigFile(this->confPath.c_str());
+  if(newConf->isConfigured()) {
+    this->shadowConf = newConf;
   }
   else{
     trace->traceEvent(TRACE_ERROR, "Please check the JSON configuration file");

@@ -34,7 +34,7 @@ class NwInterface {
   bool ifaceRunning;
   Configuration *conf, *shadowConf = NULL;
   GeoIP *geoip;
-  double confReloadTimeout = 5.00;
+  double confReloadTimeout = 300.00;
   std::thread *reloader;
 
   Marker makeVerdict(u_int8_t proto, u_int16_t vlanId,
