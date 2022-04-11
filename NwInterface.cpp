@@ -28,10 +28,10 @@ int netfilter_callback(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg,
 /* **************************************************** */
 
 NwInterface::NwInterface(u_int nf_device_id,
-				       Configuration *_c,
-				       GeoIP *_g, std::string c_path) {
+			 Configuration *_c,
+			 GeoIP *_g, std::string c_path) {
   conf = _c, geoip = _g, confPath = c_path; 
-
+  reloaderThread = NULL;
   queueId = nf_device_id, nfHandle = nfq_open();
 
   if(nfHandle == NULL) {
@@ -53,7 +53,7 @@ NwInterface::NwInterface(u_int nf_device_id,
     trace->traceEvent(TRACE_ERROR, "Unable to attach to NF_QUEUE %d: is it already in use?", queueId);
     throw 1;
   } else
-    trace->traceEvent(TRACE_NORMAL, "Succesfully connected to NF_QUEUE %d", queueId);
+    trace->traceEvent(TRACE_NORMAL, "Successfully connected to NF_QUEUE %d", queueId);
 
 #if !defined(__mips__)
   nfnl_rcvbufsiz(nfq_nfnlh(nfHandle), NF_BUFFER_SIZE);
@@ -75,6 +75,12 @@ NwInterface::NwInterface(u_int nf_device_id,
 /* **************************************************** */
 
 NwInterface::~NwInterface() {
+  /* Wait until the reload thread ends */
+  if(reloaderThread) {
+    reloaderThread->join();
+    delete reloaderThread;
+  }
+  
   if(queueHandle) nfq_destroy_queue(queueHandle);
   if(nfHandle)    nfq_close(nfHandle);
   if(conf)        delete conf;
@@ -108,19 +114,21 @@ int netfilter_callback(struct nfq_q_handle *qh,
   return(nfq_set_verdict2(qh, id, NF_ACCEPT, marker, 0, NULL));
 }
 
+
 /* **************************************************** */
 
 void NwInterface::packetPollLoop() {
   struct nfq_handle *h;
   int fd;
 
+  /* Spawn reload config thread in background */
+  reloaderThread = new std::thread(&NwInterface::reloadConfLoop, this);
+  
   ifaceRunning = true;
 
   h = get_nfHandle();
   fd = get_fd();
-
-  time_t time_zero = time(NULL);
-  shadowConf = NULL;
+  
   while(isRunning()) {
     fd_set mask;
     struct timeval wait_time;
@@ -130,21 +138,6 @@ void NwInterface::packetPollLoop() {
     wait_time.tv_sec = 1, wait_time.tv_usec = 0;
 
     if(select(fd+1, &mask, 0, 0, &wait_time) > 0) {
-      // check if an updated config is available
-      if (shadowConf != NULL){ // reloader thread has finished
-        delete conf;
-        conf = shadowConf;
-        shadowConf = NULL;
-        this->reloader->join();
-        delete this->reloader;
-        this->reloader = NULL; 
-        time_zero = time(NULL); // reset time zero
-        trace->traceEvent(TRACE_INFO,"Configuration updated");
-      }
-      // check the config isn't being updated and if reload time has elapsed
-      else if (this->reloader == NULL && difftime(time(NULL),time_zero) >= confReloadTimeout){
-        this->reloader = new std::thread(&NwInterface::reloadConf, this); // reload config in background
-      }
       char pktBuf[8192] __attribute__ ((aligned));
       int len = recv(fd, pktBuf, sizeof(pktBuf), 0);
 
@@ -159,6 +152,16 @@ void NwInterface::packetPollLoop() {
 	trace->traceEvent(TRACE_ERROR, "NF_QUEUE receive error: [len: %d][errno: %d]", len, errno);
 	break;
       }
+    }
+
+    if(shadowConf != NULL) {
+      /* Swap configurations */
+
+      delete conf;
+      conf = shadowConf;
+      shadowConf = NULL;
+
+      trace->traceEvent(TRACE_NORMAL, "New configuration has been updated");
     }
   }
 
@@ -212,22 +215,24 @@ Marker NwInterface::dissectPacket(const u_char *payload, u_int payload_len) {
     u_int8_t *nxt = ((u_int8_t *)iph + ip_payload_offset);
 
     switch (proto) {
-      case IPPROTO_TCP:
-        tcph = (struct tcphdr *)(nxt);
-        src_port = tcph->source, dst_port = tcph->dest;
-        break;
-      case IPPROTO_UDP:
-        udph = (struct udphdr *)(nxt);
-        src_port = udph->source, dst_port = udph->dest;
-        break;
-      default:
-        // we do not care about ports in other protocols
-        src_port = dst_port = 0;
+    case IPPROTO_TCP:
+      tcph = (struct tcphdr *)(nxt);
+      src_port = tcph->source, dst_port = tcph->dest;
+      break;
+    case IPPROTO_UDP:
+      udph = (struct udphdr *)(nxt);
+      src_port = udph->source, dst_port = udph->dest;
+      break;
+    default:
+      // we do not care about ports in other protocols
+      src_port = dst_port = 0;
     }
+    
     return (makeVerdict(proto, vlan_id,
                         src_port, dst_port,
                         src,dst, ipv4,ipv6));
   }
+  
   return (MARKER_PASS);
 }
 
@@ -266,7 +271,7 @@ bool NwInterface::isPrivateIPv6(const char *ip6addr) {
 
   // We use only the 32bit structure
   for(size_t l=0; l < 4; l++){ // change byte ordering
-      a.s6_addr32[l] = ntohl(a.s6_addr32[l]);
+    a.s6_addr32[l] = ntohl(a.s6_addr32[l]);
   }
   
   bool is_link_local = (a.s6_addr32[0] & (0xffc00000)) == (0xfe800000); // check the first 10 bits
@@ -315,8 +320,8 @@ void NwInterface::logFlow(const char *proto_name,
 Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
 				u_int16_t sport /* network byte order */,
 				u_int16_t dport /* network byte order */,
-        char *src_host, char *dst_host,
-        bool ipv4, bool ipv6) {
+				char *src_host, char *dst_host,
+				bool ipv4, bool ipv6) {
   // Step 0 - Check ip protocol
   if (!(ipv4 || ipv6)) return (conf->getDefaultPolicy());
 
@@ -337,26 +342,26 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
 
   /* Check if sender/recipient are blacklisted */
   if (ipv4){
-  in.s_addr = saddr;
-  /* Step 1 - For all ports/protocols, check if sender/recipient are blacklisted and if so, block this flow */
-  if((!saddr_private) && conf->isBlacklistedIPv4(&in)) {
-    logFlow(proto_name,
-	    src_host, sport, src_ctry, src_cont, true,
-	    dst_host, dport, dst_ctry, dst_cont, false,
-	    false /* drop */);
+    in.s_addr = saddr;
+    /* Step 1 - For all ports/protocols, check if sender/recipient are blacklisted and if so, block this flow */
+    if((!saddr_private) && conf->isBlacklistedIPv4(&in)) {
+      logFlow(proto_name,
+	      src_host, sport, src_ctry, src_cont, true,
+	      dst_host, dport, dst_ctry, dst_cont, false,
+	      false /* drop */);
 
-    return(MARKER_DROP);
-  }
+      return(MARKER_DROP);
+    }
 
-  in.s_addr = daddr;
-  if((!daddr_private) && conf->isBlacklistedIPv4(&in)) {
-    logFlow(proto_name,
-	    src_host, sport, src_ctry, src_cont, false,
-	    dst_host, dport, dst_ctry, dst_cont, true,
-	    false /* drop */);
+    in.s_addr = daddr;
+    if((!daddr_private) && conf->isBlacklistedIPv4(&in)) {
+      logFlow(proto_name,
+	      src_host, sport, src_ctry, src_cont, false,
+	      dst_host, dport, dst_ctry, dst_cont, true,
+	      false /* drop */);
 
-    return(MARKER_DROP);
-  }
+      return(MARKER_DROP);
+    }
   }
   if (ipv6) {
     struct in6_addr a;
@@ -443,14 +448,57 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
   return(m);
 }
 
-void NwInterface::reloadConf(){
-  trace->traceEvent(TRACE_INFO,"Reloading config file");
-  Configuration *newConf = new Configuration();
-  newConf->readConfigFile(this->confPath.c_str());
-  if(newConf->isConfigured()) {
-    this->shadowConf = newConf;
-  }
-  else{
-    trace->traceEvent(TRACE_ERROR, "Please check the JSON configuration file");
-  }
+/* **************************************************** */
+
+u_int32_t NwInterface::computeNextReloadTime() {
+  u_int32_t confReloadTimeout = 86400 /* once a day */;
+  u_int32_t now = time(NULL);
+  u_int32_t next_reload = now + confReloadTimeout;
+
+  /* Align to the midnight */
+  next_reload -= (next_reload % confReloadTimeout);
+  
+  return(next_reload);
+}
+
+/* **************************************************** */
+
+void NwInterface::reloadConfLoop() {
+  u_int32_t next_reload = computeNextReloadTime();
+
+  shadowConf = NULL;
+  
+  trace->traceEvent(TRACE_NORMAL, "Starting reload configuration loop");
+  
+  while(isRunning()) {
+    u_int32_t now = time(NULL);
+    
+    if(now > next_reload) {
+      trace->traceEvent(TRACE_NORMAL, "Reloading config file");
+
+      if(shadowConf != NULL) {
+	/* Too early */
+	trace->traceEvent(TRACE_WARNING, "An existing configuration is already available: trying again");
+	next_reload = now + 300; /* 5 mins */
+      } else {
+	Configuration *newConf = new Configuration();
+	
+	newConf->readConfigFile(this->confPath.c_str());
+	
+	if(newConf->isConfigured())
+	  shadowConf = newConf;
+	else
+	  trace->traceEvent(TRACE_ERROR, "Something went wrong: please check the JSON config file");
+
+	next_reload = computeNextReloadTime();
+      }
+    } else {
+      // trace->traceEvent(TRACE_INFO, "Will reload in %u sec", next_reload-now);
+
+      /* Important: make a short nap as we need to exit this thread during shutdown */
+      sleep(1); /* Too early */
+    }
+  } /* while */
+
+  trace->traceEvent(TRACE_NORMAL, "Reload configuration loop is over");
 }

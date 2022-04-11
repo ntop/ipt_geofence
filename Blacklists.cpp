@@ -42,7 +42,8 @@ Blacklists::~Blacklists() {
 
   if(ptree_v6)
     ndpi_patricia_destroy(ptree_v6, free_ptree_data);
-  if (urls_Blacklist)
+  
+  if(urls_Blacklist)
     free(urls_Blacklist);
 }
 
@@ -53,7 +54,7 @@ void Blacklists::addAddress(int family, void *addr, int bits) {
   ndpi_patricia_node_t *node;
   ndpi_patricia_tree_t *tree;
 
-  if (family == AF_INET)
+  if(family == AF_INET)
     tree = ptree_v4, ndpi_fill_prefix_v4(&prefix, (struct in_addr *) addr, bits, ptree_v4->maxbits);
   else
     tree = ptree_v6, ndpi_fill_prefix_v6(&prefix, (struct in6_addr *) addr, bits, ptree_v6->maxbits);

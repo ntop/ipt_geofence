@@ -78,11 +78,12 @@ int main(int argc, char *argv[]) {
     /* End of options */
     { NULL,          no_argument,          NULL,  0 }
   };
-  Configuration *config = new Configuration();
+  Configuration *config;
   GeoIP geoip;
   
   trace = new Trace();
-
+  config = new Configuration();
+  
   while((c = getopt_long(argc, argv, "c:u:l:m:svVh", long_options, NULL)) != 255) {
     switch(c) {
     case 'c':
@@ -108,9 +109,6 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  Blacklists b;
-  b.loadIPsetFromFile((char*)"dshield_7d.netset");
-
   if(!config->isConfigured()) {
     trace->traceEvent(TRACE_ERROR, "Please check the JSON configuration file");
     help();
@@ -120,13 +118,14 @@ int main(int argc, char *argv[]) {
   }
   
   signal(SIGTERM, sigproc);
+  signal(SIGINT,  sigproc);
 
   try {
     iface = new NwInterface(config->getQueueId(), config, &geoip, confPath);
     
     iface->packetPollLoop();
+    
     delete iface;
-    delete config;
   } catch(int err) {
     trace->traceEvent(TRACE_ERROR, "Interface creation error: please fix the reported errors and try again");
   }
