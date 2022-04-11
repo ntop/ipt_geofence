@@ -38,7 +38,7 @@ class Configuration {
  public:
   Configuration() { nfq_queue_id = 0, default_policy = MARKER_PASS; configured = false, all_tcp_ports = all_udp_ports = true; }
 
-  bool readConfigFile(char *path);
+  bool readConfigFile(const char *path);
 
   inline unsigned int getQueueId() { return(nfq_queue_id); }
   inline bool isConfigured()       { return(configured);   }
@@ -52,7 +52,8 @@ class Configuration {
   inline bool isMonitoredUDPPort(u_int16_t port) { return(all_udp_ports || (udp_ports.find(port) != udp_ports.end())); }
   inline bool isBlacklistedIPv4(struct in_addr *addr)                   {  return(blacklists.isBlacklistedIPv4(addr)); }
   inline bool isBlacklistedIPv6(struct in6_addr *addr6)                 { return(blacklists.isBlacklistedIPv6(addr6)); }
-  
+  inline std::string *getBlacklistsUrls()             { return(blacklists.urls_Blacklist);}
+  inline void loadIPsetFromURL(const char* url)  { blacklists.loadIPsetFromURL(url);}
 };
 
 

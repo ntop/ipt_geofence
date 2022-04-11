@@ -31,7 +31,7 @@ u_int16_t Configuration::ctry_cont2u16(char *ctry_cont_code) {
 
 /* ******************************************************* */
 
-bool Configuration::readConfigFile(char *path) {
+bool Configuration::readConfigFile(const char *path) {
   Json::Value root;
   std::ifstream ifs;
   JSONCPP_STRING errs;
@@ -121,13 +121,15 @@ bool Configuration::readConfigFile(char *path) {
         }
       }while(--counter);
   }
-
   if(!root["blacklists"].empty()) {
+    size_t n_urls = root["blacklists"].size();
+    std::string *urls = (std::string*) calloc (n_urls + 1, sizeof(std::string)); // "+1" to add NULL
     for(Json::Value::ArrayIndex i = 0; i != root["blacklists"].size(); i++) {
-      std::string url = root["blacklists"][i].asString();
-
+      std::string url (root["blacklists"][i].asString());
+      urls[i] = url;
       blacklists.loadIPsetFromURL(url.c_str());
     }
+    blacklists.urls_Blacklist = urls;
   }
 
   return(configured = true);

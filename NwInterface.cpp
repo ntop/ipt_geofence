@@ -29,8 +29,8 @@ int netfilter_callback(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg,
 
 NwInterface::NwInterface(u_int nf_device_id,
 				       Configuration *_c,
-				       GeoIP *_g) {
-  conf = _c, geoip = _g;
+				       GeoIP *_g, std::string c_path) {
+  conf = _c, geoip = _g, confPath = c_path; 
 
   queueId = nf_device_id, nfHandle = nfq_open();
 
@@ -77,6 +77,7 @@ NwInterface::NwInterface(u_int nf_device_id,
 NwInterface::~NwInterface() {
   if(queueHandle) nfq_destroy_queue(queueHandle);
   if(nfHandle)    nfq_close(nfHandle);
+  if(conf)        delete conf;
 
   nf_fd = 0;
 }
@@ -118,6 +119,8 @@ void NwInterface::packetPollLoop() {
   h = get_nfHandle();
   fd = get_fd();
 
+  time_t time_zero = time(NULL);
+  shadowConf = NULL;
   while(isRunning()) {
     fd_set mask;
     struct timeval wait_time;
@@ -127,6 +130,21 @@ void NwInterface::packetPollLoop() {
     wait_time.tv_sec = 1, wait_time.tv_usec = 0;
 
     if(select(fd+1, &mask, 0, 0, &wait_time) > 0) {
+      // check if an updated config is available
+      if (shadowConf != NULL){ // reloader thread has finished
+        delete conf;
+        conf = shadowConf;
+        shadowConf = NULL;
+        this->reloader->join();
+        delete this->reloader;
+        this->reloader = NULL; 
+        time_zero = time(NULL); // reset time zero
+        trace->traceEvent(TRACE_INFO,"Configuration updated");
+      }
+      // check the config isn't being updated and if reload time has elapsed
+      else if (this->reloader == NULL && difftime(time(NULL),time_zero) >= confReloadTimeout){
+        this->reloader = new std::thread(&NwInterface::reloadConf, this); // reload config in background
+      }
       char pktBuf[8192] __attribute__ ((aligned));
       int len = recv(fd, pktBuf, sizeof(pktBuf), 0);
 
@@ -145,7 +163,6 @@ void NwInterface::packetPollLoop() {
   }
 
   trace->traceEvent(TRACE_NORMAL, "Leaving netfilter packet poll loop");
-
   ifaceRunning = false;
 }
 
@@ -228,7 +245,8 @@ const char* NwInterface::getProtoName(u_int8_t proto) {
 /* **************************************************** */
 
 bool NwInterface::isPrivateIPv4(u_int32_t addr /* network byte order */) {
-
+  addr = ntohl(addr);
+  
   if(((addr & 0xFF000000) == 0x0A000000 /* 10.0.0.0/8 */)
      || ((addr & 0xFFF00000) == 0xAC100000 /* 172.16.0.0/12 */)
      || ((addr & 0xFFFF0000) == 0xC0A80000 /* 192.168.0.0/16 */)
@@ -313,7 +331,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
   u_int32_t daddr = ipv4 ? inet_addr(dst_host) : 0;
   bool pass_local = true,
     saddr_private = (ipv4 ? isPrivateIPv4(saddr) : isPrivateIPv6(src_host)),
-    daddr_private = (ipv4 ? isPrivateIPv4(saddr) : isPrivateIPv6(dst_host));
+    daddr_private = (ipv4 ? isPrivateIPv4(daddr) : isPrivateIPv6(dst_host));
   Marker m, src_marker, dst_marker;
   sport = ntohs(sport), dport = ntohs(dport);
 
@@ -340,7 +358,28 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
     return(MARKER_DROP);
   }
   }
+  if (ipv6) {
+    struct in6_addr a;
+    inet_pton(AF_INET6, src_host, &a);
+    if ((!saddr_private) && conf->isBlacklistedIPv6(&a)) {
+      logFlow(proto_name,
+              src_host, sport, src_ctry, src_cont, true,
+              dst_host, dport, dst_ctry, dst_cont, false,
+              false /* drop */);
 
+      return (MARKER_DROP);
+    }
+
+    inet_pton(AF_INET6, dst_host, &a);
+    if ((!daddr_private) && conf->isBlacklistedIPv6(&a)) {
+      logFlow(proto_name,
+              src_host, sport, src_ctry, src_cont, false,
+              dst_host, dport, dst_ctry, dst_cont, true,
+              false /* drop */);
+
+      return (MARKER_DROP);
+    }
+  }
 
   /* Step 2 - For TCP/UDP ignore traffic for non-monitored ports */
   switch(proto) {
@@ -402,4 +441,16 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
   }
 
   return(m);
+}
+
+void NwInterface::reloadConf(){
+  trace->traceEvent(TRACE_INFO,"Reloading config file");
+  Configuration *newConf = new Configuration();
+  newConf->readConfigFile(this->confPath.c_str());
+  if(newConf->isConfigured()) {
+    this->shadowConf = newConf;
+  }
+  else{
+    trace->traceEvent(TRACE_ERROR, "Please check the JSON configuration file");
+  }
 }
