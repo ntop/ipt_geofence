@@ -27,9 +27,9 @@
 class Configuration {
  private:
   std::unordered_map<u_int16_t, Marker> ctrs_conts;
-  std::unordered_map<u_int16_t, bool>   tcp_ports, udp_ports, ignored_ports;
+  std::unordered_map<u_int16_t, bool>   tcp_ports, udp_ports, ignored_ports, honeypot_ports;
   Marker default_policy;
-  Blacklists blacklists;
+  Blacklists blacklists, honey_banned;
   unsigned int nfq_queue_id;
   bool configured, all_tcp_ports, all_udp_ports;
   
@@ -50,9 +50,12 @@ class Configuration {
   inline bool isIgnoredPort(u_int16_t port)      { return(ignored_ports.find(port) != ignored_ports.end());            }
   inline bool isMonitoredTCPPort(u_int16_t port) { return(all_tcp_ports || (tcp_ports.find(port) != tcp_ports.end())); }
   inline bool isMonitoredUDPPort(u_int16_t port) { return(all_udp_ports || (udp_ports.find(port) != udp_ports.end())); }
+  inline bool isProtectedPort(u_int16_t port) { return(honeypot_ports.find(port) != honeypot_ports.end()); }
   inline bool isBlacklistedIPv4(struct in_addr *addr)                   {  return(blacklists.isBlacklistedIPv4(addr)); }
   inline bool isBlacklistedIPv6(struct in6_addr *addr6)                 { return(blacklists.isBlacklistedIPv6(addr6)); }
-  inline std::string *getBlacklistsUrls()             { return(blacklists.urls_Blacklist);}
+  inline void addBannedHost(char *addr) { honey_banned.addAddress(addr); }
+  inline void setBannedList(Blacklists banned_hosts)  { honey_banned = banned_hosts; }
+  inline Blacklists getBannedList()   { return(honey_banned); }
   inline void loadIPsetFromURL(const char* url)  { blacklists.loadIPsetFromURL(url);}
 };
 

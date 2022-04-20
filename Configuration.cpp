@@ -95,6 +95,16 @@ bool Configuration::readConfigFile(const char *path) {
 	ignored_ports[port] = true;
       }
     }
+
+    // Doesn't distinguish between UDP and TCP (and other protocols...)
+    if (!root["monitored_ports"]["honeypot_ports"].empty()) {
+      for (Json::Value::ArrayIndex i = 0; i != root["monitored_ports"]["honeypot_ports"].size(); i++) {
+        unsigned int port = root["monitored_ports"]["honeypot_ports"][i].asUInt();
+
+        trace->traceEvent(TRACE_INFO, "Protecting port %u", port);
+        honeypot_ports[port] = true;
+      }
+    }
   }
 
   if(all_tcp_ports) trace->traceEvent(TRACE_INFO, "All TCP ports will be monitored");

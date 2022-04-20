@@ -386,6 +386,16 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
     }
   }
 
+  /* Step 2.0 - Check honeypot ports and (eventually) ban host */
+  bool drop = false;
+  if (conf->isProtectedPort(sport)){
+    drop = true, conf->addBannedHost(src_host);
+  }
+  if (conf->isProtectedPort(dport)){
+    drop = true, conf->addBannedHost(dst_host);
+  }
+  if (drop) return(MARKER_PASS);
+
   /* Step 2 - For TCP/UDP ignore traffic for non-monitored ports */
   switch(proto) {
   case IPPROTO_TCP:
@@ -451,7 +461,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
 /* **************************************************** */
 
 u_int32_t NwInterface::computeNextReloadTime() {
-  u_int32_t confReloadTimeout = 86400 /* once a day */;
+  u_int32_t confReloadTimeout = 10 /* once a day */;
   u_int32_t now = time(NULL);
   u_int32_t next_reload = now + confReloadTimeout;
 
@@ -485,8 +495,10 @@ void NwInterface::reloadConfLoop() {
 	
 	newConf->readConfigFile(this->confPath.c_str());
 	
-	if(newConf->isConfigured())
+	if(newConf->isConfigured()) {
+    newConf->setBannedList(conf->getBannedList());
 	  shadowConf = newConf;
+  }
 	else
 	  trace->traceEvent(TRACE_ERROR, "Something went wrong: please check the JSON config file");
 
