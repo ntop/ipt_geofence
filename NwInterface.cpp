@@ -83,7 +83,7 @@ NwInterface::~NwInterface() {
   
   if(queueHandle) nfq_destroy_queue(queueHandle);
   if(nfHandle)    nfq_close(nfHandle);
-  if(conf)        delete conf;
+  if(conf) { conf->deleteBannedList(); delete conf; }
 
   nf_fd = 0;
 }
@@ -120,6 +120,7 @@ int netfilter_callback(struct nfq_q_handle *qh,
 void NwInterface::packetPollLoop() {
   struct nfq_handle *h;
   int fd;
+  conf->setBannedList(new Blacklists()); // init honeypot blacklist
 
   /* Spawn reload config thread in background */
   reloaderThread = new std::thread(&NwInterface::reloadConfLoop, this);

@@ -56,6 +56,7 @@ class Configuration {
   inline void addBannedHost(char *addr) { honey_banned->addAddress(addr); }
   inline void setBannedList(Blacklists* banned_hosts)  { honey_banned = banned_hosts; }
   inline Blacklists* getBannedList()   { return(honey_banned); }
+  inline void deleteBannedList() { delete honey_banned; }
   inline void loadIPsetFromURL(const char* url)  { blacklists.loadIPsetFromURL(url);}
 };
 
