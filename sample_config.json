@@ -6,6 +6,7 @@
 		"udp": [],
 		"ignored_ports": [123]
 	},
+	"honeypot_ports": [12345],
 	"policy": {
 		"drop": {
 			"countries_whitelist": ["IT", "DE", "CH", "NL"],

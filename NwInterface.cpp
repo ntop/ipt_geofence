@@ -395,7 +395,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
   if (conf->isProtectedPort(dport)){
     drop = true, conf->addBannedHost(dst_host);
   }
-  if (drop) return(MARKER_PASS);
+  if (drop) return(MARKER_DROP);
 
   /* Step 2 - For TCP/UDP ignore traffic for non-monitored ports */
   switch(proto) {
