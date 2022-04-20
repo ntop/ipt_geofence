@@ -389,13 +389,20 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
 
   /* Step 2.0 - Check honeypot ports and (eventually) ban host */
   bool drop = false;
-  if (conf->isProtectedPort(sport)){
-    drop = true, conf->addBannedHost(src_host);
-  }
+  // // TODO Should we check only dport ? 
+  // if (conf->isProtectedPort(sport)){
+  //   drop = true, conf->addBannedHost(src_host);
+  // }
   if (conf->isProtectedPort(dport)){
     drop = true, conf->addBannedHost(dst_host);
+    trace->traceEvent(TRACE_INFO, "Banning host %s : %u", dst_host, dport);
   }
-  if (drop) return(MARKER_DROP);
+  if (drop) {
+    logFlow(proto_name,
+	    src_host, sport, src_ctry, src_cont, false,
+	    dst_host, dport, dst_ctry, dst_cont, false,
+	    false /* drop */);
+  }
 
   /* Step 2 - For TCP/UDP ignore traffic for non-monitored ports */
   switch(proto) {
@@ -462,7 +469,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
 /* **************************************************** */
 
 u_int32_t NwInterface::computeNextReloadTime() {
-  u_int32_t confReloadTimeout = 10 /* once a day */;
+  u_int32_t confReloadTimeout = 86400 /* once a day */;
   u_int32_t now = time(NULL);
   u_int32_t next_reload = now + confReloadTimeout;
 
