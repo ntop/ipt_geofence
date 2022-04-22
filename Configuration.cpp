@@ -58,21 +58,30 @@ bool Configuration::readConfigFile(const char *path) {
   } else{
     if(root["markers"]["unknown"].empty()){
       trace->traceEvent(TRACE_ERROR, "Missing %s from %s", "unknown", path);
-        return(false);
+      return(false);
     }else{
       marker_unknown.setValue(root["markers"]["unknown"].asUInt());
     }
     if(root["markers"]["pass"].empty()){
       trace->traceEvent(TRACE_ERROR, "Missing %s from %s", "pass", path);
-        return(false);
+      return(false);
     }else{
       marker_pass.setValue(root["markers"]["pass"].asUInt());
     }
     if(root["markers"]["drop"].empty()){
       trace->traceEvent(TRACE_ERROR, "Missing %s from %s", "drop", path);
-        return(false);
+      return(false);
     }else{
       marker_drop.setValue(root["markers"]["drop"].asUInt());
+    }
+    if (marker_drop==marker_pass || marker_pass==marker_unknown || 
+        marker_drop==marker_unknown){
+        trace->traceEvent(TRACE_ERROR, "Markers values must be distinct in %s", path);
+        return(false);
+    }
+    if(marker_drop<0 || marker_pass<0 || marker_unknown<0){
+        trace->traceEvent(TRACE_ERROR, "Markers values must be positive in %s", path);
+        return(false);
     }
   }
 
