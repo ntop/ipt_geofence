@@ -52,9 +52,9 @@ class Configuration {
   
   inline void setQueueId(int nfq_id)                        { nfq_queue_id = nfq_id;  }
   inline void setCountryMarker(u_int16_t country, Marker m) { ctrs_conts[country] = m;}
-  inline Marker getMarkerUnknown(u_int16_t v)               { return marker_unknown;  }
-  inline Marker getMarkerPass(u_int16_t v)                  { return marker_pass;     }
-  inline Marker getMarkerDrop(u_int16_t v)                  { return marker_drop;     }
+  inline Marker getMarkerUnknown()                          { return marker_unknown;  }
+  inline Marker getMarkerPass()                             { return marker_pass;     }
+  inline Marker getMarkerDrop()                             { return marker_drop;     }
   inline Marker getDefaultPolicy()                          { return default_policy;  }
   Marker getMarker(char *country, char *continent);
   inline bool isIgnoredPort(u_int16_t port)      { return(ignored_ports.find(port) != ignored_ports.end());            }
