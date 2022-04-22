@@ -200,7 +200,7 @@ Marker NwInterface::dissectPacket(const u_char *payload, u_int payload_len) {
       struct in_addr a;
 
       if ((iph->protocol == IPPROTO_UDP) && ((frag_off & 0x3FFF /* IP_MF | IP_OFFSET */) != 0))
-        return (conf->getMarkerUnknown); /* Don't block it */
+        return (conf->getMarkerUnknown()); /* Don't block it */
 
       // get protocol and offset
       proto = iph->protocol;
@@ -209,7 +209,7 @@ Marker NwInterface::dissectPacket(const u_char *payload, u_int payload_len) {
       a.s_addr = iph->saddr, inet_ntop(AF_INET, &a, src, sizeof(src));
       a.s_addr = iph->daddr, inet_ntop(AF_INET, &a, dst, sizeof(dst));
     } else { // Neither ipv4 or ipv6...unlikely to be evaluated
-      return (conf->getMarkerPass);
+      return (conf->getMarkerPass());
     }
 
     u_int8_t *nxt = ((u_int8_t *)iph + ip_payload_offset);
@@ -233,7 +233,7 @@ Marker NwInterface::dissectPacket(const u_char *payload, u_int payload_len) {
                         src,dst, ipv4,ipv6));
   }
   
-  return (conf->getMarkerPass);
+  return (conf->getMarkerPass());
 }
 
 /* **************************************************** */
@@ -350,7 +350,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
 	      dst_host, dport, dst_ctry, dst_cont, false,
 	      false /* drop */);
 
-      return(conf->getMarkerDrop);
+      return(conf->getMarkerDrop());
     }
 
     in.s_addr = daddr;
@@ -360,7 +360,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
 	      dst_host, dport, dst_ctry, dst_cont, true,
 	      false /* drop */);
 
-      return(conf->getMarkerDrop);
+      return(conf->getMarkerDrop());
     }
   }
   if (ipv6) {
@@ -372,7 +372,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
               dst_host, dport, dst_ctry, dst_cont, false,
               false /* drop */);
 
-      return (conf->getMarkerDrop);
+      return (conf->getMarkerDrop());
     }
 
     inet_pton(AF_INET6, dst_host, &a);
@@ -382,7 +382,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
               dst_host, dport, dst_ctry, dst_cont, true,
               false /* drop */);
 
-      return (conf->getMarkerDrop);
+      return (conf->getMarkerDrop());
     }
   }
 
@@ -393,7 +393,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
       ;
     else {
       trace->traceEvent(TRACE_INFO, "Ignoring TCP ports %u/%u", sport, dport);
-      return(conf->getMarkerPass);
+      return(conf->getMarkerPass());
     }
     break;
 
@@ -402,7 +402,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
       ;
     else {
       trace->traceEvent(TRACE_INFO, "Ignoring UDP ports %u/%u", sport, dport);
-      return(conf->getMarkerPass);
+      return(conf->getMarkerPass());
     }
     break;
   }
@@ -415,7 +415,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
     pass_local = false;
   } else {
     /* Unknown or private IP address  */
-    src_marker = conf->getMarkerPas;
+    src_marker = conf->getMarkerPass();
   }
 
   if((!daddr_private) && (geoip->lookup(dst_host, dst_ctry, sizeof(dst_ctry), dst_cont, sizeof(dst_cont)))) {
@@ -423,21 +423,21 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
     pass_local = false;
   } else {
     /* Unknown or private IP address  */
-    dst_marker = conf->getMarkerPas;
+    dst_marker = conf->getMarkerPass();
   }
 
   /* Final step: compute the flow verdict */
 
   if((conf->isIgnoredPort(sport) || conf->isIgnoredPort(dport))
-     || ((src_marker == conf->getMarkerPass) && (dst_marker == conf->getMarkerPass))) {
-    m = conf->getMarkerPas;
+     || ((src_marker == conf->getMarkerPass()) && (dst_marker == conf->getMarkerPass()))) {
+    m = conf->getMarkerPass();
 
     logFlow(proto_name,
 	    src_host, sport, src_ctry, src_cont, false,
 	    dst_host, dport, dst_ctry, dst_cont, false,
 	    true /* pass */);
   } else {
-    m = conf->getMarkerDrop;
+    m = conf->getMarkerDrop();
 
     logFlow(proto_name,
 	    src_host, sport, src_ctry, src_cont, false,
