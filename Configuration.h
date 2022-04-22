@@ -28,9 +28,13 @@ class Configuration {
  private:
   std::unordered_map<u_int16_t, Marker> ctrs_conts;
   std::unordered_map<u_int16_t, bool>   tcp_ports, udp_ports, ignored_ports;
+  unsigned int nfq_queue_id;
+  Marker marker_unknown;
+  Marker marker_pass;
+  Marker marker_drop;
   Marker default_policy;
   Blacklists blacklists;
-  unsigned int nfq_queue_id;
+  
   bool configured, all_tcp_ports, all_udp_ports;
   
   u_int16_t ctry_cont2u16(char *country_code);
@@ -44,8 +48,11 @@ class Configuration {
   inline bool isConfigured()       { return(configured);   }
   
   inline void setQueueId(int nfq_id)                        { nfq_queue_id = nfq_id;  }
-  inline void setCountryMarker(u_int16_t country, Marker m) { ctrs_conts[country] = m; }
-  inline Marker getDefaultPolicy()                          { return(default_policy); }
+  inline void setCountryMarker(u_int16_t country, Marker m) { ctrs_conts[country] = m;}
+  inline Marker getMarkerUnknown(u_int16_t v)               { return marker_unknown;  }
+  inline Marker getMarkerPass(u_int16_t v)                  { return marker_pass;     }
+  inline Marker getMarkerDrop(u_int16_t v)                  { return marker_drop;     }
+  inline Marker getDefaultPolicy()                          { return default_policy;  }
   Marker getMarker(char *country, char *continent);
   inline bool isIgnoredPort(u_int16_t port)      { return(ignored_ports.find(port) != ignored_ports.end());            }
   inline bool isMonitoredTCPPort(u_int16_t port) { return(all_tcp_ports || (tcp_ports.find(port) != tcp_ports.end())); }
