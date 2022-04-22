@@ -40,7 +40,10 @@ class Configuration {
   u_int16_t ctry_cont2u16(char *country_code);
   
  public:
-  Configuration() { nfq_queue_id = 0, default_policy = MARKER_PASS; configured = false, all_tcp_ports = all_udp_ports = true; }
+  Configuration() { nfq_queue_id = 0, marker_unknown.setValue(0); 
+                    marker_pass.setValue(1); marker_drop.setValue(2);
+                    default_policy = marker_pass; configured = false, 
+                    all_tcp_ports = all_udp_ports = true; }
 
   bool readConfigFile(const char *path);
 
