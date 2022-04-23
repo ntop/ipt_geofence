@@ -83,6 +83,7 @@ bool Configuration::readConfigFile(const char *path) {
         trace->traceEvent(TRACE_ERROR, "Markers values must be positive in %s", path);
         return(false);
     }
+    trace->traceEvent(TRACE_INFO, "Markers are set to: unknown %d, pass %d, drop %d", marker_unknown, marker_pass, marker_drop);
   }
 
   if(root["default_policy"].empty()) {
