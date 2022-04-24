@@ -41,7 +41,7 @@ class Configuration {
   
  public:
   Configuration() { nfq_queue_id = 0, marker_unknown.setValue(0); 
-                    marker_pass.setValue(1); marker_drop.setValue(2);
+                    marker_pass.setValue(1000); marker_drop.setValue(2000);
                     default_policy = marker_pass; configured = false, 
                     all_tcp_ports = all_udp_ports = true; }
 

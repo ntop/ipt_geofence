@@ -1,8 +1,8 @@
 {
 	"queue_id": 0,
 	"markers": {
-		"pass": 1,
-		"drop": 2
+		"pass": 1000,
+		"drop": 2000
 	},
 	"default_policy": "DROP",
 	"monitored_ports": {
