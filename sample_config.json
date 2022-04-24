@@ -1,7 +1,6 @@
 {
 	"queue_id": 0,
 	"markers": {
-		"unknown": 0,
 		"pass": 1,
 		"drop": 2
 	},
