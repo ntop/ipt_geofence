@@ -1,5 +1,9 @@
 {
 	"queue_id": 0,
+	"markers": {
+		"pass": 1000,
+		"drop": 2000
+	},
 	"default_policy": "DROP",
 	"monitored_ports": {
 		"tcp": [22, 80, 443],
