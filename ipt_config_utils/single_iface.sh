@@ -10,6 +10,8 @@
 
 
 QUEUE_ID=0
+
+# User definable marker values
 MARK_PASS=1000
 MARK_DROP=2000
 
