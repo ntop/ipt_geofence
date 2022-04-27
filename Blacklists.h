@@ -37,6 +37,7 @@ class Blacklists {
 
   bool findAddress(char *addr);
   void addAddress(char *net);
+  void removeAddress(char *net);
   bool loadIPsetFromFile(const char *path);
   bool loadIPsetFromURL(const char *url);
 

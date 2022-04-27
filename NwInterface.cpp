@@ -535,6 +535,7 @@ bool NwInterface::isBanned(char *host, struct in_addr *a4, struct in6_addr *a6){
   if (h != honey_banned_time.end()){ // this should always be true
     if (difftime(time(NULL),h->second) >= banTimeout){
       honey_banned_time.erase(h); // ban timeout has expired
+      honey_banned.removeAddress(host);
       return false;
     }
     else  

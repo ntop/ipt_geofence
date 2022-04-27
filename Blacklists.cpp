@@ -137,6 +137,36 @@ void Blacklists::addAddress(char *net) {
   }
 }
 
+void Blacklists::removeAddress(char *net){
+  char *_bits = strchr(net, '/');
+  u_int bits = 0;
+  ndpi_prefix_t prefix;
+
+  if(_bits)
+    bits = atoi(&_bits[1]), _bits[0] = '\0';
+
+  if(strchr(net, ':') != NULL) {
+    struct in6_addr addr6;
+
+    if(bits == 0) bits = 128;
+
+    if(inet_pton(AF_INET6, net, &addr6)){
+      ndpi_fill_prefix_v6(&prefix, &addr6, 128, ptree_v6->maxbits);
+      ndpi_patricia_node_t *n = ndpi_patricia_search_best(ptree_v6, &prefix);
+      if (n) ndpi_patricia_remove(ptree_v6,n);
+    }
+  } else {
+    struct in_addr pin;
+
+    if(bits == 0) bits = 32;
+
+    inet_aton(net, &pin);
+    ndpi_fill_prefix_v4(&prefix, &pin, 32, ptree_v4->maxbits);
+    ndpi_patricia_node_t *n = ndpi_patricia_search_best(ptree_v4, &prefix);
+    if (n) ndpi_patricia_remove(ptree_v4,n);
+  }
+}
+
 /* ****************************************** */
 
 bool Blacklists::loadIPsetFromFile(const char *path) {
