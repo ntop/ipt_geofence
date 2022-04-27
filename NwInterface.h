@@ -35,7 +35,8 @@ class NwInterface {
   Configuration *conf, *shadowConf = NULL;
   GeoIP *geoip;
   std::thread *reloaderThread;
-  std::map<char*, time_t> honey_banned;
+  std::map<std::string, time_t> honey_banned_time;
+  Blacklists honey_banned;
 
   Marker makeVerdict(u_int8_t proto, u_int16_t vlanId,
 		     u_int16_t sport,

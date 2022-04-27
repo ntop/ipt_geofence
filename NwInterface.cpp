@@ -83,7 +83,7 @@ NwInterface::~NwInterface() {
   
   if(queueHandle) nfq_destroy_queue(queueHandle);
   if(nfHandle)    nfq_close(nfHandle);
-  if(conf) { conf->deleteBannedList(); delete conf; }
+  if(conf)        { delete conf; }
 
   nf_fd = 0;
 }
@@ -120,7 +120,6 @@ int netfilter_callback(struct nfq_q_handle *qh,
 void NwInterface::packetPollLoop() {
   struct nfq_handle *h;
   int fd;
-  conf->setBannedList(new Blacklists()); // init honeypot blacklist
 
   /* Spawn reload config thread in background */
   reloaderThread = new std::thread(&NwInterface::reloadConfLoop, this);
@@ -390,7 +389,9 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
   /* Step 2.0 - Check honeypot ports and (eventually) ban host */
   bool drop = false;
   if (conf->isProtectedPort(dport)){
-    drop = true, conf->addBannedHost(src_host);
+    drop = true, honey_banned.addAddress(src_host);
+    std::string h(src_host);
+    this->honey_banned_time[h] = time(NULL); // init/reset timer for src_host
     trace->traceEvent(TRACE_INFO, "Banning host %s : %u", src_host, sport);
   }
   if (drop) {
@@ -500,7 +501,6 @@ void NwInterface::reloadConfLoop() {
 	newConf->readConfigFile(this->confPath.c_str());
 	
 	if(newConf->isConfigured()) {
-    newConf->setBannedList(conf->getBannedList());
 	  shadowConf = newConf;
   }
 	else
@@ -520,11 +520,12 @@ void NwInterface::reloadConfLoop() {
 }
 
 bool NwInterface::isBanned(char *host){
-  std::map<char*,time_t>::iterator h = this->honey_banned.find(host);
+  std::string s(host);
+  std::map<std::string,time_t>::iterator h = this->honey_banned_time.find(host);
   u_int32_t banTimeout = 900; // 15 minutes
-  if (h != this->honey_banned.end()){ // the host is banned
+  if (h != this->honey_banned_time.end()){ // the host is banned
     if (difftime(time(NULL),h->second) >= banTimeout){
-      this->honey_banned.erase(h);
+      this->honey_banned_time.erase(h);
       return false;
     }
     else  
