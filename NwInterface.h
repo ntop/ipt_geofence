@@ -35,6 +35,7 @@ class NwInterface {
   Configuration *conf, *shadowConf = NULL;
   GeoIP *geoip;
   std::thread *reloaderThread;
+  std::map<char*, time_t> honey_banned;
 
   Marker makeVerdict(u_int8_t proto, u_int16_t vlanId,
 		     u_int16_t sport,
@@ -51,7 +52,8 @@ class NwInterface {
   bool isPrivateIPv6(const char *ip6addr);
   void reloadConfLoop();
   u_int32_t computeNextReloadTime();
-  
+  bool isBanned(char *host);
+
  public:
   NwInterface(u_int nf_device_id, Configuration *_c, GeoIP *_g, std::string c_path);
   ~NwInterface();

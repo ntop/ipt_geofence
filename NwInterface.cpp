@@ -391,7 +391,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
   bool drop = false;
   // // TODO Should we check only dport ? 
   // if (conf->isProtectedPort(sport)){
-  //   drop = true, conf->addBannedHost(src_host);
+  //   drop = true, conf->addBannedHost(src_host);ia 
   // }
   if (conf->isProtectedPort(dport)){
     drop = true, conf->addBannedHost(dst_host);
@@ -521,4 +521,19 @@ void NwInterface::reloadConfLoop() {
   } /* while */
 
   trace->traceEvent(TRACE_NORMAL, "Reload configuration loop is over");
+}
+
+bool NwInterface::isBanned(char *host){
+  std::map<char*,time_t>::iterator h = this->honey_banned.find(host);
+  u_int32_t banTimeout = 900; // 15 minutes
+  if (h != this->honey_banned.end()){ // the host is banned
+    if (difftime(time(NULL),h->second) >= banTimeout){
+      this->honey_banned.erase(h);
+      return false;
+    }
+    else  
+      return true;
+  }
+  return false;
+  
 }
