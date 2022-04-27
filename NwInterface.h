@@ -53,7 +53,7 @@ class NwInterface {
   bool isPrivateIPv6(const char *ip6addr);
   void reloadConfLoop();
   u_int32_t computeNextReloadTime();
-  bool isBanned(char *host);
+  bool isBanned(char *host, struct in_addr *a4, struct in6_addr *a6);
 
  public:
   NwInterface(u_int nf_device_id, Configuration *_c, GeoIP *_g, std::string c_path);

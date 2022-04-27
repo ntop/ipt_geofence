@@ -344,7 +344,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
   if (ipv4){
     in.s_addr = saddr;
     /* Step 1 - For all ports/protocols, check if sender/recipient are blacklisted and if so, block this flow */
-    if((!saddr_private) && conf->isBlacklistedIPv4(&in)) {
+    if((!saddr_private) && (conf->isBlacklistedIPv4(&in) || isBanned(src_host,&in,NULL))) {
       logFlow(proto_name,
 	      src_host, sport, src_ctry, src_cont, true,
 	      dst_host, dport, dst_ctry, dst_cont, false,
@@ -354,7 +354,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
     }
 
     in.s_addr = daddr;
-    if((!daddr_private) && conf->isBlacklistedIPv4(&in)) {
+    if((!daddr_private) && (conf->isBlacklistedIPv4(&in) || isBanned(src_host,&in,NULL))) {
       logFlow(proto_name,
 	      src_host, sport, src_ctry, src_cont, false,
 	      dst_host, dport, dst_ctry, dst_cont, true,
@@ -366,7 +366,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
   if (ipv6) {
     struct in6_addr a;
     inet_pton(AF_INET6, src_host, &a);
-    if ((!saddr_private) && conf->isBlacklistedIPv6(&a)) {
+    if ((!saddr_private) && (conf->isBlacklistedIPv6(&a) || isBanned(src_host,NULL,&a))) {
       logFlow(proto_name,
               src_host, sport, src_ctry, src_cont, true,
               dst_host, dport, dst_ctry, dst_cont, false,
@@ -376,7 +376,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
     }
 
     inet_pton(AF_INET6, dst_host, &a);
-    if ((!daddr_private) && conf->isBlacklistedIPv6(&a)) {
+    if ((!daddr_private) && (conf->isBlacklistedIPv6(&a) || isBanned(src_host,NULL,&a))) {
       logFlow(proto_name,
               src_host, sport, src_ctry, src_cont, false,
               dst_host, dport, dst_ctry, dst_cont, true,
@@ -391,7 +391,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
   if (conf->isProtectedPort(dport)){
     drop = true, honey_banned.addAddress(src_host);
     std::string h(src_host);
-    this->honey_banned_time[h] = time(NULL); // init/reset timer for src_host
+    honey_banned_time[h] = time(NULL); // init/reset timer for src_host
     trace->traceEvent(TRACE_INFO, "Banning host %s : %u", src_host, sport);
   }
   if (drop) {
@@ -519,18 +519,27 @@ void NwInterface::reloadConfLoop() {
   trace->traceEvent(TRACE_NORMAL, "Reload configuration loop is over");
 }
 
-bool NwInterface::isBanned(char *host){
-  std::string s(host);
-  std::map<std::string,time_t>::iterator h = this->honey_banned_time.find(host);
+/**
+ * @param host char* address representation
+ * @note a4 and a6 shouldn't be both set
+ */
+bool NwInterface::isBanned(char *host, struct in_addr *a4, struct in6_addr *a6){
+  if (( a4 && !honey_banned.isBlacklistedIPv4(a4)) ||
+      ( a6 && !honey_banned.isBlacklistedIPv6(a6)))
+    return false;
+  
+  // => host was had been banned
+  std::string s(host);  
   u_int32_t banTimeout = 900; // 15 minutes
-  if (h != this->honey_banned_time.end()){ // the host is banned
+  std::map<std::string,time_t>::iterator h = honey_banned_time.find(host);
+  if (h != honey_banned_time.end()){ // this should always be true
     if (difftime(time(NULL),h->second) >= banTimeout){
-      this->honey_banned_time.erase(h);
+      honey_banned_time.erase(h); // ban timeout has expired
       return false;
     }
     else  
-      return true;
+      return true;  // still banned
   }
-  return false;
+  return false; // should never get here
   
 }
