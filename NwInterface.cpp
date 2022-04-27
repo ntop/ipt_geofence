@@ -389,13 +389,9 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
 
   /* Step 2.0 - Check honeypot ports and (eventually) ban host */
   bool drop = false;
-  // // TODO Should we check only dport ? 
-  // if (conf->isProtectedPort(sport)){
-  //   drop = true, conf->addBannedHost(src_host);ia 
-  // }
   if (conf->isProtectedPort(dport)){
-    drop = true, conf->addBannedHost(dst_host);
-    trace->traceEvent(TRACE_INFO, "Banning host %s : %u", dst_host, dport);
+    drop = true, conf->addBannedHost(src_host);
+    trace->traceEvent(TRACE_INFO, "Banning host %s : %u", src_host, sport);
   }
   if (drop) {
     logFlow(proto_name,
