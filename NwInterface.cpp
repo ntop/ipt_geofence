@@ -153,6 +153,9 @@ void NwInterface::packetPollLoop() {
 	break;
       }
     }
+    else { 
+      honeyHarvesting(10);
+    }
 
     if(shadowConf != NULL) {
       /* Swap configurations */
