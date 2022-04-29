@@ -389,9 +389,11 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
   /* Step 2.0 - Check honeypot ports and (eventually) ban host */
   bool drop = false;
   if (conf->isProtectedPort(dport)){
-    drop = true, honey_banned.addAddress(src_host);
-    std::string h(src_host);
-    honey_banned_time[h] = time(NULL); // init/reset timer for src_host
+    drop = true, honey_banned.addAddress(src_host); // add banned host to patricia tree
+    std::string h(src_host);  // string cast
+    honey_banned_timesorted.push_back(h); // h is the "less older" banned host
+    std::pair<time_t,list_it> map_value (time(NULL), honey_banned_timesorted.end());
+    honey_banned_time[h] = map_value; // init/reset timer for src_host and keep track in list position
     trace->traceEvent(TRACE_INFO, "Banning host %s : %u", src_host, sport);
   }
   if (drop) {
@@ -531,11 +533,12 @@ bool NwInterface::isBanned(char *host, struct in_addr *a4, struct in6_addr *a6){
   // => host was had been banned
   std::string s(host);  
   u_int32_t banTimeout = 900; // 15 minutes
-  std::map<std::string,time_t>::iterator h = honey_banned_time.find(host);
+  std::map<std::string,std::pair<time_t,list_it>>::iterator h = honey_banned_time.find(host);
   if (h != honey_banned_time.end()){ // this should always be true
-    if (difftime(time(NULL),h->second) >= banTimeout){
-      honey_banned_time.erase(h); // ban timeout has expired
-      honey_banned.removeAddress(host);
+    if (difftime(time(NULL),h->second.first) >= banTimeout){ // ban timeout has expired
+      honey_banned_timesorted.erase(h->second.second); // remove from list
+      honey_banned_time.erase(h); // remove from map
+      honey_banned.removeAddress(host); // remove from patricia tree
       return false;
     }
     else  

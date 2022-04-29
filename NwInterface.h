@@ -24,6 +24,8 @@
 
 /* ********************************************** */
 
+typedef std::list<std::string>::iterator list_it;
+
 class NwInterface {
  private:
   int queueId;
@@ -35,7 +37,8 @@ class NwInterface {
   Configuration *conf, *shadowConf = NULL;
   GeoIP *geoip;
   std::thread *reloaderThread;
-  std::map<std::string, time_t> honey_banned_time;
+  std::list<std::string> honey_banned_timesorted;
+  std::map<std::string, std::pair<time_t, list_it>> honey_banned_time;
   Blacklists honey_banned;
 
   Marker makeVerdict(u_int8_t proto, u_int16_t vlanId,
