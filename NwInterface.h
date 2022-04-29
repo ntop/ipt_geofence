@@ -40,6 +40,7 @@ class NwInterface {
   std::list<std::string> honey_banned_timesorted;
   std::map<std::string, std::pair<time_t, list_it>> honey_banned_time;
   Blacklists honey_banned;
+  u_int32_t banTimeout = 900; // 15 minutes
 
   Marker makeVerdict(u_int8_t proto, u_int16_t vlanId,
 		     u_int16_t sport,
@@ -57,6 +58,7 @@ class NwInterface {
   void reloadConfLoop();
   u_int32_t computeNextReloadTime();
   bool isBanned(char *host, struct in_addr *a4, struct in6_addr *a6);
+  void honeyHarvesting(int n);
 
  public:
   NwInterface(u_int nf_device_id, Configuration *_c, GeoIP *_g, std::string c_path);

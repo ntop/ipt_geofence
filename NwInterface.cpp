@@ -532,7 +532,6 @@ bool NwInterface::isBanned(char *host, struct in_addr *a4, struct in6_addr *a6){
   
   // => host was had been banned
   std::string s(host);  
-  u_int32_t banTimeout = 900; // 15 minutes
   std::map<std::string,std::pair<time_t,list_it>>::iterator h = honey_banned_time.find(host);
   if (h != honey_banned_time.end()){ // this should always be true
     if (difftime(time(NULL),h->second.first) >= banTimeout){ // ban timeout has expired
@@ -546,4 +545,26 @@ bool NwInterface::isBanned(char *host, struct in_addr *a4, struct in6_addr *a6){
   }
   return false; // should never get here
   
+}
+
+/**
+ * @param n number of entries to be removed 
+ */
+void NwInterface::honeyHarvesting(int n){
+  list_it it;
+  while (n--){
+    // if ( {list is empty} || {there aren't elements to be cleaned})
+    if ((it = honey_banned_timesorted.begin()) == honey_banned_timesorted.end() ||
+      difftime(time(NULL),honey_banned_time.find(*it)->second.first) >= banTimeout)
+      break;
+    
+    // else remove banned host
+    std::string s(*it); // convert to char*
+    char h[s.size()];
+    strcpy(h,s.c_str());
+    honey_banned.removeAddress(h);      // remove from patricia
+    honey_banned_time.erase(s);         // remove from map
+    honey_banned_timesorted.erase(it);  // remove from list
+
+  }
 }
