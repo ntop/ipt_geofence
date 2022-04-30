@@ -395,7 +395,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
     drop = true, honey_banned.addAddress(src_host); // add banned host to patricia tree
     std::string h(src_host);  // string cast
     honey_banned_timesorted.push_back(h); // h is the "less older" banned host
-    std::pair<time_t,list_it> map_value (time(NULL), honey_banned_timesorted.end());
+    std::pair<time_t,list_it> map_value (time(NULL), std::prev(honey_banned_timesorted.end()));
     honey_banned_time[h] = map_value; // init/reset timer for src_host and keep track in list position
     trace->traceEvent(TRACE_INFO, "Banning host %s : %u", src_host, sport);
   }
