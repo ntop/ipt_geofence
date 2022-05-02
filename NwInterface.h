@@ -40,7 +40,7 @@ class NwInterface {
   std::list<std::string> honey_banned_timesorted;
   std::map<std::string, std::pair<time_t, list_it>> honey_banned_time;
   Blacklists honey_banned;
-  u_int32_t banTimeout = 900; // 15 minutes
+  double banTimeout = 10.0; // 15 minutes
 
   Marker makeVerdict(u_int8_t proto, u_int16_t vlanId,
 		     u_int16_t sport,
