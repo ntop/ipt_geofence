@@ -96,8 +96,11 @@ bool Configuration::readConfigFile(const char *path) {
       }
     }
 
+    all_honeypot_ports = true;
+
     // Doesn't distinguish between UDP and TCP (and other protocols...)
     if (!root["monitored_ports"]["honeypot_ports"].empty()) {
+      all_honeypot_ports = false;
       for (Json::Value::ArrayIndex i = 0; i != root["monitored_ports"]["honeypot_ports"].size(); i++) {
         unsigned int port = root["monitored_ports"]["honeypot_ports"][i].asUInt();
 

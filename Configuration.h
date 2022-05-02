@@ -31,7 +31,7 @@ class Configuration {
   Marker default_policy;
   Blacklists blacklists;
   unsigned int nfq_queue_id;
-  bool configured, all_tcp_ports, all_udp_ports;
+  bool configured, all_tcp_ports, all_udp_ports, all_honeypot_ports;
   
   u_int16_t ctry_cont2u16(char *country_code);
   
@@ -50,7 +50,7 @@ class Configuration {
   inline bool isIgnoredPort(u_int16_t port)      { return(ignored_ports.find(port) != ignored_ports.end());            }
   inline bool isMonitoredTCPPort(u_int16_t port) { return(all_tcp_ports || (tcp_ports.find(port) != tcp_ports.end())); }
   inline bool isMonitoredUDPPort(u_int16_t port) { return(all_udp_ports || (udp_ports.find(port) != udp_ports.end())); }
-  inline bool isProtectedPort(u_int16_t port) { return(honeypot_ports.find(port) != honeypot_ports.end()); }
+  inline bool isProtectedPort(u_int16_t port) { return(all_honeypot_ports || (honeypot_ports.find(port) != honeypot_ports.end())); }
   inline bool isBlacklistedIPv4(struct in_addr *addr)     { return(blacklists.isBlacklistedIPv4(addr)) ;}
   inline bool isBlacklistedIPv6(struct in6_addr *addr6)   { return(blacklists.isBlacklistedIPv6(addr6));}
   inline void loadIPsetFromURL(const char* url)  { blacklists.loadIPsetFromURL(url);}
