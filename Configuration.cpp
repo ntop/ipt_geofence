@@ -52,10 +52,7 @@ bool Configuration::readConfigFile(const char *path) {
   } else
     nfq_queue_id = root["queue_id"].asUInt();
 
-  if(root["markers"].empty()) {
-    trace->traceEvent(TRACE_ERROR, "Missing %s from %s", "markers", path);
-    return(false);
-  } else{
+  if(!root["markers"].empty()) {
     if(root["markers"]["pass"].empty()){
       trace->traceEvent(TRACE_ERROR, "Missing %s from %s", "pass", path);
       return(false);
@@ -76,8 +73,8 @@ bool Configuration::readConfigFile(const char *path) {
         trace->traceEvent(TRACE_ERROR, "Markers values must be greater than 0 in %s", path);
         return(false);
     }
-    trace->traceEvent(TRACE_INFO, "Markers are set to: pass %d, drop %d", marker_pass, marker_drop);
   }
+  trace->traceEvent(TRACE_INFO, "Markers are set to: pass %d, drop %d", marker_pass, marker_drop);
 
   if(root["default_policy"].empty()) {
     trace->traceEvent(TRACE_ERROR, "Missing %s from %s", "default_policy", path);
