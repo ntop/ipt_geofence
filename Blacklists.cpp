@@ -43,8 +43,6 @@ Blacklists::~Blacklists() {
   if(ptree_v6)
     ndpi_patricia_destroy(ptree_v6, free_ptree_data);
   
-  if(urls_Blacklist)
-    free(urls_Blacklist);
 }
 
 /* ****************************************** */

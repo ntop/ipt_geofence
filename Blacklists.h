@@ -43,7 +43,7 @@ class Blacklists {
 
   bool isBlacklistedIPv4(struct in_addr *pin);
   bool isBlacklistedIPv6(struct in6_addr *addr6);
-  std::string *urls_Blacklist = NULL;
+  std::vector<std::string> urls_Blacklist;
 };
 
 
