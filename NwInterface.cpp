@@ -555,8 +555,8 @@ bool NwInterface::isBanned(char *host, struct in_addr *a4, struct in6_addr *a6){
  */
 void NwInterface::honeyHarvesting(int n){
   list_it it;
-  printf(" INIT - Honey harvesting || n_entries -> %lu\n", honey_banned_time.size());
-  while (n--){
+  int x = n;
+  while (x--){
     // if ( {list is empty} || {there aren't elements to be cleaned})
     if ((it = honey_banned_timesorted.begin()) == honey_banned_timesorted.end() ||
       difftime(time(NULL),honey_banned_time.find(*it)->second.first) <= banTimeout)
@@ -565,14 +565,13 @@ void NwInterface::honeyHarvesting(int n){
     // else remove banned host
     std::string s(*it); // convert to char*
     char h[s.size() + 1];
-    printf("...copying %lu", s.size());
-    printf(" %s\n", s.c_str());
     strcpy(h,s.c_str());
     honey_banned.removeAddress(h);      // remove from patricia
     honey_banned_time.erase(s);         // remove from map
     honey_banned_timesorted.erase(it);  // remove from list
 
   }
-  printf(" DONE - Honey harvesting || n_entries -> %lu\n", honey_banned_time.size());
+  if(++x != n) // avoid trace flooding
+    trace->traceEvent(TRACE_NORMAL," Banned hosts harvesting -> %d entries erased || %lu currently banned hosts\n", n-x, honey_banned_time.size());
 
 }
