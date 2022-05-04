@@ -24,6 +24,8 @@
 
 /* ******************************* */
 
+typedef std::pair<u_int16_t,u_int16_t> port_range; // first -> upper bound && second -> lower bound
+
 class Configuration {
  private:
   std::unordered_map<u_int16_t, Marker> ctrs_conts;
@@ -32,13 +34,16 @@ class Configuration {
   Blacklists blacklists;
   unsigned int nfq_queue_id;
   bool configured, all_tcp_ports, all_udp_ports, all_honeypot_ports;
+  std::set<port_range> honeypot_ranges;
   
   u_int16_t ctry_cont2u16(char *country_code);
-  
+  bool mergePortRanges (port_range r1, port_range r2, port_range *ret);
+
  public:
   Configuration() { nfq_queue_id = 0, default_policy = MARKER_PASS; configured = false, all_tcp_ports = all_udp_ports = true; }
 
   bool readConfigFile(const char *path);
+  void addPortRange(port_range r);
 
   inline unsigned int getQueueId() { return(nfq_queue_id); }
   inline bool isConfigured()       { return(configured);   }

@@ -166,3 +166,42 @@ Marker Configuration::getMarker(char *country, char *continent) {
 }
 
 /* ******************************************************* */
+
+/**
+ * @brief  Assuming r1.high > r2.low or viceversa, puts in 'ret'
+ * the union between the two ranges. 
+ * e.g. mergeRanges(15-30,20-40) returns 15-40.
+ * 
+ * @param r1 
+ * @param r2 
+ * @param ret pointer to structure which will hold the merged range
+ * @return true if mergeable, false otherwise 
+ */
+bool Configuration::mergePortRanges (port_range r1, port_range r2, port_range *ret){
+  if (r1.first < r1.second || r2.first < r2.second || !ret)
+    return false; // r1 || r2 || ret is invalid
+  port_range 
+    l = r1.second < r2.second ? r1 : r2,  // "left" range
+    r = r1.second < r2.second ? r2 : r1;  // "right" range
+
+  if( !(l.first > r.second) )
+    return false; // r1 and r2 are disjoint ranges
+  
+  ret->first = r.first;
+  ret->second = l.second;
+  
+  return true;
+}
+
+void Configuration::addPortRange (port_range r){
+  if (r.first < r.second){
+    u_int16_t tmp = r.first;
+    r.first = r.second;
+    r.second = tmp;
+  }
+
+  port_range ins;
+  // TODO merge ins with something already in the tree 
+  //honeypot_ranges.insert()
+  
+}
