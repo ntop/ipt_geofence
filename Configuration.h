@@ -38,6 +38,8 @@ class Configuration {
   
   u_int16_t ctry_cont2u16(char *country_code);
   bool mergePortRanges (port_range r1, port_range r2, port_range *ret);
+  bool Configuration::isMergeable(port_range r, port_range *toRet);
+
 
  public:
   Configuration() { nfq_queue_id = 0, default_policy = MARKER_PASS; configured = false, all_tcp_ports = all_udp_ports = true; }

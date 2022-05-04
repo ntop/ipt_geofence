@@ -205,3 +205,26 @@ void Configuration::addPortRange (port_range r){
   //honeypot_ranges.insert()
   
 }
+
+bool Configuration::isMergeable(port_range r, port_range *toRet){
+  if (honeypot_ranges.empty())
+    return false;
+  
+  std::set<port_range>::iterator it = honeypot_ranges.lower_bound(r);
+  if (it == honeypot_ranges.end()) {// nothing greater...
+    // look for the greatest in the tree
+    it = std::prev(honeypot_ranges.end());
+    return mergePortRanges(r,*it,toRet);
+  }
+  else{
+    if (!mergePortRanges(r,*it,toRet)){ // try to look for a lower one
+      if ( it != honeypot_ranges.begin()){
+        it = std::prev(it);
+        return mergePortRanges(r,*it,toRet);
+      }
+      else return false;
+    }
+    else
+      return true;
+  }
+}
