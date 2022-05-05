@@ -181,13 +181,17 @@ bool Configuration::mergePortRanges (port_range r1, port_range r2, port_range *r
   if (r1.first < r1.second || r2.first < r2.second || !ret)
     return false; // r1 || r2 || ret is invalid
   port_range 
-    l = r1.second < r2.second ? r1 : r2,  // "left" range
-    r = r1.second < r2.second ? r2 : r1;  // "right" range
+    l = r1.second <= r2.second ? r1 : r2,  // "left" range
+    r = r1.second <= r2.second ? r2 : r1;  // "right" range
 
-  if( !(l.first > r.second) )
+
+  if( l.first < r.second )
     return false; // r1 and r2 are disjoint ranges
   
-  ret->first = r.first;
+  if( r.first < l.first )
+    ret->first = l.first; // r is completely included in l
+  else
+    ret->first = r.first;
   ret->second = l.second;
   
   return true;
