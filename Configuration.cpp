@@ -193,38 +193,28 @@ bool Configuration::mergePortRanges (port_range r1, port_range r2, port_range *r
   return true;
 }
 
-void Configuration::addPortRange (port_range r){
-  if (r.first < r.second){
-    u_int16_t tmp = r.first;
-    r.first = r.second;
-    r.second = tmp;
+void Configuration::addPortRange(port_range r) {
+  port_range curr(r), merged (r);
+  // the set must be ordered using the upper bound
+  // NB: a set of pair is ordered using pair.first
+  if (r.first < r.second) {
+    curr.first = r.second;
+    curr.second = r.first;
   }
 
-  port_range ins;
-  // TODO merge ins with something already in the tree 
-  //honeypot_ranges.insert()
-  
-}
-
-bool Configuration::isMergeable(port_range r, port_range *toRet){
-  if (honeypot_ranges.empty())
-    return false;
-  
-  std::set<port_range>::iterator it = honeypot_ranges.lower_bound(r);
-  if (it == honeypot_ranges.end()) {// nothing greater...
-    // look for the greatest in the tree
-    it = std::prev(honeypot_ranges.end());
-    return mergePortRanges(r,*it,toRet);
-  }
-  else{
-    if (!mergePortRanges(r,*it,toRet)){ // try to look for a lower one
-      if ( it != honeypot_ranges.begin()){
-        it = std::prev(it);
-        return mergePortRanges(r,*it,toRet);
+  // Make sure the set holds only disjoint ranges
+  bool mergeable = true;
+  std::set<port_range>::iterator it;
+  while (mergeable) { // look for a range which shares some values with curr
+    for (it = honeypot_ranges.begin(); it != honeypot_ranges.end(); it++) {
+      if (mergePortRanges(curr, *it, &merged)) {
+        honeypot_ranges.erase(it);  // remove the range now included in 'merged'
+        curr = merged;              // update curr for next walk
+        break;
       }
-      else return false;
     }
-    else
-      return true;
+    if (it == honeypot_ranges.end())  // walked through the whole set,
+      mergeable = false;              // but nothing was mergeable
   }
+  honeypot_ranges.insert(merged);
 }
