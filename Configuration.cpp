@@ -224,3 +224,30 @@ void Configuration::addPortRange(port_range r) {
   }
   honeypot_ranges.insert(merged);
 }
+
+bool parsePortRange(std::string s, port_range *r) {
+  if (!r) return false;
+  size_t delim;
+  if ( (delim = s.find("-")) != std::string::npos){
+    std::string s_l = s.substr(0,delim), s_r = s.substr(delim + 1, std::string::npos);
+    return (stringToU16(s_l, &(r->first)) && stringToU16(s_l, &(r->first)));
+  }
+  if ( (delim = s.find("!")) != std::string::npos){
+    //TODO
+    return false;
+  }
+}
+
+bool stringToU16(std::string s, u_int16_t *toRet) {
+  if (!toRet) return false;
+  char *err;
+  const char *_s = s.c_str();
+  unsigned long v = strtoul(_s, &err, 10);
+  if (*_s != '\0' && *err == '\0' &&
+      v <= USHRT_MAX) {  // string is valid number
+    *toRet = v;
+    return true;
+  }
+  // there are some invalid characters
+  return false;
+}
