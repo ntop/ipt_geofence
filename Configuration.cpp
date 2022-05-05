@@ -232,10 +232,16 @@ bool parsePortRange(std::string s, port_range *r) {
     std::string s_l = s.substr(0,delim), s_r = s.substr(delim + 1, std::string::npos);
     return (stringToU16(s_l, &(r->first)) && stringToU16(s_l, &(r->first)));
   }
+  return false;
+}
+
+bool parseAllExcept(std::string s, u_int16_t *port){
+  if (!port) return false;
+  size_t delim;
   if ( (delim = s.find("!")) != std::string::npos){
-    //TODO
-    return false;
+    return (stringToU16(s.substr(delim + 1, std::string::npos), port));
   }
+  return false;
 }
 
 bool stringToU16(std::string s, u_int16_t *toRet) {
