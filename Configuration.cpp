@@ -161,6 +161,7 @@ Marker Configuration::getMarker(char *country, char *continent) {
 
   if(it != ctrs_conts.end())
     return(it->second); // continent found
+
   return(default_policy);
 }
 
