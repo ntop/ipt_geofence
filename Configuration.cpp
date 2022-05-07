@@ -116,7 +116,6 @@ bool Configuration::readConfigFile(const char *path) {
             port_range p_r;
             if(parsePortRange(s,&p_r)) {
               addPortRange(p_r);
-              trace->traceEvent(TRACE_INFO, "Protecting range %u-%u",p_r.first,p_r.second);
             }
           }
         } else  { 
@@ -124,7 +123,6 @@ bool Configuration::readConfigFile(const char *path) {
           trace->traceEvent(TRACE_INFO, "Protecting port %u", honeypot_field.asUInt());}
       
       }          
-        
     }
 
   }
@@ -212,7 +210,9 @@ bool Configuration::mergePortRanges (port_range r1, port_range r2, port_range *r
   else
     ret->first = r.first;
   ret->second = l.second;
-  
+  trace->traceEvent(TRACE_INFO, "Merging ranges [%u-%u] and [%u-%u] into [%u-%u]",
+    r1.second,r1.first,r2.second,r2.first,ret->second,ret->first
+    );
   return true;
 }
 
@@ -223,13 +223,13 @@ bool Configuration::mergePortRanges (port_range r1, port_range r2, port_range *r
  * @param r range to be inserted 
  */
 void Configuration::addPortRange(port_range r) {
-  port_range curr(r), merged (r);
+  port_range curr, merged;
   // the set must be ordered using the upper bound
   // NB: a set of pair is ordered using pair.first
-  if (r.first < r.second) {
-    curr.first = r.second;
-    curr.second = r.first;
-  }
+  if (r.first <= r.second) {
+    curr.first = merged.first = r.second;
+    curr.second = merged.second = r.first;
+  } else return;
 
   // Make sure the set holds only disjoint ranges
   bool mergeable = true;
@@ -237,15 +237,23 @@ void Configuration::addPortRange(port_range r) {
   while (mergeable) { // look for a range which shares some values with curr
     for (it = honeypot_ranges.begin(); it != honeypot_ranges.end(); it++) {
       if (mergePortRanges(curr, *it, &merged)) {
-        honeypot_ranges.erase(it);  // remove the range now included in 'merged'
-        curr = merged;              // update curr for next walk
-        break;
+        if(merged.first != it->first || merged.second != it->second) {  // if merge operation generate a new range
+          honeypot_ranges.erase(it);  // remove the range now included in 'merged'
+          honeypot_ranges.insert(merged);
+          // curr = merged;  // update curr for next walk           
+          // break;
+        } 
+        return;
       }
     }
-    if (it == honeypot_ranges.end())  // walked through the whole set,
+    if (it == honeypot_ranges.end()) {  // walked through the whole set,
       mergeable = false;              // but nothing was mergeable
+      honeypot_ranges.insert(curr);
+    }
   }
-  honeypot_ranges.insert(merged);
+
+  trace->traceEvent(TRACE_INFO, "Protecting range [%u-%u]",merged.second,merged.first);
+  
 }
 
 bool Configuration::parsePortRange(std::string s, port_range *r) {
