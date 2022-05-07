@@ -68,6 +68,7 @@ static void help() {
 
 int main(int argc, char *argv[]) {
   u_char c;
+  std::string confPath = "";
   const struct option long_options[] = {
     { "config",      required_argument,    NULL, 'c' },
     { "mmdb_city",   required_argument,    NULL, 'm' },
@@ -77,15 +78,17 @@ int main(int argc, char *argv[]) {
     /* End of options */
     { NULL,          no_argument,          NULL,  0 }
   };
-  Configuration config;
+  Configuration *config;
   GeoIP geoip;
   
   trace = new Trace();
-
+  config = new Configuration();
+  
   while((c = getopt_long(argc, argv, "c:u:l:m:svVh", long_options, NULL)) != 255) {
     switch(c) {
     case 'c':
-      config.readConfigFile(optarg);
+      confPath = (optarg);
+      config->readConfigFile(confPath.c_str());
       break;
       
     case 'm':
@@ -106,10 +109,7 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  Blacklists b;
-  b.loadIPsetFromFile((char*)"dshield_7d.netset");
-
-  if(!config.isConfigured()) {
+  if(!config->isConfigured()) {
     trace->traceEvent(TRACE_ERROR, "Please check the JSON configuration file");
     help();
   } else if(!geoip.isLoaded()) {
@@ -118,11 +118,13 @@ int main(int argc, char *argv[]) {
   }
   
   signal(SIGTERM, sigproc);
+  signal(SIGINT,  sigproc);
 
   try {
-    iface = new NwInterface(config.getQueueId(), &config, &geoip);
+    iface = new NwInterface(config->getQueueId(), config, &geoip, confPath);
     
     iface->packetPollLoop();
+    
     delete iface;
   } catch(int err) {
     trace->traceEvent(TRACE_ERROR, "Interface creation error: please fix the reported errors and try again");

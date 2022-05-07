@@ -31,7 +31,7 @@ u_int16_t Configuration::ctry_cont2u16(char *ctry_cont_code) {
 
 /* ******************************************************* */
 
-bool Configuration::readConfigFile(char *path) {
+bool Configuration::readConfigFile(const char *path) {
   Json::Value root;
   std::ifstream ifs;
   JSONCPP_STRING errs;
@@ -95,6 +95,19 @@ bool Configuration::readConfigFile(char *path) {
 	ignored_ports[port] = true;
       }
     }
+
+    all_honeypot_ports = true;
+
+    // Doesn't distinguish between UDP and TCP (and other protocols...)
+    if (!root["monitored_ports"]["honeypot_ports"].empty()) {
+      all_honeypot_ports = false;
+      for (Json::Value::ArrayIndex i = 0; i != root["monitored_ports"]["honeypot_ports"].size(); i++) {
+        unsigned int port = root["monitored_ports"]["honeypot_ports"][i].asUInt();
+
+        trace->traceEvent(TRACE_INFO, "Protecting port %u", port);
+        honeypot_ports[port] = true;
+      }
+    }
   }
 
   if(all_tcp_ports) trace->traceEvent(TRACE_INFO, "All TCP ports will be monitored");
@@ -121,11 +134,12 @@ bool Configuration::readConfigFile(char *path) {
         }
       }while(--counter);
   }
-
   if(!root["blacklists"].empty()) {
-    for(Json::Value::ArrayIndex i = 0; i != root["blacklists"].size(); i++) {
-      std::string url = root["blacklists"][i].asString();
-
+    size_t n_urls = root["blacklists"].size();
+    blacklists.urls_Blacklist.resize(n_urls);
+    for(Json::Value::ArrayIndex i = 0; i != n_urls; i++) {
+      std::string url (root["blacklists"][i].asString());
+      blacklists.urls_Blacklist[i] = url;
       blacklists.loadIPsetFromURL(url.c_str());
     }
   }
@@ -151,3 +165,98 @@ Marker Configuration::getMarker(char *country, char *continent) {
 }
 
 /* ******************************************************* */
+
+/**
+ * @brief  Assuming r1.high > r2.low or viceversa, puts in 'ret'
+ * the union between the two ranges. 
+ * e.g. mergeRanges(15-30,20-40) returns 15-40.
+ * 
+ * @param r1 
+ * @param r2 
+ * @param ret pointer to structure which will hold the merged range
+ * @return true if mergeable, false otherwise 
+ */
+bool Configuration::mergePortRanges (port_range r1, port_range r2, port_range *ret){
+  if (r1.first < r1.second || r2.first < r2.second || !ret)
+    return false; // r1 || r2 || ret is invalid
+  port_range 
+    l = r1.second <= r2.second ? r1 : r2,  // "left" range
+    r = r1.second <= r2.second ? r2 : r1;  // "right" range
+
+
+  if( l.first < r.second )
+    return false; // r1 and r2 are disjoint ranges
+  
+  if( r.first < l.first )
+    ret->first = l.first; // r is completely included in l
+  else
+    ret->first = r.first;
+  ret->second = l.second;
+  
+  return true;
+}
+
+/**
+ * @brief adds a range to honeypot_ranges, making sure that all
+ * ranges in the set are disjoint and ordered using range upper bounds
+ * 
+ * @param r range to be inserted 
+ */
+void Configuration::addPortRange(port_range r) {
+  port_range curr(r), merged (r);
+  // the set must be ordered using the upper bound
+  // NB: a set of pair is ordered using pair.first
+  if (r.first < r.second) {
+    curr.first = r.second;
+    curr.second = r.first;
+  }
+
+  // Make sure the set holds only disjoint ranges
+  bool mergeable = true;
+  std::set<port_range>::iterator it;
+  while (mergeable) { // look for a range which shares some values with curr
+    for (it = honeypot_ranges.begin(); it != honeypot_ranges.end(); it++) {
+      if (mergePortRanges(curr, *it, &merged)) {
+        honeypot_ranges.erase(it);  // remove the range now included in 'merged'
+        curr = merged;              // update curr for next walk
+        break;
+      }
+    }
+    if (it == honeypot_ranges.end())  // walked through the whole set,
+      mergeable = false;              // but nothing was mergeable
+  }
+  honeypot_ranges.insert(merged);
+}
+
+bool parsePortRange(std::string s, port_range *r) {
+  if (!r) return false;
+  size_t delim;
+  if ( (delim = s.find("-")) != std::string::npos){
+    std::string s_l = s.substr(0,delim), s_r = s.substr(delim + 1, std::string::npos);
+    return (stringToU16(s_l, &(r->first)) && stringToU16(s_l, &(r->first)));
+  }
+  return false;
+}
+
+bool parseAllExcept(std::string s, u_int16_t *port){
+  if (!port) return false;
+  size_t delim;
+  if ( (delim = s.find("!")) != std::string::npos){
+    return (stringToU16(s.substr(delim + 1, std::string::npos), port));
+  }
+  return false;
+}
+
+bool stringToU16(std::string s, u_int16_t *toRet) {
+  if (!toRet) return false;
+  char *err;
+  const char *_s = s.c_str();
+  unsigned long v = strtoul(_s, &err, 10);
+  if (*_s != '\0' && *err == '\0' &&
+      v <= USHRT_MAX) {  // string is valid number
+    *toRet = v;
+    return true;
+  }
+  // there are some invalid characters
+  return false;
+}

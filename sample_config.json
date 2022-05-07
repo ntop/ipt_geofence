@@ -4,7 +4,8 @@
 	"monitored_ports": {
 		"tcp": [22, 80, 443],
 		"udp": [],
-		"ignored_ports": [123]
+		"ignored_ports": [123],
+		"honeypot_ports": []
 	},
 	"policy": {
 		"drop": {

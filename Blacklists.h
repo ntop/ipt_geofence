@@ -37,11 +37,13 @@ class Blacklists {
 
   bool findAddress(char *addr);
   void addAddress(char *net);
+  void removeAddress(char *net);
   bool loadIPsetFromFile(const char *path);
   bool loadIPsetFromURL(const char *url);
 
   bool isBlacklistedIPv4(struct in_addr *pin);
   bool isBlacklistedIPv6(struct in6_addr *addr6);
+  std::vector<std::string> urls_Blacklist;
 };
 
 
