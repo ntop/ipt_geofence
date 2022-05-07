@@ -96,18 +96,37 @@ bool Configuration::readConfigFile(const char *path) {
       }
     }
 
-    all_honeypot_ports = true;
 
     // Doesn't distinguish between UDP and TCP (and other protocols...)
     if (!root["monitored_ports"]["honeypot_ports"].empty()) {
-      all_honeypot_ports = false;
       for (Json::Value::ArrayIndex i = 0; i != root["monitored_ports"]["honeypot_ports"].size(); i++) {
-        unsigned int port = root["monitored_ports"]["honeypot_ports"][i].asUInt();
-
-        trace->traceEvent(TRACE_INFO, "Protecting port %u", port);
-        honeypot_ports[port] = true;
-      }
+        Json::Value honeypot_field = root["monitored_ports"]["honeypot_ports"][i];
+        
+        if(honeypot_field.isString()) {
+          std::string s = honeypot_field.asString();
+          
+          if(s.find_first_of("!") == 0) { // ! found in first position
+            if(parseAllExcept(s,&except_port)) {
+              honeypot_ports.clear();
+              honeypot_ranges.clear();
+              trace->traceEvent(TRACE_INFO, "Protecting all port except %u", except_port);
+              break;
+            }
+          } else {
+            port_range p_r;
+            if(parsePortRange(s,&p_r)) {
+              addPortRange(p_r);
+              trace->traceEvent(TRACE_INFO, "Protecting range %u-%u",p_r.first,p_r.second);
+            }
+          }
+        } else  { 
+          honeypot_ports[honeypot_field.asUInt()] = true; 
+          trace->traceEvent(TRACE_INFO, "Protecting port %u", honeypot_field.asUInt());}
+      
+      }          
+        
     }
+
   }
 
   if(all_tcp_ports) trace->traceEvent(TRACE_INFO, "All TCP ports will be monitored");
@@ -229,17 +248,17 @@ void Configuration::addPortRange(port_range r) {
   honeypot_ranges.insert(merged);
 }
 
-bool parsePortRange(std::string s, port_range *r) {
+bool Configuration::parsePortRange(std::string s, port_range *r) {
   if (!r) return false;
   size_t delim;
   if ( (delim = s.find("-")) != std::string::npos){
     std::string s_l = s.substr(0,delim), s_r = s.substr(delim + 1, std::string::npos);
-    return (stringToU16(s_l, &(r->first)) && stringToU16(s_l, &(r->first)));
+    return (stringToU16(s_l, &(r->first)) && stringToU16(s_r, &(r->second)));
   }
   return false;
 }
 
-bool parseAllExcept(std::string s, u_int16_t *port){
+bool Configuration::parseAllExcept(std::string s, u_int16_t *port){
   if (!port) return false;
   size_t delim;
   if ( (delim = s.find("!")) != std::string::npos){
@@ -248,7 +267,7 @@ bool parseAllExcept(std::string s, u_int16_t *port){
   return false;
 }
 
-bool stringToU16(std::string s, u_int16_t *toRet) {
+bool Configuration::stringToU16(std::string s, u_int16_t *toRet) {
   if (!toRet) return false;
   char *err;
   const char *_s = s.c_str();
