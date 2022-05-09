@@ -226,7 +226,7 @@ void Configuration::addPortRange(port_range r) {
   port_range curr, merged;
   // the set must be ordered using the upper bound
   // NB: a set of pair is ordered using pair.first
-  if (r.first <= r.second) {
+  if (r.first < r.second) {
     curr.first = merged.first = r.second;
     curr.second = merged.second = r.first;
   } else return;
