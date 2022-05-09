@@ -110,8 +110,8 @@ bool Configuration::readConfigFile(const char *path) {
           if(s.find_first_of("!") == 0) { // Might be a !P
             if(parseAllExcept(s,&except_port)) {  // !P "overrides" port ranges but NOT single ports
               // honeypot_ports.clear();
-              honeypot_ranges.clear();  // We don't care no more about these
-              honeypot_all_except_ports[except_port] = true;
+              hp_ranges.clear();  // We don't care no more about these
+              hp_all_except_ports[except_port] = true;
               trace->traceEvent(TRACE_INFO, "Protecting all ports except %u", except_port);
               break;
             }
@@ -119,7 +119,7 @@ bool Configuration::readConfigFile(const char *path) {
             addPortRange(p_r);
           }
         } else  {   // Single port
-          honeypot_ports[honeypot_field.asUInt()] = true; 
+          hp_ports[honeypot_field.asUInt()] = true; 
           trace->traceEvent(TRACE_INFO, "Protecting port %u", honeypot_field.asUInt());
         }
       }          
@@ -217,7 +217,7 @@ bool Configuration::mergePortRanges (port_range r1, port_range r2, port_range *r
 }
 
 /**
- * @brief adds a range to honeypot_ranges, making sure that all
+ * @brief adds a range to hp_ranges, making sure that all
  * ranges in the set are disjoint and ordered using range upper bounds
  * 
  * @param r range to be inserted 
@@ -233,17 +233,17 @@ void Configuration::addPortRange(port_range r) {
 
   std::set<port_range>::iterator it;
  
-  for (it = honeypot_ranges.begin(); it != honeypot_ranges.end(); it++) {
+  for (it = hp_ranges.begin(); it != hp_ranges.end(); it++) {
     if (mergePortRanges(curr, *it, &merged)) {
       if(merged!=*it) {  // if merge operation generate a new range
-        honeypot_ranges.erase(it);  // remove the range now included in 'merged'
+        hp_ranges.erase(it);  // remove the range now included in 'merged'
         curr = merged;  // update curr for next walk           
-        it = honeypot_ranges.begin(); // check if new range could be merged
+        it = hp_ranges.begin(); // check if new range could be merged
       } else return; 
     }
   }
-  if (it == honeypot_ranges.end() && curr==merged) {  // walked through the whole set,
-    honeypot_ranges.insert(curr);
+  if (it == hp_ranges.end() && curr==merged) {  // walked through the whole set,
+    hp_ranges.insert(curr);
     trace->traceEvent(TRACE_INFO, "Protecting range [%u-%u]",merged.second,merged.first);
   }
 
@@ -280,4 +280,13 @@ bool Configuration::stringToU16(std::string s, u_int16_t *toRet) {
   }
   // there are some invalid characters
   return false;
+}
+
+bool Configuration::isProtectedPort(u_int16_t port) {
+  if  (hp_ports.find(port) != hp_ports.end() ||                      // single port match
+      // include by a "!port"
+      (!hp_all_except_ports.empty() && hp_all_except_ports.find(port) == hp_all_except_ports.end())
+      // || (isIncludedInRange(port))
+  )
+    return true;
 }

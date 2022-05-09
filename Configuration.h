@@ -29,13 +29,13 @@ typedef std::pair<u_int16_t,u_int16_t> port_range; // first -> upper bound && se
 class Configuration {
  private:
   std::unordered_map<u_int16_t, Marker> ctrs_conts;
-  std::unordered_map<u_int16_t, bool>   tcp_ports, udp_ports, ignored_ports, honeypot_ports, honeypot_all_except_ports;
+  std::unordered_map<u_int16_t, bool>   tcp_ports, udp_ports, ignored_ports, hp_ports, hp_all_except_ports;
   Marker default_policy;
   Blacklists blacklists;
   unsigned int nfq_queue_id;
-  bool configured, all_tcp_ports, all_udp_ports, all_except_ports;
+  bool configured, all_tcp_ports, all_udp_ports;
 
-  std::set<port_range> honeypot_ranges;
+  std::set<port_range> hp_ranges;
   
   u_int16_t ctry_cont2u16(char *country_code);
   bool mergePortRanges (port_range r1, port_range r2, port_range *ret);
@@ -59,7 +59,7 @@ class Configuration {
   inline bool isIgnoredPort(u_int16_t port)      { return(ignored_ports.find(port) != ignored_ports.end());            }
   inline bool isMonitoredTCPPort(u_int16_t port) { return(all_tcp_ports || (tcp_ports.find(port) != tcp_ports.end())); }
   inline bool isMonitoredUDPPort(u_int16_t port) { return(all_udp_ports || (udp_ports.find(port) != udp_ports.end())); }
-  // inline bool isProtectedPort(u_int16_t port) { return except_port != 0 ? except_port : (honeypot_ports.find(port) != honeypot_ports.end()); }
+  bool isProtectedPort(u_int16_t port);
   inline bool isBlacklistedIPv4(struct in_addr *addr)     { return(blacklists.isBlacklistedIPv4(addr)) ;}
   inline bool isBlacklistedIPv6(struct in6_addr *addr6)   { return(blacklists.isBlacklistedIPv6(addr6));}
   inline void loadIPsetFromURL(const char* url)  { blacklists.loadIPsetFromURL(url);}
