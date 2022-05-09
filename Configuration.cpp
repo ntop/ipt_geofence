@@ -109,7 +109,7 @@ bool Configuration::readConfigFile(const char *path) {
             if(parseAllExcept(s,&except_port)) {
               honeypot_ports.clear();
               honeypot_ranges.clear();
-              trace->traceEvent(TRACE_INFO, "Protecting all port except %u", except_port);
+              trace->traceEvent(TRACE_INFO, "Protecting all ports except %u", except_port);
               break;
             }
           } else {
