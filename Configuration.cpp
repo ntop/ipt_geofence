@@ -229,7 +229,7 @@ void Configuration::addPortRange(port_range r) {
   if (r.first < r.second) {
     curr.first = merged.first = r.second;
     curr.second = merged.second = r.first;
-  } else return;
+  }
 
   std::set<port_range>::iterator it;
  
