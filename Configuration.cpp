@@ -284,9 +284,20 @@ bool Configuration::stringToU16(std::string s, u_int16_t *toRet) {
 
 bool Configuration::isProtectedPort(u_int16_t port) {
   if  (hp_ports.find(port) != hp_ports.end() ||                      // single port match
-      // include by a "!port"
-      (!hp_all_except_ports.empty() && hp_all_except_ports.find(port) == hp_all_except_ports.end())
-      // || (isIncludedInRange(port))
+      // included by a "!port"
+      (!hp_all_except_ports.empty() && hp_all_except_ports.find(port) == hp_all_except_ports.end()) ||
+      (isIncludedInRange(port))
   )
+    return true;
+  return false;
+}
+
+bool Configuration::isIncludedInRange(u_int16_t port) {
+  port_range toSearch {port, 0}; // we don't care about .second
+  std::set<port_range>::iterator it = hp_ranges.lower_bound(toSearch);
+  if (it == hp_ranges.end()) // No range includes port
+    return false;
+  // else
+  if ((*it).second <= port) // <= (*it).first
     return true;
 }
