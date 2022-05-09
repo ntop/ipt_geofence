@@ -116,6 +116,7 @@ bool Configuration::readConfigFile(const char *path) {
             }
           } else if (parsePortRange(s, &p_r)) {  // Might be a port range
             addPortRange(p_r);
+            trace->traceEvent(TRACE_INFO, "Added range...");
           }
         } else  {   // Single port
           hp_ports[honeypot_field.asUInt()] = true; 
@@ -233,8 +234,9 @@ void Configuration::addPortRange(port_range r) {
   std::set<port_range>::iterator it;
  
   for (it = hp_ranges.begin(); it != hp_ranges.end(); it++) {
+    trace->traceEvent(TRACE_INFO,"Node %u-%u | Curr %u-%u | Merged %u-%u", (*it).first, (*it).second, curr.first, curr.second, merged.first, merged.second);
     if (mergePortRanges(curr, *it, &merged)) {
-      if(merged!=*it) {  // if merge operation generate a new range
+      if(merged!=*it) {  // if merge operation generates a new range
         hp_ranges.erase(it);  // remove the range now included in 'merged'
         curr = merged;  // update curr for next walk           
         it = hp_ranges.begin(); // check if new range could be merged
