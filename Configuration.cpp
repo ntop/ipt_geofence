@@ -297,7 +297,7 @@ bool Configuration::isIncludedInRange(u_int16_t port) {
   std::set<port_range>::iterator it = hp_ranges.lower_bound(toSearch);
   if (it == hp_ranges.end()) // No range includes port
     return false;
-  // else
-  if ((*it).second <= port) // <= (*it).first
+  /* else */ if ((*it).second <= port)  // <= (*it).first
     return true;
+  /* else */ return false;
 }

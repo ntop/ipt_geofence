@@ -43,7 +43,7 @@ class Configuration {
   bool stringToU16(std::string s, u_int16_t *toRet);
   bool parsePortRange(std::string s, port_range *r);
   bool parseAllExcept(std::string s, u_int16_t *port);
-  bool Configuration::isIncludedInRange(u_int16_t port);
+  bool isIncludedInRange(u_int16_t port);
   
  public:
   Configuration() { nfq_queue_id = 0, default_policy = MARKER_PASS; configured = false, all_tcp_ports = all_udp_ports = true; }
