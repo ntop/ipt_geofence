@@ -5,7 +5,7 @@
 		"tcp": [22, 80, 443],
 		"udp": [],
 		"ignored_ports": [123],
-		"honeypot_ports": []
+		"honeypot_ports": ["6123-6789",10,20,30,"!80"]
 	},
 	"policy": {
 		"drop": {
