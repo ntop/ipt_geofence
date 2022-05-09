@@ -102,26 +102,26 @@ bool Configuration::readConfigFile(const char *path) {
       for (Json::Value::ArrayIndex i = 0; i != root["monitored_ports"]["honeypot_ports"].size(); i++) {
         Json::Value honeypot_field = root["monitored_ports"]["honeypot_ports"][i];
         
-        if(honeypot_field.isString()) {
+        if(honeypot_field.isString()) { // port range [A-B] or "all ports except" !P
+          u_int16_t except_port;
+          port_range p_r;
           std::string s = honeypot_field.asString();
           
-          if(s.find_first_of("!") == 0) { // ! found in first position
-            if(parseAllExcept(s,&except_port)) {
-              honeypot_ports.clear();
-              honeypot_ranges.clear();
+          if(s.find_first_of("!") == 0) { // Might be a !P
+            if(parseAllExcept(s,&except_port)) {  // !P "overrides" port ranges but NOT single ports
+              // honeypot_ports.clear();
+              honeypot_ranges.clear();  // We don't care no more about these
+              honeypot_all_except_ports[except_port] = true;
               trace->traceEvent(TRACE_INFO, "Protecting all ports except %u", except_port);
               break;
             }
-          } else {
-            port_range p_r;
-            if(parsePortRange(s,&p_r)) {
-              addPortRange(p_r);
-            }
+          } else if (parsePortRange(s, &p_r)) {  // Might be a port range
+            addPortRange(p_r);
           }
-        } else  { 
+        } else  {   // Single port
           honeypot_ports[honeypot_field.asUInt()] = true; 
-          trace->traceEvent(TRACE_INFO, "Protecting port %u", honeypot_field.asUInt());}
-      
+          trace->traceEvent(TRACE_INFO, "Protecting port %u", honeypot_field.asUInt());
+        }
       }          
     }
 
