@@ -113,7 +113,6 @@ bool Configuration::readConfigFile(const char *path) {
               hp_ranges.clear();  // We don't care no more about these
               hp_all_except_ports[except_port] = true;
               trace->traceEvent(TRACE_INFO, "Protecting all ports except %u", except_port);
-              break;
             }
           } else if (parsePortRange(s, &p_r)) {  // Might be a port range
             addPortRange(p_r);
