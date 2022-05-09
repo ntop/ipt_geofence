@@ -397,7 +397,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
     honey_banned_timesorted.push_back(h); // h is the "less older" banned host
     std::pair<time_t,list_it> map_value (time(NULL), std::prev(honey_banned_timesorted.end()));
     honey_banned_time[h] = map_value; // init/reset timer for src_host and keep track in list position
-    trace->traceEvent(TRACE_WARNING, "Banning host %s : %u", src_host, sport);
+    trace->traceEvent(TRACE_WARNING, "Banning host %s || Protected port %u", src_host, dport);
   }
   if (drop) {
     logFlow(proto_name,
