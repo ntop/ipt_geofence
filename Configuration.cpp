@@ -223,7 +223,7 @@ bool Configuration::mergePortRanges (port_range r1, port_range r2, port_range *r
  * @param r range to be inserted 
  */
 void Configuration::addPortRange(port_range r) {
-  port_range curr, merged;
+  port_range curr (r), merged (r);
   // the set must be ordered using the upper bound
   // NB: a set of pair is ordered using pair.first
   if (r.first < r.second) {
