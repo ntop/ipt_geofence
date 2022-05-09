@@ -122,7 +122,9 @@ bool Configuration::readConfigFile(const char *path) {
           hp_ports[honeypot_field.asUInt()] = true; 
           trace->traceEvent(TRACE_INFO, "Protecting port %u", honeypot_field.asUInt());
         }
-      }          
+      }
+      if (!hp_all_except_ports.empty())
+        hp_ranges.clear();         
     }
 
   }
