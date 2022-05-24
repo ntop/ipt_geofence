@@ -52,13 +52,37 @@ bool Configuration::readConfigFile(const char *path) {
   } else
     nfq_queue_id = root["queue_id"].asUInt();
 
+  if(!root["markers"].empty()) {
+    if(root["markers"]["pass"].empty()){
+      trace->traceEvent(TRACE_ERROR, "Missing %s from %s", "pass", path);
+      return(false);
+    }else{
+      marker_pass.setValue(root["markers"]["pass"].asUInt());
+    }
+    if(root["markers"]["drop"].empty()){
+      trace->traceEvent(TRACE_ERROR, "Missing %s from %s", "drop", path);
+      return(false);
+    }else{
+      marker_drop.setValue(root["markers"]["drop"].asUInt());
+    }
+    if (marker_drop==marker_pass ){
+        trace->traceEvent(TRACE_ERROR, "Markers values must be distinct in %s", path);
+        return(false);
+    }
+    if(marker_drop<=0 || marker_pass<=0 ){
+        trace->traceEvent(TRACE_ERROR, "Markers values must be greater than 0 in %s", path);
+        return(false);
+    }
+  }
+  trace->traceEvent(TRACE_INFO, "Markers are set to: pass %d, drop %d", marker_pass, marker_drop);
+
   if(root["default_policy"].empty()) {
     trace->traceEvent(TRACE_ERROR, "Missing %s from %s", "default_policy", path);
     return(false);
   } else {
     std::string m = root["default_policy"].asString();
     trace->traceEvent(TRACE_INFO, "Default policy: %s", m.c_str());
-    default_policy = (m == "PASS") ? MARKER_PASS : MARKER_DROP;
+    default_policy = (m == "PASS") ? marker_pass : marker_drop;
 
   }
 
@@ -132,7 +156,7 @@ bool Configuration::readConfigFile(const char *path) {
   if(all_tcp_ports) trace->traceEvent(TRACE_INFO, "All TCP ports will be monitored");
   if(all_udp_ports) trace->traceEvent(TRACE_INFO, "All UDP ports will be monitored");
 
-  std::string json_policy_str = default_policy == MARKER_DROP ? "drop" : "pass";
+  std::string json_policy_str = default_policy == marker_drop ? "drop" : "pass";
 
   if(!root["policy"].empty() && !root["policy"][json_policy_str].empty()) {
 
@@ -148,7 +172,7 @@ bool Configuration::readConfigFile(const char *path) {
             std::string ctry_cont = json_policy_obj[json_value_str+json_list_str][i].asString();
 
             trace->traceEvent(TRACE_INFO, "Adding %s to %s", ctry_cont.c_str(), (json_value_str+json_list_str).c_str());
-            ctrs_conts[ctry_cont2u16((char*)ctry_cont.c_str())] = json_policy_str == "drop" ? MARKER_PASS : MARKER_DROP;
+            ctrs_conts[ctry_cont2u16((char*)ctry_cont.c_str())] = json_policy_str == "drop" ? marker_pass : marker_drop;
           }
         }
       }while(--counter);

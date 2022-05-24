@@ -30,9 +30,13 @@ class Configuration {
  private:
   std::unordered_map<u_int16_t, Marker> ctrs_conts;
   std::unordered_map<u_int16_t, bool>   tcp_ports, udp_ports, ignored_ports, hp_ports, hp_all_except_ports;
+  unsigned int nfq_queue_id;
+  Marker marker_unknown;
+  Marker marker_pass;
+  Marker marker_drop;
   Marker default_policy;
   Blacklists blacklists;
-  unsigned int nfq_queue_id;
+  
   bool configured, all_tcp_ports, all_udp_ports;
 
   std::set<port_range> hp_ranges;
@@ -46,7 +50,10 @@ class Configuration {
   bool isIncludedInRange(u_int16_t port);
   
  public:
-  Configuration() { nfq_queue_id = 0, default_policy = MARKER_PASS; configured = false, all_tcp_ports = all_udp_ports = true; }
+  Configuration() { nfq_queue_id = 0, marker_unknown.setValue(0); 
+                    marker_pass.setValue(1000); marker_drop.setValue(2000);
+                    default_policy = marker_pass; configured = false, 
+                    all_tcp_ports = all_udp_ports = true; }
 
   bool readConfigFile(const char *path);
 
@@ -54,8 +61,11 @@ class Configuration {
   inline bool isConfigured()       { return(configured);   }
   
   inline void setQueueId(int nfq_id)                        { nfq_queue_id = nfq_id;  }
-  inline void setCountryMarker(u_int16_t country, Marker m) { ctrs_conts[country] = m; }
-  inline Marker getDefaultPolicy()                          { return(default_policy); }
+  inline void setCountryMarker(u_int16_t country, Marker m) { ctrs_conts[country] = m;}
+  inline Marker getMarkerUnknown()                          { return marker_unknown;  }
+  inline Marker getMarkerPass()                             { return marker_pass;     }
+  inline Marker getMarkerDrop()                             { return marker_drop;     }
+  inline Marker getDefaultPolicy()                          { return default_policy;  }
   Marker getMarker(char *country, char *continent);
   inline bool isIgnoredPort(u_int16_t port)      { return(ignored_ports.find(port) != ignored_ports.end());            }
   inline bool isMonitoredTCPPort(u_int16_t port) { return(all_tcp_ports || (tcp_ports.find(port) != tcp_ports.end())); }

@@ -67,17 +67,18 @@
 
 /* ********************************************** */
 
-typedef enum {
-  MARKER_UNKNOWN = 0,
-  MARKER_PASS    = 1,
-  MARKER_DROP    = 2
-} Marker;
+class Marker{
+ private:
+  u_int16_t value;
 
+ public:
+  inline void setValue(u_int16_t v){value=v;}
+  operator u_int16_t() {return value;}
+};
 
 //#if !defined(__mips__)
 #define HAVE_NFQ_SET_VERDICT2 1
 //#endif
-
 
 #define NF_BUFFER_SIZE     (32768*16384)
 #define NF_MAX_QUEUE_LEN   (8192)

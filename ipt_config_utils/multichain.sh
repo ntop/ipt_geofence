@@ -24,6 +24,10 @@ fi
 
 QUEUE_ID=0
 
+# User definable marker values
+MARK_PASS=1000
+MARK_DROP=2000
+
 # Enable connection tracking in the kernel
 modprobe nf_conntrack
 
@@ -63,10 +67,10 @@ for i in {1,2}; do
     $IPTABLES -t mangle -A GEO_POSTROUTING -j CONNMARK --save-mark
 
     # PASS (1)
-    $IPTABLES -t mangle -A GEO_PREROUTING --match mark --mark 1 -j ACCEPT
+    $IPTABLES -t mangle -A GEO_PREROUTING --match mark --mark $MARK_PASS -j ACCEPT
 
     # DROP (2)
-    $IPTABLES -t mangle -A GEO_PREROUTING --match mark --mark 2 -j DROP
+    $IPTABLES -t mangle -A GEO_PREROUTING --match mark --mark $MARK_DROP -j DROP
 
     # Send traffic to NFQUEUE
     $IPTABLES -t mangle -A GEO_PREROUTING  -p tcp --match mark --mark 0 -j NFQUEUE --queue-num $QUEUE_ID --queue-bypass
