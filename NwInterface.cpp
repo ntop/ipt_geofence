@@ -30,7 +30,7 @@ int netfilter_callback(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg,
 NwInterface::NwInterface(u_int nf_device_id,
 			 Configuration *_c,
 			 GeoIP *_g, std::string c_path) {
-  conf = _c, geoip = _g, confPath = c_path; 
+  conf = _c, geoip = _g, confPath = c_path;
   reloaderThread = NULL;
   queueId = nf_device_id, nfHandle = nfq_open();
 
@@ -80,7 +80,7 @@ NwInterface::~NwInterface() {
     reloaderThread->join();
     delete reloaderThread;
   }
-  
+
   if(queueHandle) nfq_destroy_queue(queueHandle);
   if(nfHandle)    nfq_close(nfHandle);
   if(conf)        { delete conf; }
@@ -123,12 +123,12 @@ void NwInterface::packetPollLoop() {
 
   /* Spawn reload config thread in background */
   reloaderThread = new std::thread(&NwInterface::reloadConfLoop, this);
-  
+
   ifaceRunning = true;
 
   h = get_nfHandle();
   fd = get_fd();
-  
+
   while(isRunning()) {
     fd_set mask;
     struct timeval wait_time;
@@ -153,7 +153,7 @@ void NwInterface::packetPollLoop() {
 	break;
       }
     }
-    else { 
+    else {
       honeyHarvesting(10);
     }
 
@@ -230,12 +230,12 @@ Marker NwInterface::dissectPacket(const u_char *payload, u_int payload_len) {
       // we do not care about ports in other protocols
       src_port = dst_port = 0;
     }
-    
+
     return (makeVerdict(proto, vlan_id,
                         src_port, dst_port,
                         src,dst, ipv4,ipv6));
   }
-  
+
   return (conf->getMarkerPass());
 }
 
@@ -254,7 +254,7 @@ const char* NwInterface::getProtoName(u_int8_t proto) {
 
 bool NwInterface::isPrivateIPv4(u_int32_t addr /* network byte order */) {
   addr = ntohl(addr);
-  
+
   if(((addr & 0xFF000000) == 0x0A000000 /* 10.0.0.0/8 */)
      || ((addr & 0xFFF00000) == 0xAC100000 /* 172.16.0.0/12 */)
      || ((addr & 0xFFFF0000) == 0xC0A80000 /* 192.168.0.0/16 */)
@@ -276,10 +276,10 @@ bool NwInterface::isPrivateIPv6(const char *ip6addr) {
   for(size_t l=0; l < 4; l++){ // change byte ordering
     a.s6_addr32[l] = ntohl(a.s6_addr32[l]);
   }
-  
+
   bool is_link_local = (a.s6_addr32[0] & (0xffc00000)) == (0xfe800000); // check the first 10 bits
-  bool is_unique_local = (a.s6_addr32[0] & (0xfe000000)) == (0xfc000000); // check the first 7 bits 
-  
+  bool is_unique_local = (a.s6_addr32[0] & (0xfe000000)) == (0xfc000000); // check the first 7 bits
+
   return is_unique_local || is_link_local;
 }
 
@@ -293,7 +293,7 @@ void NwInterface::logFlow(const char *proto_name,
   Json::Value root;
   std::string json_txt;
   Json::FastWriter writer;
-  
+
   root["proto"] = proto_name;
 
   root["src"]["host"] = src_host;
@@ -307,7 +307,7 @@ void NwInterface::logFlow(const char *proto_name,
   if(dst_country && (dst_country[0] != '\0')) root["dst"]["country"] = dst_country;
   if(dst_continent && (dst_continent[0] != '\0')) root["dst"]["continent"] = dst_continent;
   if(dst_blacklisted) root["dst"]["blacklisted"] = dst_blacklisted;
-  
+
   root["verdict"] = pass_verdict ? "pass" : "drop";
 
   json_txt = writer.write(root);
@@ -477,7 +477,7 @@ u_int32_t NwInterface::computeNextReloadTime() {
 
   /* Align to the midnight */
   next_reload -= (next_reload % confReloadTimeout);
-  
+
   return(next_reload);
 }
 
@@ -487,12 +487,12 @@ void NwInterface::reloadConfLoop() {
   u_int32_t next_reload = computeNextReloadTime();
 
   shadowConf = NULL;
-  
+
   trace->traceEvent(TRACE_NORMAL, "Starting reload configuration loop");
-  
+
   while(isRunning()) {
     u_int32_t now = time(NULL);
-    
+
     if(now > next_reload) {
       trace->traceEvent(TRACE_NORMAL, "Reloading config file");
 
@@ -502,9 +502,9 @@ void NwInterface::reloadConfLoop() {
 	next_reload = now + 300; /* 5 mins */
       } else {
 	Configuration *newConf = new Configuration();
-	
+
 	newConf->readConfigFile(this->confPath.c_str());
-	
+
 	if(newConf->isConfigured()) {
 	  shadowConf = newConf;
   }
@@ -532,9 +532,9 @@ bool NwInterface::isBanned(char *host, struct in_addr *a4, struct in6_addr *a6){
   if (( a4 && !honey_banned.isBlacklistedIPv4(a4)) ||
       ( a6 && !honey_banned.isBlacklistedIPv6(a6)))
     return false;
-  
+
   // => host was had been banned
-  std::string s(host);  
+  std::string s(host);
   std::map<std::string,std::pair<time_t,list_it>>::iterator h = honey_banned_time.find(host);
   if (h != honey_banned_time.end()){ // this should always be true
     if (difftime(time(NULL),h->second.first) >= banTimeout){ // ban timeout has expired
@@ -543,15 +543,15 @@ bool NwInterface::isBanned(char *host, struct in_addr *a4, struct in6_addr *a6){
       honey_banned.removeAddress(host); // remove from patricia tree
       return false;
     }
-    else  
+    else
       return true;  // still banned
   }
   return false; // should never get here
-  
+
 }
 
 /**
- * @param n number of entries to be removed 
+ * @param n number of entries to be removed
  */
 void NwInterface::honeyHarvesting(int n){
   list_it it;
@@ -561,7 +561,7 @@ void NwInterface::honeyHarvesting(int n){
     if ((it = honey_banned_timesorted.begin()) == honey_banned_timesorted.end() ||
       difftime(time(NULL),honey_banned_time.find(*it)->second.first) <= banTimeout)
       break;
-    
+
     // else remove banned host
     std::string s(*it); // convert to char*
     char h[s.size() + 1];

@@ -55,7 +55,7 @@ void Trace::traceEvent(int eventTraceLevel, const char* _file,
     char filebuf[PATH_MAX];
     const char *backslash = strrchr(_file, '/');
     struct tm result;
-    
+
     if(backslash != NULL) {
       snprintf(filebuf, sizeof(filebuf), "%s", &backslash[1]);
       file = (char*)filebuf;
@@ -79,24 +79,23 @@ void Trace::traceEvent(int eventTraceLevel, const char* _file,
     else if(eventTraceLevel == 1 /* TRACE_WARNING */)
       extra_msg = "WARNING: ";
 
-    while(buf[strlen(buf)-1] == '\n') buf[strlen(buf)-1] = '\0';   
-    
+    while(buf[strlen(buf)-1] == '\n') buf[strlen(buf)-1] = '\0';
+
     if(!syslogOnly) {
       snprintf(out_buf, sizeof(out_buf), "%s [%s:%d] %s%s", theDate, file, line, extra_msg, buf);
       printf("%s\n", out_buf);
       fflush(stdout);
     } else {
       snprintf(out_buf, sizeof(out_buf), "%s%s", extra_msg, buf);
-      
+
       if(eventTraceLevel == 0 /* TRACE_ERROR */)
 	syslog(LOG_ERR, "%s", out_buf);
       else if(eventTraceLevel == 1 /* TRACE_WARNING */)
 	syslog(LOG_WARNING, "%s", out_buf);
     }
-    
+
     va_end(va_ap);
   }
 }
 
 /* ******************************* */
-

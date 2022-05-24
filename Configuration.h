@@ -22,6 +22,9 @@
 #ifndef _CONFIG_H_
 #define _CONFIG_H_
 
+#define DEFAULT_PASS_MARKER  1000
+#define DEFAULT_DROP_MARKER  2000
+
 /* ******************************* */
 
 typedef std::pair<u_int16_t,u_int16_t> port_range; // first -> upper bound && second -> lower bound
