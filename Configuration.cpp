@@ -95,6 +95,38 @@ bool Configuration::readConfigFile(const char *path) {
 	ignored_ports[port] = true;
       }
     }
+
+
+    // Doesn't distinguish between UDP and TCP (and other protocols...)
+    if (!root["monitored_ports"]["honeypot_ports"].empty()) {
+      for (Json::Value::ArrayIndex i = 0; i != root["monitored_ports"]["honeypot_ports"].size(); i++) {
+        Json::Value honeypot_field = root["monitored_ports"]["honeypot_ports"][i];
+        
+        if(honeypot_field.isString()) { // port range [A-B] or "all ports except" !P
+          u_int16_t except_port;
+          port_range p_r;
+          std::string s = honeypot_field.asString();
+          
+          if(s.find_first_of("!") == 0) { // Might be a !P
+            if(parseAllExcept(s,&except_port)) {  // !P "overrides" port ranges but NOT single ports
+              // honeypot_ports.clear();
+              hp_ranges.clear();  // We don't care no more about these
+              hp_all_except_ports[except_port] = true;
+              trace->traceEvent(TRACE_INFO, "Protecting all ports except %u", except_port);
+            }
+          } else if (parsePortRange(s, &p_r)) {  // Might be a port range
+            addPortRange(p_r);
+            // trace->traceEvent(TRACE_INFO, "Added range..."); 
+          }
+        } else  {   // Single port
+          hp_ports[honeypot_field.asUInt()] = true; 
+          trace->traceEvent(TRACE_INFO, "Protecting port %u", honeypot_field.asUInt());
+        }
+      }
+      if (!hp_all_except_ports.empty())
+        hp_ranges.clear();         
+    }
+
   }
 
   if(all_tcp_ports) trace->traceEvent(TRACE_INFO, "All TCP ports will be monitored");
@@ -123,13 +155,12 @@ bool Configuration::readConfigFile(const char *path) {
   }
   if(!root["blacklists"].empty()) {
     size_t n_urls = root["blacklists"].size();
-    std::string *urls = (std::string*) calloc (n_urls + 1, sizeof(std::string)); // "+1" to add NULL
-    for(Json::Value::ArrayIndex i = 0; i != root["blacklists"].size(); i++) {
+    blacklists.urls_Blacklist.resize(n_urls);
+    for(Json::Value::ArrayIndex i = 0; i != n_urls; i++) {
       std::string url (root["blacklists"][i].asString());
-      urls[i] = url;
+      blacklists.urls_Blacklist[i] = url;
       blacklists.loadIPsetFromURL(url.c_str());
     }
-    blacklists.urls_Blacklist = urls;
   }
 
   return(configured = true);
@@ -154,3 +185,121 @@ Marker Configuration::getMarker(char *country, char *continent) {
 }
 
 /* ******************************************************* */
+
+/**
+ * @brief  Assuming r1.high > r2.low or viceversa, puts in 'ret'
+ * the union between the two ranges. 
+ * e.g. mergeRanges(15-30,20-40) returns 15-40.
+ * 
+ * @param r1 
+ * @param r2 
+ * @param ret pointer to structure which will hold the merged range
+ * @return true if mergeable, false otherwise 
+ */
+bool Configuration::mergePortRanges (port_range r1, port_range r2, port_range *ret){
+  if (r1.first < r1.second || r2.first < r2.second || !ret)
+    return false; // r1 || r2 || ret is invalid
+  port_range 
+    l = r1.second <= r2.second ? r1 : r2,  // "left" range
+    r = r1.second <= r2.second ? r2 : r1;  // "right" range
+
+
+  if( l.first < r.second )
+    return false; // r1 and r2 are disjoint ranges
+  
+  if( r.first < l.first )
+    ret->first = l.first; // r is completely included in l
+  else
+    ret->first = r.first;
+  ret->second = l.second;
+  trace->traceEvent(TRACE_INFO, "Merging ranges [%u-%u] and [%u-%u] into [%u-%u]",
+    r1.second,r1.first,r2.second,r2.first,ret->second,ret->first
+    );
+  return true;
+}
+
+/**
+ * @brief adds a range to hp_ranges, making sure that all
+ * ranges in the set are disjoint and ordered using range upper bounds
+ * 
+ * @param r range to be inserted 
+ */
+void Configuration::addPortRange(port_range r) {
+  port_range curr (r), merged (r);
+  // the set must be ordered using the upper bound
+  // NB: a set of pair is ordered using pair.first
+  if (r.first < r.second) {
+    curr.first = merged.first = r.second;
+    curr.second = merged.second = r.first;
+  }
+
+  std::set<port_range>::iterator it = hp_ranges.begin();
+  
+  while(it != hp_ranges.end()) {
+    if (mergePortRanges(curr, *it, &merged)) {
+      if(merged!=*it) {  // if merge operation has generated a new range
+        hp_ranges.erase(it);  // remove the range now included in 'merged'
+        curr = merged;  // update curr for next walk           
+        it = hp_ranges.begin(); // check if new range can be merged again
+      } else return; 
+    } else it++;
+  }
+  if (it == hp_ranges.end() && curr==merged) {  // walked through the whole set,
+    hp_ranges.insert(curr);
+    trace->traceEvent(TRACE_INFO, "Protecting range [%u-%u]",merged.second,merged.first);
+  }
+
+}
+
+bool Configuration::parsePortRange(std::string s, port_range *r) {
+  if (!r) return false;
+  size_t delim;
+  if ( (delim = s.find("-")) != std::string::npos){
+    std::string s_l = s.substr(0,delim), s_r = s.substr(delim + 1, std::string::npos);
+    return (stringToU16(s_l, &(r->first)) && stringToU16(s_r, &(r->second)));
+  }
+  return false;
+}
+
+bool Configuration::parseAllExcept(std::string s, u_int16_t *port){
+  if (!port) return false;
+  size_t delim;
+  if ( (delim = s.find("!")) != std::string::npos){
+    return (stringToU16(s.substr(delim + 1, std::string::npos), port));
+  }
+  return false;
+}
+
+bool Configuration::stringToU16(std::string s, u_int16_t *toRet) {
+  if (!toRet) return false;
+  char *err;
+  const char *_s = s.c_str();
+  unsigned long v = strtoul(_s, &err, 10);
+  if (*_s != '\0' && *err == '\0' &&
+      v <= USHRT_MAX) {  // string is valid number
+    *toRet = v;
+    return true;
+  }
+  // there are some invalid characters
+  return false;
+}
+
+bool Configuration::isProtectedPort(u_int16_t port) {
+  if  (hp_ports.find(port) != hp_ports.end() ||                      // single port match
+      // included by a "!port"
+      (!hp_all_except_ports.empty() && hp_all_except_ports.find(port) == hp_all_except_ports.end()) ||
+      (isIncludedInRange(port))
+  )
+    return true;
+  return false;
+}
+
+bool Configuration::isIncludedInRange(u_int16_t port) {
+  port_range toSearch {port, 0}; // we don't care about .second
+  std::set<port_range>::iterator it = hp_ranges.lower_bound(toSearch);
+  if (it == hp_ranges.end()) // No range includes port
+    return false;
+  /* else */ if ((*it).second <= port)  // <= (*it).first
+    return true;
+  /* else */ return false;
+}
