@@ -8,7 +8,8 @@
 	"monitored_ports": {
 		"tcp": [22, 80, 443],
 		"udp": [],
-		"ignored_ports": [123]
+		"ignored_ports": [123],
+		"honeypot_ports": ["51000-56000","50000-56100", "51000-52000",10,20,30]
 	},
 	"policy": {
 		"drop": {

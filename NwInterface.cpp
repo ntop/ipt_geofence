@@ -83,7 +83,7 @@ NwInterface::~NwInterface() {
   
   if(queueHandle) nfq_destroy_queue(queueHandle);
   if(nfHandle)    nfq_close(nfHandle);
-  if(conf)        delete conf;
+  if(conf)        { delete conf; }
 
   nf_fd = 0;
 }
@@ -152,6 +152,9 @@ void NwInterface::packetPollLoop() {
 	trace->traceEvent(TRACE_ERROR, "NF_QUEUE receive error: [len: %d][errno: %d]", len, errno);
 	break;
       }
+    }
+    else { 
+      honeyHarvesting(10);
     }
 
     if(shadowConf != NULL) {
@@ -344,7 +347,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
   if (ipv4){
     in.s_addr = saddr;
     /* Step 1 - For all ports/protocols, check if sender/recipient are blacklisted and if so, block this flow */
-    if((!saddr_private) && conf->isBlacklistedIPv4(&in)) {
+    if((!saddr_private) && (conf->isBlacklistedIPv4(&in) || isBanned(src_host,&in,NULL))) {
       logFlow(proto_name,
 	      src_host, sport, src_ctry, src_cont, true,
 	      dst_host, dport, dst_ctry, dst_cont, false,
@@ -354,7 +357,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
     }
 
     in.s_addr = daddr;
-    if((!daddr_private) && conf->isBlacklistedIPv4(&in)) {
+    if((!daddr_private) && (conf->isBlacklistedIPv4(&in) || isBanned(src_host,&in,NULL))) {
       logFlow(proto_name,
 	      src_host, sport, src_ctry, src_cont, false,
 	      dst_host, dport, dst_ctry, dst_cont, true,
@@ -366,7 +369,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
   if (ipv6) {
     struct in6_addr a;
     inet_pton(AF_INET6, src_host, &a);
-    if ((!saddr_private) && conf->isBlacklistedIPv6(&a)) {
+    if ((!saddr_private) && (conf->isBlacklistedIPv6(&a) || isBanned(src_host,NULL,&a))) {
       logFlow(proto_name,
               src_host, sport, src_ctry, src_cont, true,
               dst_host, dport, dst_ctry, dst_cont, false,
@@ -376,7 +379,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
     }
 
     inet_pton(AF_INET6, dst_host, &a);
-    if ((!daddr_private) && conf->isBlacklistedIPv6(&a)) {
+    if ((!daddr_private) && (conf->isBlacklistedIPv6(&a) || isBanned(src_host,NULL,&a))) {
       logFlow(proto_name,
               src_host, sport, src_ctry, src_cont, false,
               dst_host, dport, dst_ctry, dst_cont, true,
@@ -384,6 +387,23 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
 
       return (conf->getMarkerDrop());
     }
+  }
+
+  /* Step 2.0 - Check honeypot ports and (eventually) ban host */
+  bool drop = false;
+  if (!saddr_private && conf->isProtectedPort(dport)){
+    drop = true, honey_banned.addAddress(src_host); // add banned host to patricia tree
+    std::string h(src_host);  // string cast
+    honey_banned_timesorted.push_back(h); // h is the "less older" banned host
+    std::pair<time_t,list_it> map_value (time(NULL), std::prev(honey_banned_timesorted.end()));
+    honey_banned_time[h] = map_value; // init/reset timer for src_host and keep track in list position
+    trace->traceEvent(TRACE_WARNING, "Banning host %s || Protected port %u", src_host, dport);
+  }
+  if (drop) {
+    logFlow(proto_name,
+	    src_host, sport, src_ctry, src_cont, false,
+	    dst_host, dport, dst_ctry, dst_cont, false,
+	    false /* drop */);
   }
 
   /* Step 2 - For TCP/UDP ignore traffic for non-monitored ports */
@@ -485,8 +505,9 @@ void NwInterface::reloadConfLoop() {
 	
 	newConf->readConfigFile(this->confPath.c_str());
 	
-	if(newConf->isConfigured())
+	if(newConf->isConfigured()) {
 	  shadowConf = newConf;
+  }
 	else
 	  trace->traceEvent(TRACE_ERROR, "Something went wrong: please check the JSON config file");
 
@@ -501,4 +522,56 @@ void NwInterface::reloadConfLoop() {
   } /* while */
 
   trace->traceEvent(TRACE_NORMAL, "Reload configuration loop is over");
+}
+
+/**
+ * @param host char* address representation
+ * @note a4 and a6 shouldn't be both set
+ */
+bool NwInterface::isBanned(char *host, struct in_addr *a4, struct in6_addr *a6){
+  if (( a4 && !honey_banned.isBlacklistedIPv4(a4)) ||
+      ( a6 && !honey_banned.isBlacklistedIPv6(a6)))
+    return false;
+  
+  // => host was had been banned
+  std::string s(host);  
+  std::map<std::string,std::pair<time_t,list_it>>::iterator h = honey_banned_time.find(host);
+  if (h != honey_banned_time.end()){ // this should always be true
+    if (difftime(time(NULL),h->second.first) >= banTimeout){ // ban timeout has expired
+      honey_banned_timesorted.erase(h->second.second); // remove from list
+      honey_banned_time.erase(h); // remove from map
+      honey_banned.removeAddress(host); // remove from patricia tree
+      return false;
+    }
+    else  
+      return true;  // still banned
+  }
+  return false; // should never get here
+  
+}
+
+/**
+ * @param n number of entries to be removed 
+ */
+void NwInterface::honeyHarvesting(int n){
+  list_it it;
+  int x = n;
+  while (x--){
+    // if ( {list is empty} || {there aren't elements to be cleaned})
+    if ((it = honey_banned_timesorted.begin()) == honey_banned_timesorted.end() ||
+      difftime(time(NULL),honey_banned_time.find(*it)->second.first) <= banTimeout)
+      break;
+    
+    // else remove banned host
+    std::string s(*it); // convert to char*
+    char h[s.size() + 1];
+    strcpy(h,s.c_str());
+    honey_banned.removeAddress(h);      // remove from patricia
+    honey_banned_time.erase(s);         // remove from map
+    honey_banned_timesorted.erase(it);  // remove from list
+
+  }
+  if(++x != n) // avoid trace flooding
+    trace->traceEvent(TRACE_NORMAL," Banned hosts harvesting -> %d entries erased || %lu currently banned hosts\n", n-x, honey_banned_time.size());
+
 }

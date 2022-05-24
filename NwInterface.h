@@ -24,6 +24,8 @@
 
 /* ********************************************** */
 
+typedef std::list<std::string>::iterator list_it;
+
 class NwInterface {
  private:
   int queueId;
@@ -35,6 +37,10 @@ class NwInterface {
   Configuration *conf, *shadowConf = NULL;
   GeoIP *geoip;
   std::thread *reloaderThread;
+  std::list<std::string> honey_banned_timesorted;
+  std::map<std::string, std::pair<time_t, list_it>> honey_banned_time;
+  Blacklists honey_banned;
+  double banTimeout = 900.0; // 15 minutes
 
   Marker makeVerdict(u_int8_t proto, u_int16_t vlanId,
 		     u_int16_t sport,
@@ -51,7 +57,9 @@ class NwInterface {
   bool isPrivateIPv6(const char *ip6addr);
   void reloadConfLoop();
   u_int32_t computeNextReloadTime();
-  
+  bool isBanned(char *host, struct in_addr *a4, struct in6_addr *a6);
+  void honeyHarvesting(int n);
+
  public:
   NwInterface(u_int nf_device_id, Configuration *_c, GeoIP *_g, std::string c_path);
   ~NwInterface();
