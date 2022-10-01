@@ -68,13 +68,13 @@ bool Configuration::readConfigFile(const char *path) {
     }
 
     if(marker_drop==marker_pass ){
-        trace->traceEvent(TRACE_ERROR, "Markers values must be distinct in %s", path);
-        return(false);
+      trace->traceEvent(TRACE_ERROR, "Markers values must be distinct in %s", path);
+      return(false);
     }
 
     if(marker_drop<=0 || marker_pass<=0 ){
-        trace->traceEvent(TRACE_ERROR, "Markers values must be greater than 0 in %s", path);
-        return(false);
+      trace->traceEvent(TRACE_ERROR, "Markers values must be greater than 0 in %s", path);
+      return(false);
     }
   }
   trace->traceEvent(TRACE_INFO, "Markers are set to: pass %d, drop %d", marker_pass, marker_drop);
@@ -100,6 +100,15 @@ bool Configuration::readConfigFile(const char *path) {
 
 	trace->traceEvent(TRACE_INFO, "Adding TCP/%u", port);
 	tcp_ports[port] = true;
+      }
+    }
+
+    if(!root["monitored_ports"]["tcp_watches"].empty()) {
+      for(Json::Value::ArrayIndex i = 0; i != root["monitored_ports"]["tcp_watches"].size(); i++) {
+	u_int16_t port = root["monitored_ports"]["tcp_watches"][i].asUInt();
+
+	trace->traceEvent(TRACE_INFO, "Adding TCP_WATCHES/%u", port);
+	tcp_watches_ports[htons(port) /* nw byte order */] = true;
       }
     }
 
@@ -161,27 +170,45 @@ bool Configuration::readConfigFile(const char *path) {
   std::string json_policy_str = default_policy == marker_drop ? "drop" : "pass";
 
   if(!root["policy"].empty() && !root["policy"][json_policy_str].empty()) {
+    Json::Value json_policy_obj = root["policy"][json_policy_str];
+    std::string json_list_str = json_policy_str == "drop" ? "_whitelist" : "_blacklist";
+    int counter = 2;
+    do {
+      std::string json_value_str = counter == 2 ? "countries" : "continents";
+      if(json_policy_obj[json_value_str+json_list_str].empty()) {
+	trace->traceEvent(TRACE_INFO, "Missing %s from %s", (json_value_str+json_list_str).c_str(), path);
+      } else {
+	for(Json::Value::ArrayIndex i = 0; i != json_policy_obj[json_value_str+json_list_str].size(); i++) {
+	  std::string ctry_cont = json_policy_obj[json_value_str+json_list_str][i].asString();
 
-      Json::Value json_policy_obj = root["policy"][json_policy_str];
-      std::string json_list_str = json_policy_str == "drop" ? "_whitelist" : "_blacklist";
-      int counter = 2;
-      do {
-        std::string json_value_str = counter == 2 ? "countries" : "continents";
-        if(json_policy_obj[json_value_str+json_list_str].empty()) {
-          trace->traceEvent(TRACE_INFO, "Missing %s from %s", (json_value_str+json_list_str).c_str(), path);
-        } else {
-          for(Json::Value::ArrayIndex i = 0; i != json_policy_obj[json_value_str+json_list_str].size(); i++) {
-            std::string ctry_cont = json_policy_obj[json_value_str+json_list_str][i].asString();
-
-            trace->traceEvent(TRACE_INFO, "Adding %s to %s", ctry_cont.c_str(), (json_value_str+json_list_str).c_str());
-            ctrs_conts[ctry_cont2u16((char*)ctry_cont.c_str())] = json_policy_str == "drop" ? marker_pass : marker_drop;
-          }
-        }
-      }while(--counter);
+	  trace->traceEvent(TRACE_INFO, "Adding %s to %s", ctry_cont.c_str(), (json_value_str+json_list_str).c_str());
+	  ctrs_conts[ctry_cont2u16((char*)ctry_cont.c_str())] = json_policy_str == "drop" ? marker_pass : marker_drop;
+	}
+      }
+    } while(--counter);
   }
+
+  if(!root["watches"].empty()) {
+    size_t num_watches = root["watches"].size();
+
+    for(Json::Value::ArrayIndex i = 0; i != num_watches; i++) {
+      Json::Value item = root["watches"][i];
+      std::string name = item["name"].asString();
+      std::string cmd  = item["cmd"].asString();
+
+      if(name.empty() || cmd.empty()) {
+	trace->traceEvent(TRACE_WARNING, "Invalid watch format");
+	break;
+      } else
+	watches[name] = cmd;
+    }
+  }
+
   if(!root["blacklists"].empty()) {
     size_t n_urls = root["blacklists"].size();
+
     blacklists.urls_Blacklist.resize(n_urls);
+
     for(Json::Value::ArrayIndex i = 0; i != n_urls; i++) {
       std::string url (root["blacklists"][i].asString());
       blacklists.urls_Blacklist[i] = url;
@@ -239,8 +266,8 @@ bool Configuration::mergePortRanges (port_range r1, port_range r2, port_range *r
     ret->first = r.first;
   ret->second = l.second;
   trace->traceEvent(TRACE_INFO, "Merging ranges [%u-%u] and [%u-%u] into [%u-%u]",
-    r1.second,r1.first,r2.second,r2.first,ret->second,ret->first
-    );
+		    r1.second,r1.first,r2.second,r2.first,ret->second,ret->first
+		    );
   return true;
 }
 
@@ -302,7 +329,7 @@ bool Configuration::stringToU16(std::string s, u_int16_t *toRet) {
   const char *_s = s.c_str();
   unsigned long v = strtoul(_s, &err, 10);
   if(*_s != '\0' && *err == '\0' &&
-      v <= USHRT_MAX) {  // string is valid number
+     v <= USHRT_MAX) {  // string is valid number
     *toRet = v;
     return true;
   }
@@ -312,11 +339,12 @@ bool Configuration::stringToU16(std::string s, u_int16_t *toRet) {
 
 bool Configuration::isProtectedPort(u_int16_t port) {
   if  (hp_ports.find(port) != hp_ports.end() ||                      // single port match
-      // included by a "!port"
-      (!hp_all_except_ports.empty() && hp_all_except_ports.find(port) == hp_all_except_ports.end()) ||
-      (isIncludedInRange(port))
-  )
+       // included by a "!port"
+       (!hp_all_except_ports.empty() && hp_all_except_ports.find(port) == hp_all_except_ports.end()) ||
+       (isIncludedInRange(port))
+       )
     return true;
+
   return false;
 }
 

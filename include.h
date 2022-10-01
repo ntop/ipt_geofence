@@ -89,6 +89,7 @@ class Marker{
 #include "Blacklists.h"
 #include "Configuration.h"
 #include "GeoIP.h"
+#include "WatchMatches.h"
 #include "NwInterface.h"
 
 extern Trace *trace;

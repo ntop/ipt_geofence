@@ -21,6 +21,8 @@
 
 #include "include.h"
 
+#define TOO_MANY_INVALID_ATTEMPTS   3
+
 /* Forward */
 int netfilter_callback(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg,
 		       struct nfq_data *nfa, void *data);
@@ -114,15 +116,29 @@ int netfilter_callback(struct nfq_q_handle *qh,
   return(nfq_set_verdict2(qh, id, NF_ACCEPT, marker, 0, NULL));
 }
 
-
 /* **************************************************** */
 
 void NwInterface::packetPollLoop() {
   struct nfq_handle *h;
   int fd;
+  std::unordered_map<std::string,std::string> *watches = conf->get_watches();
+  std::vector<FILE*> pipes;
+  std::vector<int> pipes_fileno;
 
   /* Spawn reload config thread in background */
   reloaderThread = new std::thread(&NwInterface::reloadConfLoop, this);
+
+  /* Start watches */
+  for(std::unordered_map<std::string,std::string>::iterator it = watches->begin(); it != watches->end(); it++) {
+    FILE *watcher = popen(it->second.c_str(), "r");
+
+    if(watcher == NULL) {
+      trace->traceEvent(TRACE_ERROR, "Unable to run watch %s", it->first.c_str());
+    } else {
+      pipes.push_back(watcher);
+      pipes_fileno.push_back(fileno(watcher));
+    }
+  }
 
   ifaceRunning = true;
 
@@ -132,28 +148,59 @@ void NwInterface::packetPollLoop() {
   while(isRunning()) {
     fd_set mask;
     struct timeval wait_time;
+    int max_fd = fd;
 
     FD_ZERO(&mask);
     FD_SET(fd, &mask);
+
+    for(u_int i=0, s = pipes_fileno.size(); i < s; i++) {
+      FD_SET(pipes_fileno[i], &mask);
+      if(pipes_fileno[i] > max_fd)
+	max_fd = pipes_fileno[i];
+    }
+
     wait_time.tv_sec = 1, wait_time.tv_usec = 0;
 
-    if(select(fd+1, &mask, 0, 0, &wait_time) > 0) {
-      char pktBuf[8192] __attribute__ ((aligned));
-      int len = recv(fd, pktBuf, sizeof(pktBuf), 0);
+    if(select(max_fd+1, &mask, 0, 0, &wait_time) > 0) {
+      if(FD_ISSET(fd, &mask)) {
+	/* Socket data */
+	char pktBuf[8192] __attribute__ ((aligned));
+	int len = recv(fd, pktBuf, sizeof(pktBuf), 0);
 
-      // trace->traceEvent(TRACE_INFO, "Pkt len %d", len);
+	// trace->traceEvent(TRACE_INFO, "Pkt len %d", len);
 
-      if(len >= 0) {
-	int rc = nfq_handle_packet(h, pktBuf, len);
+	if(len >= 0) {
+	  int rc = nfq_handle_packet(h, pktBuf, len);
 
-	if(rc < 0)
-	  trace->traceEvent(TRACE_ERROR, "nfq_handle_packet() failed: [len: %d][rc: %d][errno: %d]", len, rc, errno);
+	  if(rc < 0)
+	    trace->traceEvent(TRACE_ERROR, "nfq_handle_packet() failed: [len: %d][rc: %d][errno: %d]", len, rc, errno);
+	} else {
+	  trace->traceEvent(TRACE_ERROR, "NF_QUEUE receive error: [len: %d][errno: %d]", len, errno);
+	  break;
+	}
       } else {
-	trace->traceEvent(TRACE_ERROR, "NF_QUEUE receive error: [len: %d][errno: %d]", len, errno);
-	break;
+	/* Watches */
+
+	for(u_int i=0, s = pipes_fileno.size(); i < s; i++) {
+	  if(FD_ISSET(pipes_fileno[i], &mask)) {
+	    char ip[64];
+
+	    while(fgets(ip, sizeof(ip), pipes[i]) != NULL) {
+	      u_int32_t key = inet_addr(ip);
+	      std::unordered_map<u_int32_t, WatchMatches*>::iterator it = watches_backlist.find(key);
+
+	      if(it == watches_backlist.end()) {
+		watches_backlist[key] = new WatchMatches();
+	      } else {
+		WatchMatches *m = it->second;
+
+		m->inc_matches();
+	      }
+	    }
+	  }
+	}
       }
-    }
-    else {
+    } else {
       honeyHarvesting(10);
     }
 
@@ -167,6 +214,12 @@ void NwInterface::packetPollLoop() {
       trace->traceEvent(TRACE_NORMAL, "New configuration has been updated");
     }
   }
+
+  for(u_int i=0, s = pipes.size(); i < s; i++)
+    pclose(pipes[i]);
+
+  for(std::unordered_map<u_int32_t, WatchMatches*>::iterator it = watches_backlist.begin(); it != watches_backlist.end(); it++)
+    delete it->second;
 
   trace->traceEvent(TRACE_NORMAL, "Leaving netfilter packet poll loop");
   ifaceRunning = false;
@@ -331,23 +384,43 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
   struct in_addr in;
   char src_ctry[3]={}, dst_ctry[3]={}, src_cont[3]={}, dst_cont[3]={} ;
   const char *proto_name = getProtoName(proto);
-
-  // trace->traceEvent(TRACE_DEBUG, "%s %s %s : %u -> %s : %u",ipv4 ? "IPv4" : (ipv6 ? "IPv6" : "???"),
-  //   proto_name, src_host, sport, dst_host, dport);
-
   u_int32_t saddr = ipv4 ? inet_addr(src_host) : 0;
   u_int32_t daddr = ipv4 ? inet_addr(dst_host) : 0;
-  bool pass_local = true,
-    saddr_private = (ipv4 ? isPrivateIPv4(saddr) : isPrivateIPv6(src_host)),
-    daddr_private = (ipv4 ? isPrivateIPv4(daddr) : isPrivateIPv6(dst_host));
+  bool pass_local = true;
+  bool saddr_private = (ipv4 ? isPrivateIPv4(saddr) : isPrivateIPv6(src_host));
+  bool daddr_private = (ipv4 ? isPrivateIPv4(daddr) : isPrivateIPv6(dst_host));
   Marker m, src_marker, dst_marker;
+
   sport = ntohs(sport), dport = ntohs(dport);
 
   /* Check if sender/recipient are blacklisted */
-  if (ipv4){
+  if (ipv4) {
+    if(conf->isTCPWatchPort(dport)) {
+      /* Step 0 - check watchers [TODO add IPv6 support] */
+      std::unordered_map<u_int32_t, WatchMatches*>::iterator it = watches_backlist.find(saddr);
+
+      if(it == watches_backlist.end()) {
+	WatchMatches *m = it->second;
+
+	if(m->get_num_matches() > TOO_MANY_INVALID_ATTEMPTS) {
+	  /* Too many drops */
+	  logFlow(proto_name,
+		  src_host, sport, src_ctry, src_cont, true,
+		  dst_host, dport, dst_ctry, dst_cont, false,
+		false /* drop */);
+
+	  return(conf->getMarkerDrop());
+	} else {
+	  /* Watch ports are not further processed */
+	  return(conf->getMarkerPass());
+	}
+      }
+    }
+    
     in.s_addr = saddr;
+
     /* Step 1 - For all ports/protocols, check if sender/recipient are blacklisted and if so, block this flow */
-    if((!saddr_private) && (conf->isBlacklistedIPv4(&in) || isBanned(src_host,&in,NULL))) {
+    if((!saddr_private) && (conf->isBlacklistedIPv4(&in) || isBanned(src_host, &in, NULL))) {
       logFlow(proto_name,
 	      src_host, sport, src_ctry, src_cont, true,
 	      dst_host, dport, dst_ctry, dst_cont, false,
@@ -357,7 +430,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
     }
 
     in.s_addr = daddr;
-    if((!daddr_private) && (conf->isBlacklistedIPv4(&in) || isBanned(src_host,&in,NULL))) {
+    if((!daddr_private) && (conf->isBlacklistedIPv4(&in) || isBanned(src_host, &in, NULL))) {
       logFlow(proto_name,
 	      src_host, sport, src_ctry, src_cont, false,
 	      dst_host, dport, dst_ctry, dst_cont, true,
@@ -366,8 +439,10 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
       return(conf->getMarkerDrop());
     }
   }
+
   if (ipv6) {
     struct in6_addr a;
+
     inet_pton(AF_INET6, src_host, &a);
     if ((!saddr_private) && (conf->isBlacklistedIPv6(&a) || isBanned(src_host,NULL,&a))) {
       logFlow(proto_name,

@@ -1,32 +1,36 @@
 {
-	"queue_id": 0,
-	"markers": {
-		"pass": 1000,
-		"drop": 2000
+    "queue_id": 0,
+    "markers": {
+	"pass": 1000,
+	"drop": 2000
+    },
+    "default_policy": "DROP",
+    "monitored_ports": {
+	"tcp": [22, 80, 443],
+	"tcp_watches": [25,587],
+	"udp": [],
+	"ignored_ports": [123],
+	"honeypot_ports": ["51000-56000","50000-56100", "51000-52000",10,20,30]
+    },
+    "policy": {
+	"drop": {
+	    "countries_whitelist": ["IT", "DE", "CH", "NL"],
+	    "continents_whitelist": ["NA"]
 	},
-	"default_policy": "DROP",
-	"monitored_ports": {
-		"tcp": [22, 80, 443],
-		"udp": [],
-		"ignored_ports": [123],
-		"honeypot_ports": ["51000-56000","50000-56100", "51000-52000",10,20,30]
-	},
-	"policy": {
-		"drop": {
-			"countries_whitelist": ["IT", "DE", "CH", "NL"],
-			"continents_whitelist": ["NA"]
-		},
-		"pass": {
-			"countries_blacklist": ["RU", "BY"],
-			"continents_blacklist": []
-		}
-	},
-	"blacklists": [
-		"https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/dshield_7d.netset",
-		"https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/alienvault_reputation.ipset",
-		"https://feodotracker.abuse.ch/downloads/ipblocklist_recommended.txt",
-		"https://rules.emergingthreats.net/fwrules/emerging-Block-IPs.txt",
-		"https://feodotracker.abuse.ch/downloads/ipblocklist.txt",
-		"https://sslbl.abuse.ch/blacklist/sslipblacklist.txt"
-	]
+	"pass": {
+	    "countries_blacklist": ["RU", "BY"],
+	    "continents_blacklist": []
+	}
+    },
+    "blacklists": [
+	"https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/dshield_7d.netset",
+	"https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/alienvault_reputation.ipset",
+	"https://feodotracker.abuse.ch/downloads/ipblocklist_recommended.txt",
+	"https://rules.emergingthreats.net/fwrules/emerging-Block-IPs.txt",
+	"https://feodotracker.abuse.ch/downloads/ipblocklist.txt",
+	"https://sslbl.abuse.ch/blacklist/sslipblacklist.txt"
+    ],
+    "watches": [
+	{ "name" : "postfix", "cmd": "tail -f /var/log/mail.log | grep failure | cut -d'[' -f 3 | cut -d']' -f 1" }
+    ]
 }
