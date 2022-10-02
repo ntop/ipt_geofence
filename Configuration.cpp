@@ -107,7 +107,7 @@ bool Configuration::readConfigFile(const char *path) {
       for(Json::Value::ArrayIndex i = 0; i != root["monitored_ports"]["tcp_watches"].size(); i++) {
 	u_int16_t port = root["monitored_ports"]["tcp_watches"][i].asUInt();
 
-	trace->traceEvent(TRACE_INFO, "Adding TCP_WATCHES/%u", port);
+	trace->traceEvent(TRACE_NORMAL, "Adding TCP_WATCHES/%u", port);
 	tcp_watches_ports[htons(port) /* nw byte order */] = true;
       }
     }

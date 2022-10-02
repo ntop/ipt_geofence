@@ -23,6 +23,8 @@
 
 #define TOO_MANY_INVALID_ATTEMPTS   3
 
+/* #define DEBUG */
+
 /* Forward */
 int netfilter_callback(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg,
 		       struct nfq_data *nfa, void *data);
@@ -135,8 +137,11 @@ void NwInterface::packetPollLoop() {
     if(watcher == NULL) {
       trace->traceEvent(TRACE_ERROR, "Unable to run watch %s", it->first.c_str());
     } else {
+      int fd = fileno(watcher);
+
       pipes.push_back(watcher);
-      pipes_fileno.push_back(fileno(watcher));
+      fcntl(fd, F_SETFL, O_NONBLOCK);
+      pipes_fileno.push_back(fd);
     }
   }
 
@@ -148,7 +153,7 @@ void NwInterface::packetPollLoop() {
   while(isRunning()) {
     fd_set mask;
     struct timeval wait_time;
-    int max_fd = fd;
+    int max_fd = fd, num;
 
     FD_ZERO(&mask);
     FD_SET(fd, &mask);
@@ -161,24 +166,30 @@ void NwInterface::packetPollLoop() {
 
     wait_time.tv_sec = 1, wait_time.tv_usec = 0;
 
-    if(select(max_fd+1, &mask, 0, 0, &wait_time) > 0) {
+    num = select(max_fd+1, &mask, 0, 0, &wait_time);
+
+    if(num > 0) {
       if(FD_ISSET(fd, &mask)) {
 	/* Socket data */
 	char pktBuf[8192] __attribute__ ((aligned));
 	int len = recv(fd, pktBuf, sizeof(pktBuf), 0);
-
+      
 	// trace->traceEvent(TRACE_INFO, "Pkt len %d", len);
-
+      
 	if(len >= 0) {
 	  int rc = nfq_handle_packet(h, pktBuf, len);
-
+	
 	  if(rc < 0)
 	    trace->traceEvent(TRACE_ERROR, "nfq_handle_packet() failed: [len: %d][rc: %d][errno: %d]", len, rc, errno);
 	} else {
 	  trace->traceEvent(TRACE_ERROR, "NF_QUEUE receive error: [len: %d][errno: %d]", len, errno);
 	  break;
 	}
-      } else {
+
+	num--;
+      }
+
+      if(num > 0) {
 	/* Watches */
 
 	for(u_int i=0, s = pipes_fileno.size(); i < s; i++) {
@@ -187,14 +198,20 @@ void NwInterface::packetPollLoop() {
 
 	    while(fgets(ip, sizeof(ip), pipes[i]) != NULL) {
 	      u_int32_t key = inet_addr(ip);
-	      std::unordered_map<u_int32_t, WatchMatches*>::iterator it = watches_backlist.find(key);
-
-	      if(it == watches_backlist.end()) {
-		watches_backlist[key] = new WatchMatches();
+	      std::unordered_map<u_int32_t, WatchMatches*>::iterator it = watches_blacklist.find(key);
+	      
+	      if(it == watches_blacklist.end()) {
+		watches_blacklist[key] = new WatchMatches();
+#ifdef DEBUG
+		trace->traceEvent(TRACE_ERROR, "NEW %s", ip);
+#endif
 	      } else {
 		WatchMatches *m = it->second;
 
 		m->inc_matches();
+#ifdef DEBUG
+		trace->traceEvent(TRACE_ERROR, "UPDATE %s [%u macthes]", ip, m->get_num_matches());
+#endif
 	      }
 	    }
 	  }
@@ -218,7 +235,7 @@ void NwInterface::packetPollLoop() {
   for(u_int i=0, s = pipes.size(); i < s; i++)
     pclose(pipes[i]);
 
-  for(std::unordered_map<u_int32_t, WatchMatches*>::iterator it = watches_backlist.begin(); it != watches_backlist.end(); it++)
+  for(std::unordered_map<u_int32_t, WatchMatches*>::iterator it = watches_blacklist.begin(); it != watches_blacklist.end(); it++)
     delete it->second;
 
   trace->traceEvent(TRACE_NORMAL, "Leaving netfilter packet poll loop");
@@ -390,31 +407,44 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
   bool saddr_private = (ipv4 ? isPrivateIPv4(saddr) : isPrivateIPv6(src_host));
   bool daddr_private = (ipv4 ? isPrivateIPv4(daddr) : isPrivateIPv6(dst_host));
   Marker m, src_marker, dst_marker;
-
+  u_int16_t _dport = dport;
+  bool check_only_blacklists = false;
+    
   sport = ntohs(sport), dport = ntohs(dport);
 
   /* Check if sender/recipient are blacklisted */
   if (ipv4) {
-    if(conf->isTCPWatchPort(dport)) {
+    if(conf->isTCPWatchPort(_dport)) {
       /* Step 0 - check watchers [TODO add IPv6 support] */
-      std::unordered_map<u_int32_t, WatchMatches*>::iterator it = watches_backlist.find(saddr);
+      std::unordered_map<u_int32_t, WatchMatches*>::iterator it = watches_blacklist.find(saddr);
 
-      if(it == watches_backlist.end()) {
+#ifdef DEBUG
+    trace->traceEvent(TRACE_ERROR, "Checking %s:%u <-> %s:%u", src_host, sport, dst_host, dport);
+#endif
+
+      if(it != watches_blacklist.end()) {
 	WatchMatches *m = it->second;
 
-	if(m->get_num_matches() > TOO_MANY_INVALID_ATTEMPTS) {
+#ifdef DEBUG
+	trace->traceEvent(TRACE_ERROR, "Found %u matches for %s", m->get_num_matches(), src_host);
+#endif
+	
+	if(m->get_num_matches() >= TOO_MANY_INVALID_ATTEMPTS) {
+	  trace->traceEvent(TRACE_ERROR, "[DROP] Found %u matches for %s", m->get_num_matches(), src_host);
+	  
 	  /* Too many drops */
 	  logFlow(proto_name,
 		  src_host, sport, src_ctry, src_cont, true,
 		  dst_host, dport, dst_ctry, dst_cont, false,
-		false /* drop */);
+		  false /* drop */);
 
 	  return(conf->getMarkerDrop());
-	} else {
-	  /* Watch ports are not further processed */
-	  return(conf->getMarkerPass());
 	}
+
+	/* No else so we can check blacklists */
       }
+
+      check_only_blacklists = true;
     }
     
     in.s_addr = saddr;
@@ -438,9 +468,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
 
       return(conf->getMarkerDrop());
     }
-  }
-
-  if (ipv6) {
+  } else if(ipv6) {
     struct in6_addr a;
 
     inet_pton(AF_INET6, src_host, &a);
@@ -464,6 +492,15 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
     }
   }
 
+  if(check_only_blacklists) {
+    logFlow(proto_name,
+	    src_host, sport, src_ctry, src_cont, false,
+	    dst_host, dport, dst_ctry, dst_cont, false,
+	    true /* pass */);
+
+    return(conf->getMarkerPass());
+  }
+    
   /* Step 2.0 - Check honeypot ports and (eventually) ban host */
   bool drop = false;
   if (!saddr_private && conf->isProtectedPort(dport)){
@@ -472,8 +509,10 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
     honey_banned_timesorted.push_back(h); // h is the "less older" banned host
     std::pair<time_t,list_it> map_value (time(NULL), std::prev(honey_banned_timesorted.end()));
     honey_banned_time[h] = map_value; // init/reset timer for src_host and keep track in list position
-    trace->traceEvent(TRACE_WARNING, "Banning host %s || Protected port %u", src_host, dport);
+
+    trace->traceEvent(TRACE_INFO, "Banning host %s || Protected port %u", src_host, dport);
   }
+  
   if (drop) {
     logFlow(proto_name,
 	    src_host, sport, src_ctry, src_cont, false,
@@ -517,12 +556,11 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
     dst_marker = conf->getMarker(dst_ctry, dst_cont);
     pass_local = false;
   } else {
-    /* Unknown or private IP address  */
+    /* Unknown or private IP address */
     dst_marker = conf->getMarkerPass();
   }
 
   /* Final step: compute the flow verdict */
-
   if((conf->isIgnoredPort(sport) || conf->isIgnoredPort(dport))
      || ((src_marker == conf->getMarkerPass()) && (dst_marker == conf->getMarkerPass()))) {
     m = conf->getMarkerPass();
@@ -582,7 +620,7 @@ void NwInterface::reloadConfLoop() {
 
 	if(newConf->isConfigured()) {
 	  shadowConf = newConf;
-  }
+	}
 	else
 	  trace->traceEvent(TRACE_ERROR, "Something went wrong: please check the JSON config file");
 
@@ -634,7 +672,7 @@ void NwInterface::honeyHarvesting(int n){
   while (x--){
     // if ( {list is empty} || {there aren't elements to be cleaned})
     if ((it = honey_banned_timesorted.begin()) == honey_banned_timesorted.end() ||
-      difftime(time(NULL),honey_banned_time.find(*it)->second.first) <= banTimeout)
+	difftime(time(NULL),honey_banned_time.find(*it)->second.first) <= banTimeout)
       break;
 
     // else remove banned host
