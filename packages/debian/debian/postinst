@@ -43,6 +43,9 @@ fi
 
 if [ -f /.dockerenv ]; then exit 0; fi
 
+# Reload rsyslog configuration
+service rsyslog restart
+
 # Start service after upgrade/install
 systemctl daemon-reload
 systemctl reset-failed
