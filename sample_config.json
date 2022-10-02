@@ -23,6 +23,7 @@
 	}
     },
     "blacklists": [
+	"https://mcfp.felk.cvut.cz/publicDatasets/CTU-AIPP-BlackList/Todays-Blacklists/AIP_historical_blacklist_prioritized_by_newest_attackers.csv",
 	"https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/dshield_7d.netset",
 	"https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/alienvault_reputation.ipset",
 	"https://feodotracker.abuse.ch/downloads/ipblocklist_recommended.txt",
@@ -31,6 +32,7 @@
 	"https://sslbl.abuse.ch/blacklist/sslipblacklist.txt"
     ],
     "watches": [
-	{ "name" : "postfix", "cmd": "tail -f /var/log/mail.log | grep failure | cut -d'[' -f 3 | cut -d']' -f 1" }
+	{ "name" : "postfix", "cmd": "tail -f /var/log/mail.log | grep failure | cut -d'[' -f 3 | cut -d']' -f 1" },
+	{ "name" : "postfix-2", "cmd": "tail -F /var/log/mail.log | grep --line-buffered 'no auth attempts' |cut -d '=' -f 3|cut -d ',' -f 1" }	
     ]
 }

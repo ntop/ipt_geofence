@@ -135,6 +135,8 @@ void Blacklists::addAddress(char *net) {
   }
 }
 
+/* ****************************************** */
+
 void Blacklists::removeAddress(char *net){
   char *_bits = strchr(net, '/');
   u_int bits = 0;
@@ -174,13 +176,28 @@ bool Blacklists::loadIPsetFromFile(const char *path) {
   if(!infile.is_open())
     return(false);
 
-  while(getline(infile, line)){
+  while(getline(infile, line)){   
     if((line[0] == '#') || (line[0] == '\0'))
       continue;
 
     // trace->traceEvent(TRACE_INFO, "Adding %s", line.c_str());
 
-    addAddress((char*)line.c_str());
+    if(line.find(',') != std::string::npos) {
+      /* 
+	 Check Stratosphere IPS format
+	 66,185.156.73.120,0.0033643602135959
+      */
+      char *token, *dup = strdup(line.c_str());
+      
+      if((token = strtok(dup, ",")) != NULL) {
+	if((token = strtok(NULL, ",")) != NULL) {
+	  addAddress(token);
+	}
+      }
+      
+      free(dup);
+    } else
+      addAddress((char*)line.c_str());
   }
 
   infile.close();

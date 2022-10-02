@@ -416,21 +416,26 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
   if (ipv4) {
     if(conf->isTCPWatchPort(_dport)) {
       /* Step 0 - check watchers [TODO add IPv6 support] */
+      /*
+	smtpd_error_sleep_time = 1s
+	smtpd_soft_error_limit = 2
+	smtpd_hard_error_limit = 3
+       */
       std::unordered_map<u_int32_t, WatchMatches*>::iterator it = watches_blacklist.find(saddr);
 
 #ifdef DEBUG
-    trace->traceEvent(TRACE_ERROR, "Checking %s:%u <-> %s:%u", src_host, sport, dst_host, dport);
+      trace->traceEvent(TRACE_ERROR, "Checking %s:%u <-> %s:%u", src_host, sport, dst_host, dport);
 #endif
 
       if(it != watches_blacklist.end()) {
 	WatchMatches *m = it->second;
 
 #ifdef DEBUG
-	trace->traceEvent(TRACE_ERROR, "Found %u matches for %s", m->get_num_matches(), src_host);
+	trace->traceEvent(TRACE_WARNING, "Found %u matches for %s", m->get_num_matches(), src_host);
 #endif
 	
 	if(m->get_num_matches() >= TOO_MANY_INVALID_ATTEMPTS) {
-	  trace->traceEvent(TRACE_ERROR, "[DROP] Found %u matches for %s", m->get_num_matches(), src_host);
+	  trace->traceEvent(TRACE_WARNING, "[DROP] Found %u matches for %s", m->get_num_matches(), src_host);
 	  
 	  /* Too many drops */
 	  logFlow(proto_name,
