@@ -75,6 +75,16 @@ else
    fi
 fi
 
+AC_MSG_CHECKING([PF_RING nBPF])
+NBPF_HOME=../PF_RING/userland/nbpf
+LIBNBPF=${NBPF_HOME}/libnbpf.a
+if test -f ${LIBNBPF}; then :
+   LIBS="${LIBS} ${LIBNBPF}"
+   AC_MSG_RESULT(yes)
+else
+   AC_MSG_RESULT(no)
+fi
+
 AC_SUBST(VERSION)
 AC_SUBST(RELEASE)
 AC_SUBST(REVISION)
