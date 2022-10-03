@@ -42,6 +42,7 @@ class NwInterface {
   Blacklists honey_banned;
   double banTimeout = 900.0; // 15 minutes
   std::unordered_map<u_int32_t /* IPv4 [TODO add IPv6] */, WatchMatches*> watches_blacklist;
+  std::string confPath;
   
   Marker makeVerdict(u_int8_t proto, u_int16_t vlanId,
 		     u_int16_t sport,
@@ -60,7 +61,8 @@ class NwInterface {
   u_int32_t computeNextReloadTime();
   bool isBanned(char *host, struct in_addr *a4, struct in6_addr *a6);
   void honeyHarvesting(int n);
-
+  void harvestWatches();
+  
  public:
   NwInterface(u_int nf_device_id, Configuration *_c, GeoIP *_g, std::string c_path);
   ~NwInterface();
@@ -73,7 +75,6 @@ class NwInterface {
   inline struct nfq_handle*   get_nfHandle()    { return(nfHandle);                    };
   inline struct nfq_q_handle* get_queueHandle() { return(queueHandle);                 };
   void packetPollLoop();
-  std::string confPath;
 };
 
 #endif /* _NETWORK_INTERFACE_H_ */

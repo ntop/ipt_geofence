@@ -1,7 +1,7 @@
 AC_INIT([Makefile.in], 1.0)
 
 # NOTE: this file is not actually used. You need to edit configure as well!
-IPT_GEOFENCE_VERSION_SHORT=`grep PACKAGE_VERSION ../../config.h | cut -d '"' -f 2`
+IPT_GEOFENCE_VERSION_SHORT=`grep IPT_RELEASE ../../config.h | cut -d '"' -f 2`
 GIT_COMMITS=`git rev-list --count HEAD`
 
 MACHINE=`uname -m`

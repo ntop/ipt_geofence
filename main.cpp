@@ -24,7 +24,7 @@
 /* Global */
 Trace *trace;
 
-const char *version = PACKAGE_VERSION;
+const char *version = IPT_RELEASE;
 u_int32_t last_modification_time = 0;
 NwInterface *iface;
 

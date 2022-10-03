@@ -22,6 +22,8 @@
 #ifndef _WATCH_MATCHES_H_
 #define _WATCH_MATCHES_H_
 
+#define MAX_IDLENESS   43200 /* 12 hours */
+
 class WatchMatches {
 private:
   u_int32_t last_match, num_matches;
@@ -29,10 +31,10 @@ private:
 public:
   WatchMatches() { last_match = time(NULL), num_matches = 1; }
 
-  inline u_int32_t get_last_match()  { return(last_match);                     }
-  inline u_int32_t get_num_matches() { return(num_matches);                    }
-  inline void      inc_matches()     { num_matches++, last_match = time(NULL); }
-
+  inline u_int32_t get_last_match()   { return(last_match);                     }
+  inline u_int32_t get_num_matches()  { return(num_matches);                    }
+  inline void      inc_matches()      { num_matches++, last_match = time(NULL); }
+  inline bool      ready_to_harvest(u_int32_t when) { return((last_match < when) ? true : false); }
 };
 
 #endif /* _WATCH_MATCHES_H_ */

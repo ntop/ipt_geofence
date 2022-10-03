@@ -173,12 +173,12 @@ void NwInterface::packetPollLoop() {
 	/* Socket data */
 	char pktBuf[8192] __attribute__ ((aligned));
 	int len = recv(fd, pktBuf, sizeof(pktBuf), 0);
-      
+
 	// trace->traceEvent(TRACE_INFO, "Pkt len %d", len);
-      
+
 	if(len >= 0) {
 	  int rc = nfq_handle_packet(h, pktBuf, len);
-	
+
 	  if(rc < 0)
 	    trace->traceEvent(TRACE_ERROR, "nfq_handle_packet() failed: [len: %d][rc: %d][errno: %d]", len, rc, errno);
 	} else {
@@ -199,7 +199,7 @@ void NwInterface::packetPollLoop() {
 	    while(fgets(ip, sizeof(ip), pipes[i]) != NULL) {
 	      u_int32_t key = inet_addr(ip);
 	      std::unordered_map<u_int32_t, WatchMatches*>::iterator it = watches_blacklist.find(key);
-	      
+
 	      if(it == watches_blacklist.end()) {
 		watches_blacklist[key] = new WatchMatches();
 #ifdef DEBUG
@@ -219,6 +219,7 @@ void NwInterface::packetPollLoop() {
       }
     } else {
       honeyHarvesting(10);
+      harvestWatches();
     }
 
     if(shadowConf != NULL) {
@@ -338,6 +339,8 @@ bool NwInterface::isPrivateIPv4(u_int32_t addr /* network byte order */) {
     return(false);
 }
 
+/* **************************************************** */
+
 bool NwInterface::isPrivateIPv6(const char *ip6addr) {
   struct in6_addr a;
   inet_pton(AF_INET6,ip6addr,&a);
@@ -409,7 +412,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
   Marker m, src_marker, dst_marker;
   u_int16_t _dport = dport;
   bool check_only_blacklists = false;
-    
+
   sport = ntohs(sport), dport = ntohs(dport);
 
   /* Check if sender/recipient are blacklisted */
@@ -433,10 +436,10 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
 #ifdef DEBUG
 	trace->traceEvent(TRACE_WARNING, "Found %u matches for %s", m->get_num_matches(), src_host);
 #endif
-	
+
 	if(m->get_num_matches() >= TOO_MANY_INVALID_ATTEMPTS) {
 	  trace->traceEvent(TRACE_WARNING, "[DROP] Found %u matches for %s", m->get_num_matches(), src_host);
-	  
+
 	  /* Too many drops */
 	  logFlow(proto_name,
 		  src_host, sport, src_ctry, src_cont, true,
@@ -451,7 +454,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
 
       check_only_blacklists = true;
     }
-    
+
     in.s_addr = saddr;
 
     /* Step 1 - For all ports/protocols, check if sender/recipient are blacklisted and if so, block this flow */
@@ -505,7 +508,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
 
     return(conf->getMarkerPass());
   }
-    
+
   /* Step 2.0 - Check honeypot ports and (eventually) ban host */
   bool drop = false;
   if (!saddr_private && conf->isProtectedPort(dport)){
@@ -517,7 +520,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
 
     trace->traceEvent(TRACE_INFO, "Banning host %s || Protected port %u", src_host, dport);
   }
-  
+
   if (drop) {
     logFlow(proto_name,
 	    src_host, sport, src_ctry, src_cont, false,
@@ -642,6 +645,8 @@ void NwInterface::reloadConfLoop() {
   trace->traceEvent(TRACE_NORMAL, "Reload configuration loop is over");
 }
 
+/* **************************************************** */
+
 /**
  * @param host char* address representation
  * @note a4 and a6 shouldn't be both set
@@ -664,9 +669,11 @@ bool NwInterface::isBanned(char *host, struct in_addr *a4, struct in6_addr *a6){
     else
       return true;  // still banned
   }
-  return false; // should never get here
 
+  return false; // should never get here
 }
+
+/* **************************************************** */
 
 /**
  * @param n number of entries to be removed
@@ -674,7 +681,8 @@ bool NwInterface::isBanned(char *host, struct in_addr *a4, struct in6_addr *a6){
 void NwInterface::honeyHarvesting(int n){
   list_it it;
   int x = n;
-  while (x--){
+
+  while (x--) {
     // if ( {list is empty} || {there aren't elements to be cleaned})
     if ((it = honey_banned_timesorted.begin()) == honey_banned_timesorted.end() ||
 	difftime(time(NULL),honey_banned_time.find(*it)->second.first) <= banTimeout)
@@ -684,12 +692,27 @@ void NwInterface::honeyHarvesting(int n){
     std::string s(*it); // convert to char*
     char h[s.size() + 1];
     strcpy(h,s.c_str());
+
     honey_banned.removeAddress(h);      // remove from patricia
     honey_banned_time.erase(s);         // remove from map
     honey_banned_timesorted.erase(it);  // remove from list
-
   }
-  if(++x != n) // avoid trace flooding
-    trace->traceEvent(TRACE_NORMAL," Banned hosts harvesting -> %d entries erased || %lu currently banned hosts\n", n-x, honey_banned_time.size());
 
+  if(++x != n) // avoid trace flooding
+    trace->traceEvent(TRACE_NORMAL, "Banned hosts harvesting -> %d entries erased || %lu currently banned hosts\n",
+		      n-x, honey_banned_time.size());
+}
+
+/* **************************************************** */
+
+void NwInterface::harvestWatches() {
+  u_int32_t when = time(NULL) - MAX_IDLENESS;
+  
+  for(std::unordered_map<u_int32_t, WatchMatches*>::iterator it = watches_blacklist.begin();  it != watches_blacklist.end();) {
+    if(it->second->ready_to_harvest(when)) {
+      watches_blacklist.erase(it++);    // or "it = m.erase(it)" since C++11
+      delete it->second;
+    } else
+      ++it;
+  }
 }

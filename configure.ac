@@ -5,13 +5,14 @@ AC_PROG_CPP
 AC_PROG_CXX
 
 DATE=`date +%y%m%d`
-VERSION="1.0.0"
+VERSION="1.0"
 RELEASE=`git log --pretty=oneline | wc -l`
-REVISION=`git rev-list --all |wc -l`
 GIT_BRANCH=`git branch --no-color|cut -d ' ' -f 2`
 GIT_HASH=`git log --pretty=format:"%H (%ad)"|head -1`
-DATE=`date -R`
 MACHINE=`uname -m`
+
+IPT_RELEASE="${VERSION}.${DATE}"
+AC_DEFINE_UNQUOTED(IPT_RELEASE, "$IPT_RELEASE", [release version])
 
 AC_LANG_CPLUSPLUS
 
@@ -87,7 +88,7 @@ fi
 
 AC_SUBST(VERSION)
 AC_SUBST(RELEASE)
-AC_SUBST(REVISION)
+AC_SUBST(IPT_RELEASE)
 AC_SUBST(GIT_BRANCH)
 AC_SUBST(GIT_HASH)
 AC_SUBST(DATE)
