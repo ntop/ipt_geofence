@@ -56,6 +56,12 @@
 #include <inttypes.h>
 #include <netinet/ip6.h>
 
+#ifdef HAVE_ZMQ
+#include <zmq.h>
+#endif
+
+/* ***** C++ ***** */
+
 #include <unordered_map>
 #include <fstream>
 #include <iostream>
@@ -63,7 +69,6 @@
 #include <thread>
 #include <list>
 #include <set>
-
 
 /* ********************************************** */
 
@@ -88,6 +93,7 @@ class Marker{
 #include "Trace.h"
 #include "Blacklists.h"
 #include "Configuration.h"
+#include "ZMQ.h"
 #include "GeoIP.h"
 #include "WatchMatches.h"
 #include "NwInterface.h"

@@ -22,6 +22,14 @@ if test ${ac_cv_lib_curl_curl_easy_perform} = "no"; then
   exit 1
 fi
 
+AC_CHECK_LIB([zmq], [zmq_socket_monitor])
+if test "x$ac_cv_lib_zmq_zmq_socket_monitor" = xyes; then :
+   LIBS="$LIBS -lzmq"
+  AC_DEFINE_UNQUOTED(HAVE_ZMQ, 1, [ZMQ is present])
+else
+  echo "ZMQ not present or too old"
+fi
+
 AC_CHECK_HEADERS([libnetfilter_queue/libnetfilter_queue.h], AC_DEFINE_UNQUOTED(HAVE_NETFILTER, 1, [nfq is present]))
 
 if test "x$ac_cv_header_libnetfilter_queue_libnetfilter_queue_h" = xyes; then :
