@@ -56,6 +56,16 @@ for i in {1,2}; do
     $IPTABLES -t mangle -N GEO_POSTROUTING
     $IPTABLES -t mangle -N GEO_OUTPUT
 
+    # Flush all if already there
+    $IPTABLES -F BLACKLIST
+    $IPTABLES -X BLACKLIST
+    # Create the blacklist chain where we will store IP to ban
+    $IPTABLES -N BLACKLIST
+    # Return to the original chain
+    $IPTABLES -A BLACKLIST -j RETURN
+    # Jump to the blacklist chain
+    $IPTABLES -A INPUT  -j BLACKLIST
+
     # Read CONNMARK and set it in mark
     # (A) For incoming packets
     $IPTABLES -t mangle -A GEO_PREROUTING -j CONNMARK --restore-mark

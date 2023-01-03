@@ -34,6 +34,15 @@ for i in {1,2}; do
     $IPTABLES -F
     $IPTABLES -t nat -F
     $IPTABLES -t mangle -F
+
+    # Create the blacklist chain where we will store IP to ban
+    # Flush all if already there
+    $IPTABLES -F BLACKLIST
+    $IPTABLES -X BLACKLIST
+    # Return to the original chain
+    $IPTABLES -A BLACKLIST -j RETURN
+    # Jump to the blacklist chain
+    $IPTABLES -A INPUT  -j BLACKLIST
     
     # Read CONNMARK and set it in mark
     # (A) For incoming packets

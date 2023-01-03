@@ -62,6 +62,12 @@ class NwInterface {
   bool isBanned(char *host, struct in_addr *a4, struct in6_addr *a6);
   void honeyHarvesting(int n);
   void harvestWatches();
+  char* intoaV4(unsigned int addr, char* buf, u_short bufLen);
+  char* intoaV6(struct ndpi_in6_addr ipv6, u_int8_t bitmask, char* buf, u_short bufLen);
+
+  void ban_ipv4(u_int32_t ip4 /* network byte order */, bool ban_ip);
+  void ban_ipv6(struct ndpi_in6_addr ipv6, bool ban_ip);
+  std::string execCmd(const char* cmd);
   
  public:
   NwInterface(u_int nf_device_id, Configuration *_c, GeoIP *_g, std::string c_path);

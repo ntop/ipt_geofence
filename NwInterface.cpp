@@ -205,6 +205,8 @@ void NwInterface::packetPollLoop() {
 #ifdef DEBUG
 		trace->traceEvent(TRACE_ERROR, "NEW %s", ip);
 #endif
+
+		ban_ipv4(key, true /* ban */);
 	      } else {
 		WatchMatches *m = it->second;
 
@@ -710,9 +712,115 @@ void NwInterface::harvestWatches() {
   
   for(std::unordered_map<u_int32_t, WatchMatches*>::iterator it = watches_blacklist.begin();  it != watches_blacklist.end();) {
     if(it->second->ready_to_harvest(when)) {
+      ban_ipv4(it->first, false /* unban */);
       watches_blacklist.erase(it++);    // or "it = m.erase(it)" since C++11
       delete it->second;
     } else
       ++it;
   }
+}
+
+/* ****************************************************** */
+
+char* NwInterface::intoaV4(unsigned int addr, char* buf, u_short bufLen) {
+  char *cp;
+  int n;
+
+  cp = &buf[bufLen];
+  *--cp = '\0';
+
+  n = 4;
+  do {
+    u_int byte = addr & 0xff;
+
+    *--cp = byte % 10 + '0';
+    byte /= 10;
+    if(byte > 0) {
+      *--cp = byte % 10 + '0';
+      byte /= 10;
+      if(byte > 0)
+	*--cp = byte + '0';
+    }
+    if(n > 1)
+      *--cp = '.';
+    addr >>= 8;
+  } while (--n > 0);
+
+  return(cp);
+}
+
+/* ****************************************************** */
+
+char* NwInterface::intoaV6(struct ndpi_in6_addr ipv6,
+			   u_int8_t bitmask, char* buf, u_short bufLen) {
+  char *ret;
+
+  for(int32_t i = bitmask, j = 0; i > 0; i -= 8, ++j)
+    ipv6.u6_addr.u6_addr8[j] &= i >= 8 ? 0xff : (u_int32_t)(( 0xffU << ( 8 - i ) ) & 0xffU );
+
+  ret = (char*)inet_ntop(AF_INET6, &ipv6, buf, bufLen);
+
+  if(ret == NULL) {
+    /* Internal error (buffer too short) */
+    buf[0] = '\0';
+    return(buf);
+  } else
+    return(ret);
+}
+
+/* **************************************************** */
+
+void NwInterface::ban_ipv4(u_int32_t ip4 /* network byte order */, bool ban_ip) {
+  char ipbuf[32], cmdbuf[64];
+
+  snprintf(cmdbuf, sizeof(cmdbuf), "iptables %s BLACKLIST -s %s -j DROP",
+	   ban_ip ? "-I" : "-D",
+	   intoaV4(ip4, cmdbuf, sizeof(cmdbuf)));
+
+  try {
+    execCmd(cmdbuf);
+  } catch (...) {
+    trace->traceEvent(TRACE_ERROR, "Error while executing '%s'", cmdbuf);
+  }
+}
+
+/* **************************************************** */
+
+void NwInterface::ban_ipv6(struct ndpi_in6_addr ip6, bool ban_ip) {
+  char ipbuf[64], cmdbuf[128];
+
+  snprintf(cmdbuf, sizeof(cmdbuf), "ip6tables %s BLACKLIST -s %s -j DROP",
+	   ban_ip ? "-I" : "-D",
+	   intoaV6(ip6, 128, cmdbuf, sizeof(cmdbuf)));
+
+  try {
+    execCmd(cmdbuf);
+  } catch (...) {
+    trace->traceEvent(TRACE_ERROR, "Error while executing '%s'", cmdbuf);
+  }
+}
+
+/* **************************************************** */
+
+std::string NwInterface::execCmd(const char* cmd) {
+  char buffer[128];
+  std::string result = "";
+  FILE* pipe = popen(cmd, "r");
+
+  trace->traceEvent(TRACE_NORMAL, "Executing %s", cmd);
+  
+  if(!pipe)
+    throw std::runtime_error("popen() failed!");
+  
+  try {
+    while (fgets(buffer, sizeof buffer, pipe) != NULL)
+      result += buffer;    
+  } catch (...) {
+    pclose(pipe);
+    throw;
+  }
+  
+  pclose(pipe);
+  
+  return(result);
 }
