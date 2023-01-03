@@ -7,7 +7,6 @@
     "default_policy": "DROP",
     "monitored_ports": {
 	"tcp": [22, 80, 443],
-	"tcp_watches": [25,587],
 	"udp": [],
 	"ignored_ports": [123],
 	"honeypot_ports": ["51000-56000","50000-56100", "51000-52000",10,20,30]

@@ -32,7 +32,7 @@ typedef std::pair<u_int16_t,u_int16_t> port_range; // first -> upper bound && se
 class Configuration {
  private:
   std::unordered_map<u_int16_t, Marker> ctrs_conts;
-  std::unordered_map<u_int16_t, bool>   tcp_ports, tcp_watches_ports, udp_ports, ignored_ports, hp_ports, hp_all_except_ports;
+  std::unordered_map<u_int16_t, bool>   tcp_ports, udp_ports, ignored_ports, hp_ports, hp_all_except_ports;
   std::unordered_map<std::string /* name */, std::string /* cmd */> watches;
   unsigned int nfq_queue_id;
   Marker marker_unknown;
@@ -72,7 +72,6 @@ class Configuration {
   inline Marker getDefaultPolicy()                          { return default_policy;  }
   Marker getMarker(char *country, char *continent);
   inline bool isIgnoredPort(u_int16_t port)      { return(ignored_ports.find(port) != ignored_ports.end());            }
-  inline bool isTCPWatchPort(u_int16_t port /* nw byte order */)  { return(tcp_watches_ports.find(port) != tcp_watches_ports.end()); }
   inline bool isMonitoredTCPPort(u_int16_t port) { return(all_tcp_ports || (tcp_ports.find(port) != tcp_ports.end())); }
   inline bool isMonitoredUDPPort(u_int16_t port) { return(all_udp_ports || (udp_ports.find(port) != udp_ports.end())); }
   bool isProtectedPort(u_int16_t port);

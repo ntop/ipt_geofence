@@ -276,7 +276,7 @@ Marker NwInterface::dissectPacket(const u_char *payload, u_int payload_len) {
       struct in_addr a;
 
       if ((iph->protocol == IPPROTO_UDP) && ((frag_off & 0x3FFF /* IP_MF | IP_OFFSET */) != 0))
-        return (conf->getMarkerUnknown()); /* Don't block it */
+        return(conf->getMarkerUnknown()); /* Don't block it */
 
       // get protocol and offset
       proto = iph->protocol;
@@ -285,7 +285,7 @@ Marker NwInterface::dissectPacket(const u_char *payload, u_int payload_len) {
       a.s_addr = iph->saddr, inet_ntop(AF_INET, &a, src, sizeof(src));
       a.s_addr = iph->daddr, inet_ntop(AF_INET, &a, dst, sizeof(dst));
     } else { // Neither ipv4 or ipv6...unlikely to be evaluated
-      return (conf->getMarkerPass());
+      return(conf->getMarkerPass());
     }
 
     u_int8_t *nxt = ((u_int8_t *)iph + ip_payload_offset);
@@ -304,12 +304,12 @@ Marker NwInterface::dissectPacket(const u_char *payload, u_int payload_len) {
       src_port = dst_port = 0;
     }
 
-    return (makeVerdict(proto, vlan_id,
+    return(makeVerdict(proto, vlan_id,
                         src_port, dst_port,
-                        src,dst, ipv4,ipv6));
+                        src, dst, ipv4, ipv6));
   }
 
-  return (conf->getMarkerPass());
+  return(conf->getMarkerPass());
 }
 
 /* **************************************************** */
@@ -361,6 +361,22 @@ bool NwInterface::isPrivateIPv6(const char *ip6addr) {
 
 /* **************************************************** */
 
+void NwInterface::logHostBan(char *host_ip, bool ban_ip) {
+  Json::Value root;
+  std::string json_txt;
+  Json::FastWriter writer;
+
+  root["reason"] = "watch-host-ban";
+  root["host"]   = host_ip;
+  root["action"] = ban_ip ? "ban" : "unban";
+
+  json_txt = writer.write(root);
+
+  trace->traceEvent(TRACE_NORMAL, "%s", json_txt.c_str());
+}
+  
+/* **************************************************** */
+
 void NwInterface::logFlow(const char *proto_name,
 			  char *src_host, u_int16_t sport, char *src_country, char *src_continent, bool src_blacklisted,
 			  char *dst_host, u_int16_t dport, char *dst_country, char *dst_continent, bool dst_blacklisted,
@@ -369,8 +385,8 @@ void NwInterface::logFlow(const char *proto_name,
   std::string json_txt;
   Json::FastWriter writer;
 
-  root["proto"] = proto_name;
-
+  root["reason"] = "flow-ban";
+  root["proto"]  = proto_name;
   root["src"]["host"] = src_host;
   root["src"]["port"] = sport;
   if(src_country && (src_country[0] != '\0')) root["src"]["country"] = src_country;
@@ -390,7 +406,7 @@ void NwInterface::logFlow(const char *proto_name,
   if(pass_verdict)
     trace->traceEvent(TRACE_INFO, "%s", json_txt.c_str());
   else
-    trace->traceEvent(TRACE_WARNING, "%s", json_txt.c_str());
+    trace->traceEvent(TRACE_NORMAL, "%s", json_txt.c_str());
 }
 
 /* **************************************************** */
@@ -401,7 +417,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
 				char *src_host, char *dst_host,
 				bool ipv4, bool ipv6) {
   // Step 0 - Check ip protocol
-  if (!(ipv4 || ipv6)) return (conf->getDefaultPolicy());
+  if (!(ipv4 || ipv6)) return(conf->getDefaultPolicy());
 
   struct in_addr in;
   char src_ctry[3]={}, dst_ctry[3]={}, src_cont[3]={}, dst_cont[3]={} ;
@@ -419,44 +435,6 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
 
   /* Check if sender/recipient are blacklisted */
   if (ipv4) {
-    if(conf->isTCPWatchPort(_dport)) {
-      /* Step 0 - check watchers [TODO add IPv6 support] */
-      /*
-	smtpd_error_sleep_time = 1s
-	smtpd_soft_error_limit = 2
-	smtpd_hard_error_limit = 3
-       */
-      std::unordered_map<u_int32_t, WatchMatches*>::iterator it = watches_blacklist.find(saddr);
-
-#ifdef DEBUG
-      trace->traceEvent(TRACE_ERROR, "Checking %s:%u <-> %s:%u", src_host, sport, dst_host, dport);
-#endif
-
-      if(it != watches_blacklist.end()) {
-	WatchMatches *m = it->second;
-
-#ifdef DEBUG
-	trace->traceEvent(TRACE_WARNING, "Found %u matches for %s", m->get_num_matches(), src_host);
-#endif
-
-	if(m->get_num_matches() >= TOO_MANY_INVALID_ATTEMPTS) {
-	  trace->traceEvent(TRACE_WARNING, "[DROP] Found %u matches for %s", m->get_num_matches(), src_host);
-
-	  /* Too many drops */
-	  logFlow(proto_name,
-		  src_host, sport, src_ctry, src_cont, true,
-		  dst_host, dport, dst_ctry, dst_cont, false,
-		  false /* drop */);
-
-	  return(conf->getMarkerDrop());
-	}
-
-	/* No else so we can check blacklists */
-      }
-
-      check_only_blacklists = true;
-    }
-
     in.s_addr = saddr;
 
     /* Step 1 - For all ports/protocols, check if sender/recipient are blacklisted and if so, block this flow */
@@ -488,7 +466,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
               dst_host, dport, dst_ctry, dst_cont, false,
               false /* drop */);
 
-      return (conf->getMarkerDrop());
+      return(conf->getMarkerDrop());
     }
 
     inet_pton(AF_INET6, dst_host, &a);
@@ -498,7 +476,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
               dst_host, dport, dst_ctry, dst_cont, true,
               false /* drop */);
 
-      return (conf->getMarkerDrop());
+      return(conf->getMarkerDrop());
     }
   }
 
@@ -771,12 +749,14 @@ char* NwInterface::intoaV6(struct ndpi_in6_addr ipv6,
 /* **************************************************** */
 
 void NwInterface::ban_ipv4(u_int32_t ip4 /* network byte order */, bool ban_ip) {
-  char ipbuf[32], cmdbuf[64];
+  char ipbuf[32], cmdbuf[64], *host;
 
+  host = intoaV4(ip4, cmdbuf, sizeof(cmdbuf));
   snprintf(cmdbuf, sizeof(cmdbuf), "iptables %s BLACKLIST -s %s -j DROP",
-	   ban_ip ? "-I" : "-D",
-	   intoaV4(ip4, cmdbuf, sizeof(cmdbuf)));
+	   ban_ip ? "-I" : "-D", host);
 
+  logHostBan(host, ban_ip);
+  
   try {
     execCmd(cmdbuf);
   } catch (...) {
@@ -787,11 +767,13 @@ void NwInterface::ban_ipv4(u_int32_t ip4 /* network byte order */, bool ban_ip) 
 /* **************************************************** */
 
 void NwInterface::ban_ipv6(struct ndpi_in6_addr ip6, bool ban_ip) {
-  char ipbuf[64], cmdbuf[128];
+  char ipbuf[64], cmdbuf[128], *host;
 
+  host = intoaV6(ip6, 128, cmdbuf, sizeof(cmdbuf));
   snprintf(cmdbuf, sizeof(cmdbuf), "ip6tables %s BLACKLIST -s %s -j DROP",
-	   ban_ip ? "-I" : "-D",
-	   intoaV6(ip6, 128, cmdbuf, sizeof(cmdbuf)));
+	   ban_ip ? "-I" : "-D", host);
+
+  logHostBan(host, ban_ip);
 
   try {
     execCmd(cmdbuf);
