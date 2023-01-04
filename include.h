@@ -88,6 +88,8 @@ class Marker{
 #define NF_BUFFER_SIZE     (32768*16384)
 #define NF_MAX_QUEUE_LEN   (8192)
 
+#define ZMQ_TOPIC_NAME     "ban_messages"
+
 /* ********************************************** */
 
 #include "Trace.h"

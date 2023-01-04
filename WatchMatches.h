@@ -22,7 +22,7 @@
 #ifndef _WATCH_MATCHES_H_
 #define _WATCH_MATCHES_H_
 
-#define MAX_IDLENESS   43200 /* 12 hours */
+#define MAX_IDLENESS   300 /* 5 minutes */
 
 class WatchMatches {
 private:

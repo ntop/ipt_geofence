@@ -37,12 +37,12 @@ for i in {1,2}; do
 
     # Create the blacklist chain where we will store IP to ban
     # Flush all if already there
-    $IPTABLES -F BLACKLIST
-    $IPTABLES -X BLACKLIST
+    $IPTABLES -F IPT_GEOFENCE_BLACKLIST
+    $IPTABLES -X IPT_GEOFENCE_BLACKLIST
     # Return to the original chain
-    $IPTABLES -A BLACKLIST -j RETURN
+    $IPTABLES -A IPT_GEOFENCE_BLACKLIST -j RETURN
     # Jump to the blacklist chain
-    $IPTABLES -A INPUT  -j BLACKLIST
+    $IPTABLES -A INPUT  -j IPT_GEOFENCE_BLACKLIST
     
     # Read CONNMARK and set it in mark
     # (A) For incoming packets

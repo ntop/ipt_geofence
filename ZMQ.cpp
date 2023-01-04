@@ -95,7 +95,7 @@ ZMQ::~ZMQ() {
 
 /* ******************************* */
 
-void ZMQ::sendMessage(char *topic, char *msg) {
+void ZMQ::sendMessage(const char *topic, const char *msg) {
   struct zmq_msg_hdr msg_hdr;
   u_int len = strlen(msg);
   

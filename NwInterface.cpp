@@ -33,7 +33,8 @@ int netfilter_callback(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg,
 
 NwInterface::NwInterface(u_int nf_device_id,
 			 Configuration *_c,
-			 GeoIP *_g, std::string c_path) {
+			 GeoIP *_g, std::string c_path,
+			 char *zmq_handler, char *zmq_encryption_key) {
   conf = _c, geoip = _g, confPath = c_path;
   reloaderThread = NULL;
   queueId = nf_device_id, nfHandle = nfq_open();
@@ -74,6 +75,13 @@ NwInterface::NwInterface(u_int nf_device_id,
   }
 
   nf_fd = nfq_fd(nfHandle);
+
+  if(zmq_handler != NULL) {
+    zmq = new ZMQ(zmq_handler, zmq_encryption_key);
+  } else
+    zmq = NULL;
+
+  flush_ban();
 }
 
 /* **************************************************** */
@@ -87,9 +95,12 @@ NwInterface::~NwInterface() {
 
   if(queueHandle) nfq_destroy_queue(queueHandle);
   if(nfHandle)    nfq_close(nfHandle);
-  if(conf)        { delete conf; }
-
+  if(conf)        delete conf;
+  if(zmq)         delete zmq;
+  
   nf_fd = 0;
+
+  flush_ban();
 }
 
 /* **************************************************** */
@@ -142,6 +153,8 @@ void NwInterface::packetPollLoop() {
       pipes.push_back(watcher);
       fcntl(fd, F_SETFL, O_NONBLOCK);
       pipes_fileno.push_back(fd);
+
+      trace->traceEvent(TRACE_NORMAL, "Added watch %s [%s]", it->first.c_str(), it->second.c_str());
     }
   }
 
@@ -198,6 +211,11 @@ void NwInterface::packetPollLoop() {
 
 	    while(fgets(ip, sizeof(ip), pipes[i]) != NULL) {
 	      u_int32_t key = inet_addr(ip);
+
+#ifdef DEBUG
+	      trace->traceEvent(TRACE_ERROR, "Watch received %s", ip);
+#endif
+
 	      std::unordered_map<u_int32_t, WatchMatches*>::iterator it = watches_blacklist.find(key);
 
 	      if(it == watches_blacklist.end()) {
@@ -251,7 +269,7 @@ Marker NwInterface::dissectPacket(const u_char *payload, u_int payload_len) {
   /* We can see only IP addresses */
   u_int16_t ip_offset = 0, vlan_id = 0 /* FIX */;
 
-  if (payload_len >= ip_offset) {
+  if(payload_len >= ip_offset) {
     struct iphdr *iph = (struct iphdr *)&payload[ip_offset];
     bool ipv4 = false, ipv6 = false;
 
@@ -261,7 +279,7 @@ Marker NwInterface::dissectPacket(const u_char *payload, u_int payload_len) {
     u_int8_t proto, ip_payload_offset = 40 /* ipv6 is 40B long */;
     char src[INET6_ADDRSTRLEN] = {}, dst[INET6_ADDRSTRLEN] = {};
 
-    if (iph->version == 6) {
+    if(iph->version == 6) {
       ipv6 = true;
       struct ip6_hdr *ip6h = (struct ip6_hdr *)&payload[ip_offset];
       proto = ip6h->ip6_nxt;
@@ -270,12 +288,12 @@ Marker NwInterface::dissectPacket(const u_char *payload, u_int payload_len) {
       inet_ntop(AF_INET6, &(ip6h->ip6_src), src, sizeof(src));
       inet_ntop(AF_INET6, &(ip6h->ip6_dst), dst, sizeof(dst));
 
-    } else if (iph->version == 4) {
+    } else if(iph->version == 4) {
       ipv4 = true;
       u_int8_t frag_off = ntohs(iph->frag_off);
       struct in_addr a;
 
-      if ((iph->protocol == IPPROTO_UDP) && ((frag_off & 0x3FFF /* IP_MF | IP_OFFSET */) != 0))
+      if((iph->protocol == IPPROTO_UDP) && ((frag_off & 0x3FFF /* IP_MF | IP_OFFSET */) != 0))
         return(conf->getMarkerUnknown()); /* Don't block it */
 
       // get protocol and offset
@@ -358,7 +376,6 @@ bool NwInterface::isPrivateIPv6(const char *ip6addr) {
   return is_unique_local || is_link_local;
 }
 
-
 /* **************************************************** */
 
 void NwInterface::logHostBan(char *host_ip, bool ban_ip) {
@@ -372,9 +389,12 @@ void NwInterface::logHostBan(char *host_ip, bool ban_ip) {
 
   json_txt = writer.write(root);
 
-  trace->traceEvent(TRACE_NORMAL, "%s", json_txt.c_str());
+  trace->traceEvent(TRACE_ERROR, "%s", json_txt.c_str());
+
+  if(zmq)
+    zmq->sendMessage(ZMQ_TOPIC_NAME, json_txt.c_str());
 }
-  
+
 /* **************************************************** */
 
 void NwInterface::logFlow(const char *proto_name,
@@ -405,8 +425,12 @@ void NwInterface::logFlow(const char *proto_name,
 
   if(pass_verdict)
     trace->traceEvent(TRACE_INFO, "%s", json_txt.c_str());
-  else
+  else {
     trace->traceEvent(TRACE_NORMAL, "%s", json_txt.c_str());
+
+    if(zmq)
+      zmq->sendMessage(ZMQ_TOPIC_NAME, json_txt.c_str());
+  }
 }
 
 /* **************************************************** */
@@ -417,7 +441,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
 				char *src_host, char *dst_host,
 				bool ipv4, bool ipv6) {
   // Step 0 - Check ip protocol
-  if (!(ipv4 || ipv6)) return(conf->getDefaultPolicy());
+  if(!(ipv4 || ipv6)) return(conf->getDefaultPolicy());
 
   struct in_addr in;
   char src_ctry[3]={}, dst_ctry[3]={}, src_cont[3]={}, dst_cont[3]={} ;
@@ -434,7 +458,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
   sport = ntohs(sport), dport = ntohs(dport);
 
   /* Check if sender/recipient are blacklisted */
-  if (ipv4) {
+  if(ipv4) {
     in.s_addr = saddr;
 
     /* Step 1 - For all ports/protocols, check if sender/recipient are blacklisted and if so, block this flow */
@@ -460,7 +484,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
     struct in6_addr a;
 
     inet_pton(AF_INET6, src_host, &a);
-    if ((!saddr_private) && (conf->isBlacklistedIPv6(&a) || isBanned(src_host,NULL,&a))) {
+    if((!saddr_private) && (conf->isBlacklistedIPv6(&a) || isBanned(src_host,NULL,&a))) {
       logFlow(proto_name,
               src_host, sport, src_ctry, src_cont, true,
               dst_host, dport, dst_ctry, dst_cont, false,
@@ -470,7 +494,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
     }
 
     inet_pton(AF_INET6, dst_host, &a);
-    if ((!daddr_private) && (conf->isBlacklistedIPv6(&a) || isBanned(src_host,NULL,&a))) {
+    if((!daddr_private) && (conf->isBlacklistedIPv6(&a) || isBanned(src_host,NULL,&a))) {
       logFlow(proto_name,
               src_host, sport, src_ctry, src_cont, false,
               dst_host, dport, dst_ctry, dst_cont, true,
@@ -491,7 +515,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
 
   /* Step 2.0 - Check honeypot ports and (eventually) ban host */
   bool drop = false;
-  if (!saddr_private && conf->isProtectedPort(dport)){
+  if(!saddr_private && conf->isProtectedPort(dport)){
     drop = true, honey_banned.addAddress(src_host); // add banned host to patricia tree
     std::string h(src_host);  // string cast
     honey_banned_timesorted.push_back(h); // h is the "less older" banned host
@@ -501,7 +525,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
     trace->traceEvent(TRACE_INFO, "Banning host %s || Protected port %u", src_host, dport);
   }
 
-  if (drop) {
+  if(drop) {
     logFlow(proto_name,
 	    src_host, sport, src_ctry, src_cont, false,
 	    dst_host, dport, dst_ctry, dst_cont, false,
@@ -632,15 +656,16 @@ void NwInterface::reloadConfLoop() {
  * @note a4 and a6 shouldn't be both set
  */
 bool NwInterface::isBanned(char *host, struct in_addr *a4, struct in6_addr *a6){
-  if (( a4 && !honey_banned.isBlacklistedIPv4(a4)) ||
+  if(( a4 && !honey_banned.isBlacklistedIPv4(a4)) ||
       ( a6 && !honey_banned.isBlacklistedIPv6(a6)))
     return false;
 
   // => host was had been banned
   std::string s(host);
   std::map<std::string,std::pair<time_t,list_it>>::iterator h = honey_banned_time.find(host);
-  if (h != honey_banned_time.end()){ // this should always be true
-    if (difftime(time(NULL),h->second.first) >= banTimeout){ // ban timeout has expired
+
+  if(h != honey_banned_time.end()){ // this should always be true
+    if(difftime(time(NULL),h->second.first) >= banTimeout){ // ban timeout has expired
       honey_banned_timesorted.erase(h->second.second); // remove from list
       honey_banned_time.erase(h); // remove from map
       honey_banned.removeAddress(host); // remove from patricia tree
@@ -662,9 +687,9 @@ void NwInterface::honeyHarvesting(int n){
   list_it it;
   int x = n;
 
-  while (x--) {
-    // if ( {list is empty} || {there aren't elements to be cleaned})
-    if ((it = honey_banned_timesorted.begin()) == honey_banned_timesorted.end() ||
+  while(x--) {
+    // if( {list is empty} || {there aren't elements to be cleaned})
+    if((it = honey_banned_timesorted.begin()) == honey_banned_timesorted.end() ||
 	difftime(time(NULL),honey_banned_time.find(*it)->second.first) <= banTimeout)
       break;
 
@@ -687,7 +712,7 @@ void NwInterface::honeyHarvesting(int n){
 
 void NwInterface::harvestWatches() {
   u_int32_t when = time(NULL) - MAX_IDLENESS;
-  
+
   for(std::unordered_map<u_int32_t, WatchMatches*>::iterator it = watches_blacklist.begin();  it != watches_blacklist.end();) {
     if(it->second->ready_to_harvest(when)) {
       ban_ipv4(it->first, false /* unban */);
@@ -722,7 +747,7 @@ char* NwInterface::intoaV4(unsigned int addr, char* buf, u_short bufLen) {
     if(n > 1)
       *--cp = '.';
     addr >>= 8;
-  } while (--n > 0);
+  } while(--n > 0);
 
   return(cp);
 }
@@ -749,14 +774,14 @@ char* NwInterface::intoaV6(struct ndpi_in6_addr ipv6,
 /* **************************************************** */
 
 void NwInterface::ban_ipv4(u_int32_t ip4 /* network byte order */, bool ban_ip) {
-  char ipbuf[32], cmdbuf[64], *host;
+  char ipbuf[32], cmdbuf[128], *host;
 
-  host = intoaV4(ip4, cmdbuf, sizeof(cmdbuf));
-  snprintf(cmdbuf, sizeof(cmdbuf), "iptables %s BLACKLIST -s %s -j DROP",
+  host = intoaV4(ntohl(ip4), ipbuf, sizeof(ipbuf));
+  snprintf(cmdbuf, sizeof(cmdbuf), "/usr/sbin/iptables %s IPT_GEOFENCE_BLACKLIST -s %s -j DROP",
 	   ban_ip ? "-I" : "-D", host);
 
   logHostBan(host, ban_ip);
-  
+
   try {
     execCmd(cmdbuf);
   } catch (...) {
@@ -769,8 +794,8 @@ void NwInterface::ban_ipv4(u_int32_t ip4 /* network byte order */, bool ban_ip) 
 void NwInterface::ban_ipv6(struct ndpi_in6_addr ip6, bool ban_ip) {
   char ipbuf[64], cmdbuf[128], *host;
 
-  host = intoaV6(ip6, 128, cmdbuf, sizeof(cmdbuf));
-  snprintf(cmdbuf, sizeof(cmdbuf), "ip6tables %s BLACKLIST -s %s -j DROP",
+  host = intoaV6(ip6, 128, ipbuf, sizeof(ipbuf));
+  snprintf(cmdbuf, sizeof(cmdbuf), "/usr/sbin/ip6tables %s IPT_GEOFENCE_BLACKLIST -s %s -j DROP",
 	   ban_ip ? "-I" : "-D", host);
 
   logHostBan(host, ban_ip);
@@ -784,25 +809,36 @@ void NwInterface::ban_ipv6(struct ndpi_in6_addr ip6, bool ban_ip) {
 
 /* **************************************************** */
 
+void NwInterface::flush_ban() {
+  try {
+    execCmd("/usr/sbin/iptables  -F IPT_GEOFENCE_BLACKLIST");
+    execCmd("/usr/sbin/ip6tables -F IPT_GEOFENCE_BLACKLIST");
+  } catch (...) {
+    trace->traceEvent(TRACE_ERROR, "Error while flushing blacklists");
+  }
+}
+
+/* **************************************************** */
+
 std::string NwInterface::execCmd(const char* cmd) {
   char buffer[128];
   std::string result = "";
   FILE* pipe = popen(cmd, "r");
 
-  trace->traceEvent(TRACE_NORMAL, "Executing %s", cmd);
-  
+  trace->traceEvent(TRACE_ERROR, "Executing %s", cmd);
+
   if(!pipe)
     throw std::runtime_error("popen() failed!");
-  
+
   try {
-    while (fgets(buffer, sizeof buffer, pipe) != NULL)
-      result += buffer;    
+    while(fgets(buffer, sizeof buffer, pipe) != NULL)
+      result += buffer;
   } catch (...) {
     pclose(pipe);
     throw;
   }
-  
+
   pclose(pipe);
-  
+
   return(result);
 }
