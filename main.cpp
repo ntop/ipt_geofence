@@ -59,12 +59,12 @@ static void help() {
   printf("-m <city>         | Local mmdb_city MMDB file\n");
   printf("-z <zmq>          | ZMQ collector to which events are sent (producer)\n");
   printf("-k <zmq enc key>  | ZMQ encryption key\n");
+  printf("-T <message>      | [Debug] Send ZMQ test message and exits.\n");
 
   printf("\nExample: ipt_geofence -c sample_config.json -m dbip-country-lite.mmdb -z tcp://182.168.1.1:1234\n");
 
   exit(0);
 }
-
 
 /* ************************************************* */
 
@@ -78,6 +78,7 @@ int main(int argc, char *argv[]) {
     { "syslog",      no_argument,          NULL, 's' },
     { "zmq",         required_argument,    NULL, 'z' },
     { "zmq-enc-key", required_argument,    NULL, 'k' },
+    { "zmq-test",    required_argument,    NULL, 'T' },
     { "verbose",     no_argument,          NULL, 'v' },
     /* End of options */
     { NULL,          no_argument,          NULL,  0 }
@@ -85,11 +86,12 @@ int main(int argc, char *argv[]) {
   Configuration *config;
   GeoIP geoip;
   char *zmq_handler = NULL, *zmq_encryption_key = NULL;
+  const char *zmq_test_msg = NULL;
   
   trace = new Trace();
   config = new Configuration();
 
-  while((c = getopt_long(argc, argv, "c:k:u:l:m:svVz:h", long_options, NULL)) != 255) {
+  while((c = getopt_long(argc, argv, "c:k:u:l:m:svVz:T:h", long_options, NULL)) != 255) {
     switch(c) {
     case 'c':
       confPath = (optarg);
@@ -108,6 +110,10 @@ int main(int argc, char *argv[]) {
       trace->traceToSyslogOnly();
       break;
 
+    case 'T':
+      zmq_test_msg = optarg;
+      break;
+
     case 'v':
       trace->set_trace_level(6);
       break;
@@ -122,6 +128,23 @@ int main(int argc, char *argv[]) {
     }
   }
 
+  if(zmq_test_msg) {
+    if(zmq_handler) {
+      ZMQ zmq(zmq_handler, zmq_encryption_key, true);
+
+      trace->traceEvent(TRACE_NORMAL, "Sent message on topic %s to %s",
+			ZMQ_TOPIC_NAME, zmq_handler);
+
+      sleep(1); /* Wait until ZMQ is setup */
+      
+      for(int i=0; i<100; i++)
+	zmq.sendMessage(ZMQ_TOPIC_NAME, zmq_test_msg);
+      
+      return(0);
+    } else
+      trace->traceEvent(TRACE_ERROR, "Ignored -T as -z was not specified");
+  }
+  
   if(!config->isConfigured()) {
     trace->traceEvent(TRACE_ERROR, "Please check the JSON configuration file");
     help();

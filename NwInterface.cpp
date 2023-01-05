@@ -77,7 +77,7 @@ NwInterface::NwInterface(u_int nf_device_id,
   nf_fd = nfq_fd(nfHandle);
 
   if(zmq_handler != NULL) {
-    zmq = new ZMQ(zmq_handler, zmq_encryption_key);
+    zmq = new ZMQ(zmq_handler, zmq_encryption_key, false);
   } else
     zmq = NULL;
 
@@ -702,8 +702,8 @@ void NwInterface::harvestWatches() {
   for(std::unordered_map<u_int32_t, WatchMatches*>::iterator it = watches_blacklist.begin();  it != watches_blacklist.end();) {
     if(it->second->ready_to_harvest(when)) {
       ban_ipv4(it->first, false /* unban */);
-      watches_blacklist.erase(it++);    // or "it = m.erase(it)" since C++11
       delete it->second;
+      watches_blacklist.erase(it++);    // or "it = m.erase(it)" since C++11
     } else
       ++it;
   }

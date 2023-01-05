@@ -23,25 +23,30 @@
 
 #ifdef HAVE_ZMQ
 
+#define DEFAULT_ZMQ_TCP_KEEPALIVE            1  /* Keepalive ON */
+#define DEFAULT_ZMQ_TCP_KEEPALIVE_IDLE       30 /* Keepalive after 30 seconds */
+#define DEFAULT_ZMQ_TCP_KEEPALIVE_CNT        3  /* Keepalive send 3 probes */
+#define DEFAULT_ZMQ_TCP_KEEPALIVE_INTVL      3  /* Keepalive probes sent every 3 seconds */
+#define MAX_SOCKET_BUFFER_SIZE 8388608 /* 8 MB */
+
 /* ******************************* */
 
-ZMQ::ZMQ(char *endpoint, char *server_public_key) {
-  errno = 0;
+ZMQ::ZMQ(char *endpoint, char *server_public_key, bool client_mode) {
   context = zmq_ctx_new();
-  
+
   if(context == NULL) {
     trace->traceEvent(TRACE_ERROR, "[ERROR] Unable to create ZMQ context");
     exit(1);
   }
 
-  flow_publisher = zmq_socket(context, ZMQ_PUB);
+  zmq_socket_handler = zmq_socket(context, ZMQ_PUB /* always publisher: we produce messages */);
 
-  if(flow_publisher == NULL) {
-    trace->traceEvent(TRACE_ERROR, "Unable to create ZMQ publisher");
+  if(zmq_socket_handler == NULL) {
+    trace->traceEvent(TRACE_ERROR, "Unable to create ZMQ socket");
     exit(1);
   }
 
-  if (server_public_key != NULL) {
+  if(server_public_key != NULL) {
     char client_public_key[41];
     char client_secret_key[41];
     int rc;
@@ -58,38 +63,73 @@ ZMQ::ZMQ(char *endpoint, char *server_public_key) {
       exit(1);
     }
 
-    rc = zmq_setsockopt(flow_publisher, ZMQ_CURVE_SERVERKEY, server_public_key, strlen(server_public_key)+1);
-
+    rc = zmq_setsockopt(zmq_socket_handler, ZMQ_CURVE_SERVERKEY, server_public_key, strlen(server_public_key)+1);
     if (rc != 0) {
       trace->traceEvent(TRACE_ERROR, "Error setting ZMQ_CURVE_SERVERKEY = %s (%d)", server_public_key, errno);
       exit(1);
     }
 
-    rc = zmq_setsockopt(flow_publisher, ZMQ_CURVE_PUBLICKEY, client_public_key, strlen(client_public_key)+1);
-
+    rc = zmq_setsockopt(zmq_socket_handler, ZMQ_CURVE_PUBLICKEY, client_public_key, strlen(client_public_key)+1);
     if (rc != 0) {
       trace->traceEvent(TRACE_ERROR, "Error setting ZMQ_CURVE_PUBLICKEY = %s", client_public_key);
       exit(1);
     }
 
-    rc = zmq_setsockopt(flow_publisher, ZMQ_CURVE_SECRETKEY, client_secret_key, strlen(client_secret_key)+1);
-
+    rc = zmq_setsockopt(zmq_socket_handler, ZMQ_CURVE_SECRETKEY, client_secret_key, strlen(client_secret_key)+1);
     if (rc != 0) {
       trace->traceEvent(TRACE_ERROR, "Error setting ZMQ_CURVE_SECRETKEY = %s", client_secret_key);
       exit(1);
     }
   }
+
+  if(true) {
+    int send_buffer_len = MAX_SOCKET_BUFFER_SIZE;
+
+    if(zmq_setsockopt(zmq_socket_handler, ZMQ_SNDBUF, &send_buffer_len, sizeof(send_buffer_len)) != 0)
+      trace->traceEvent(TRACE_WARNING, "ZMQ set sending buffer failed");
+
+    int val = DEFAULT_ZMQ_TCP_KEEPALIVE;
+    if(zmq_setsockopt(zmq_socket_handler, ZMQ_TCP_KEEPALIVE, &val, sizeof(val)) != 0)
+      trace->traceEvent(TRACE_ERROR, "Unable to set TCP keepalive");
+    else
+      trace->traceEvent(TRACE_INFO, "TCP keepalive set");
+
+    val = DEFAULT_ZMQ_TCP_KEEPALIVE_IDLE;
+    if(zmq_setsockopt(zmq_socket_handler, ZMQ_TCP_KEEPALIVE_IDLE, &val, sizeof(val)) != 0)
+      trace->traceEvent(TRACE_ERROR, "Unable to set TCP keepalive idle to %u seconds", val);
+    else
+      trace->traceEvent(TRACE_INFO, "TCP keepalive idle set to %u seconds", val);
+
+    val = DEFAULT_ZMQ_TCP_KEEPALIVE_CNT;
+    if(zmq_setsockopt(zmq_socket_handler, ZMQ_TCP_KEEPALIVE_CNT, &val, sizeof(val)) != 0)
+      trace->traceEvent(TRACE_ERROR, "Unable to set TCP keepalive count to %u", val);
+    else
+      trace->traceEvent(TRACE_INFO, "TCP keepalive count set to %u", val);
+
+    val = DEFAULT_ZMQ_TCP_KEEPALIVE_INTVL;
+    if(zmq_setsockopt(zmq_socket_handler, ZMQ_TCP_KEEPALIVE_INTVL, &val, sizeof(val)) != 0)
+      trace->traceEvent(TRACE_ERROR, "Unable to set TCP keepalive interval to %u seconds", val);
+    else
+      trace->traceEvent(TRACE_INFO, "TCP keepalive interval set to %u seconds", val);
+  }
   
-  if(zmq_bind(flow_publisher, endpoint) != 0) {
-    trace->traceEvent(TRACE_ERROR, "Unable to bind ZMQ endpoint %s [%s]", endpoint, strerror(errno));
-    throw "ZMQ bind error";
+  if(client_mode) {
+    if(zmq_connect(zmq_socket_handler, endpoint) != 0) {
+      trace->traceEvent(TRACE_ERROR, "Unable to connect to ZMQ endpoint %s [%s]", endpoint, strerror(errno));
+      throw "ZMQ connect error";
+    }
+  } else {
+    if(zmq_bind(zmq_socket_handler, endpoint) != 0) {
+      trace->traceEvent(TRACE_ERROR, "Unable to bind ZMQ endpoint %s [%s]", endpoint, strerror(errno));
+      throw "ZMQ bind error";
+    }
   }
 };
 
 /* ******************************* */
 
 ZMQ::~ZMQ() {
-  zmq_close(flow_publisher);
+  zmq_close(zmq_socket_handler);
   zmq_ctx_destroy(context);
 };
 
@@ -98,12 +138,18 @@ ZMQ::~ZMQ() {
 void ZMQ::sendMessage(const char *topic, const char *msg) {
   struct zmq_msg_hdr msg_hdr;
   u_int len = strlen(msg);
+
+  memset(&msg_hdr, 0, sizeof(msg_hdr));
+  snprintf(msg_hdr.url, sizeof(msg_hdr.url), "%s", topic);  
+  msg_hdr.source_id = 999, msg_hdr.version = ZMQ_MSG_VERSION, msg_hdr.size = len;
   
-  snprintf(msg_hdr.url, sizeof(msg_hdr.url), "%s", topic);
+  if(zmq_send(zmq_socket_handler, &msg_hdr, sizeof(msg_hdr), ZMQ_SNDMORE) != sizeof(msg_hdr))
+    trace->traceEvent(TRACE_WARNING, "ZMQ send errror");
   
-  msg_hdr.version = 0, msg_hdr.size = len;
-  zmq_send(flow_publisher, &msg_hdr, sizeof(msg_hdr), ZMQ_SNDMORE);
-  zmq_send(flow_publisher, msg, msg_hdr.size, 0);
+  if(zmq_send(zmq_socket_handler, msg, msg_hdr.size, 0) != msg_hdr.size)
+    trace->traceEvent(TRACE_WARNING, "ZMQ send errror");
+  else
+    trace->traceEvent(TRACE_NORMAL, "Sent [topic: %s][msg: %s]", msg_hdr.url, msg);
 }
 
 /* ******************************* */

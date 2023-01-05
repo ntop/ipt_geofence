@@ -25,18 +25,20 @@
 /* ******************************* */
 
 struct zmq_msg_hdr {
-  char url[32];
-  u_int32_t version;
-  u_int32_t size;
+  char url[16];
+  u_int8_t version;
+  u_int16_t size;
+  u_int32_t msg_id, source_id;
 };
+
+#define ZMQ_MSG_VERSION           2
 
 class ZMQ {
  private:
- void *context, *flow_publisher;
-
+  void *context, *zmq_socket_handler;
 
  public:
-  ZMQ(char *zmq_enpoint, char *server_public_key);
+  ZMQ(char *zmq_enpoint, char *server_public_key, bool client_mode);
   ~ZMQ();
 
   void sendMessage(const char *topic, const char *msg);
