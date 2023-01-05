@@ -28,9 +28,7 @@
 /* ********************************************************************************* */
 
 bool GeoIP::loadCountry(const char *ip_country_data) {
-  int status;
-
-  if((status = MMDB_open(ip_country_data, MMDB_MODE_MMAP, &mmdb_country)) != MMDB_SUCCESS) {
+  if(MMDB_open(ip_country_data, MMDB_MODE_MMAP, &mmdb_country) != MMDB_SUCCESS) {
     trace->traceEvent(TRACE_ERROR, "Unable to load %s", ip_country_data);
     return(false);
   } else
@@ -56,7 +54,6 @@ bool GeoIP::lookup(char *ip,
   int gai_error, mmdb_error;
   MMDB_lookup_result_s result;
   MMDB_entry_data_s entry_data;
-  int status;
 
   result = MMDB_lookup_string(&mmdb_country, ip, &gai_error, &mmdb_error);
 
@@ -67,6 +64,8 @@ bool GeoIP::lookup(char *ip,
 
     return(false);
   } else {
+    int status;
+    
     if(country_code_len > 0) {
       status = MMDB_get_value(&result.entry, &entry_data, "country", "iso_code", NULL);
 

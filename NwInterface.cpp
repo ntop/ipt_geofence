@@ -113,7 +113,7 @@ int netfilter_callback(struct nfq_q_handle *qh,
   struct nfqnl_msg_packet_hdr *ph = nfq_get_msg_packet_hdr(nfa);
   NwInterface *iface = (NwInterface *)data;
   u_int payload_len;
-  u_int32_t id = ntohl(ph->packet_id);
+  u_int32_t id = ph ? ntohl(ph->packet_id) : 0;
   u_int16_t marker;
 
   if(!ph) return(-1);
@@ -148,7 +148,7 @@ void NwInterface::packetPollLoop() {
     if(watcher == NULL) {
       trace->traceEvent(TRACE_ERROR, "Unable to run watch %s", it->first.c_str());
     } else {
-      int fd = fileno(watcher);
+      fd = fileno(watcher);
 
       pipes.push_back(watcher);
       fcntl(fd, F_SETFL, O_NONBLOCK);
@@ -448,12 +448,10 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
   const char *proto_name = getProtoName(proto);
   u_int32_t saddr = ipv4 ? inet_addr(src_host) : 0;
   u_int32_t daddr = ipv4 ? inet_addr(dst_host) : 0;
-  bool pass_local = true;
   bool saddr_private = (ipv4 ? isPrivateIPv4(saddr) : isPrivateIPv6(src_host));
   bool daddr_private = (ipv4 ? isPrivateIPv4(daddr) : isPrivateIPv6(dst_host));
   Marker m, src_marker, dst_marker;
   u_int16_t _dport = dport;
-  bool check_only_blacklists = false;
 
   sport = ntohs(sport), dport = ntohs(dport);
 
@@ -504,15 +502,6 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
     }
   }
 
-  if(check_only_blacklists) {
-    logFlow(proto_name,
-	    src_host, sport, src_ctry, src_cont, false,
-	    dst_host, dport, dst_ctry, dst_cont, false,
-	    true /* pass */);
-
-    return(conf->getMarkerPass());
-  }
-
   /* Step 2.0 - Check honeypot ports and (eventually) ban host */
   bool drop = false;
   if(!saddr_private && conf->isProtectedPort(dport)){
@@ -558,7 +547,6 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
   /* Step 3 - For monitored TCP/UDP ports (and ICMP) check the country blacklist */
   if((!saddr_private) && (geoip->lookup(src_host, src_ctry, sizeof(src_ctry), src_cont, sizeof(src_cont)))) {
     src_marker = conf->getMarker(src_ctry,src_cont);
-    pass_local = false;
   } else {
     /* Unknown or private IP address  */
     src_marker = conf->getMarkerPass();
@@ -566,7 +554,6 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
 
   if((!daddr_private) && (geoip->lookup(dst_host, dst_ctry, sizeof(dst_ctry), dst_cont, sizeof(dst_cont)))) {
     dst_marker = conf->getMarker(dst_ctry, dst_cont);
-    pass_local = false;
   } else {
     /* Unknown or private IP address */
     dst_marker = conf->getMarkerPass();
@@ -661,7 +648,6 @@ bool NwInterface::isBanned(char *host, struct in_addr *a4, struct in6_addr *a6){
     return false;
 
   // => host was had been banned
-  std::string s(host);
   std::map<std::string,std::pair<time_t,list_it>>::iterator h = honey_banned_time.find(host);
 
   if(h != honey_banned_time.end()){ // this should always be true
@@ -821,7 +807,6 @@ void NwInterface::flush_ban() {
 /* **************************************************** */
 
 std::string NwInterface::execCmd(const char* cmd) {
-  char buffer[128];
   std::string result = "";
   FILE* pipe = popen(cmd, "r");
 
@@ -831,6 +816,8 @@ std::string NwInterface::execCmd(const char* cmd) {
     throw std::runtime_error("popen() failed!");
 
   try {
+    char buffer[128];
+    
     while(fgets(buffer, sizeof buffer, pipe) != NULL)
       result += buffer;
   } catch (...) {

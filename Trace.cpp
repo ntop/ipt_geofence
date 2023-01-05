@@ -45,9 +45,8 @@ void Trace::set_trace_level(u_int8_t id) {
 
 void Trace::traceEvent(int eventTraceLevel, const char* _file,
 		       const int line, const char * format, ...) {
-  va_list va_ap;
-
   if((eventTraceLevel <= traceLevel) && (traceLevel > 0)) {
+    va_list va_ap;
     char buf[3000], out_buf[8192];
     char theDate[32], *file = (char*)_file;
     const char *extra_msg = "";

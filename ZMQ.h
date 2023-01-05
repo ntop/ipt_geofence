@@ -32,9 +32,7 @@ struct zmq_msg_hdr {
 
 class ZMQ {
  private:
- int run;
  void *context, *flow_publisher;
- const char *server_public_key;
 
 
  public:

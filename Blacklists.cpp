@@ -91,8 +91,6 @@ bool Blacklists::isBlacklistedIPv6(struct in6_addr *addr6) {
 
 bool Blacklists::findAddress(char *addr) {
   ndpi_prefix_t prefix;
-  ndpi_patricia_node_t *node;
-  ndpi_patricia_tree_t *tree;
 
   if(strchr(addr, ':') != NULL) {
     struct in6_addr addr6;
@@ -151,7 +149,7 @@ void Blacklists::removeAddress(char *net){
     if(bits == 0) bits = 128;
 
     if(inet_pton(AF_INET6, net, &addr6)){
-      ndpi_fill_prefix_v6(&prefix, &addr6, 128, ptree_v6->maxbits);
+      ndpi_fill_prefix_v6(&prefix, &addr6, bits, ptree_v6->maxbits);
       ndpi_patricia_node_t *n = ndpi_patricia_search_best(ptree_v6, &prefix);
       if (n) ndpi_patricia_remove(ptree_v6,n);
     }
@@ -161,7 +159,7 @@ void Blacklists::removeAddress(char *net){
     if(bits == 0) bits = 32;
 
     inet_aton(net, &pin);
-    ndpi_fill_prefix_v4(&prefix, &pin, 32, ptree_v4->maxbits);
+    ndpi_fill_prefix_v4(&prefix, &pin, bits, ptree_v4->maxbits);
     ndpi_patricia_node_t *n = ndpi_patricia_search_best(ptree_v4, &prefix);
     if (n) ndpi_patricia_remove(ptree_v4,n);
   }
