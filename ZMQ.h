@@ -38,7 +38,7 @@ class ZMQ {
   void *context, *zmq_socket_handler;
 
  public:
-  ZMQ(char *zmq_enpoint, char *server_public_key, bool client_mode);
+  ZMQ(char *zmq_enpoint, char *server_public_key);
   ~ZMQ();
 
   void sendMessage(const char *topic, const char *msg);

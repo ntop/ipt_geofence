@@ -7,11 +7,17 @@ HERE=$(shell pwd)
 CPPFLAGS= -O2 @INCS@ # -g
 TARGET=ipt_geofence
 LIBS=@LIBS@
-OBJECTS = $(patsubst %.cpp, %.o, $(wildcard *.cpp))
+
+OBJECTS = Blacklists.o Configuration.o  GeoIP.o  NwInterface.o  Trace.o  ZMQ.o  main.o
 HEADERS = $(wildcard *.h)
+
+all: $(TARGET) zmqReceiver
 
 $(TARGET): $(OBJECTS)
 	$(CXX) $(CPPFLAGS) $(OBJECTS) -o ipt_geofence $(LIBS)
+
+zmqReceiver: zmqReceiver.cpp Makefile
+	$(CXX) $(CPPFLAGS) zmqReceiver.cpp -o zmqReceiver $(LIBS)
 
 %.o: %.cpp $(HEADERS) Makefile
 	$(CXX) $(CPPFLAGS) -c $< -o $@
@@ -22,3 +28,4 @@ clean:
 
 cleanall: clean
 	/bin/rm -rf config.h autom4te.cache/ config.* configure $* Makefile
+

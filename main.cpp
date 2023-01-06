@@ -130,14 +130,16 @@ int main(int argc, char *argv[]) {
 
   if(zmq_test_msg) {
     if(zmq_handler) {
-      ZMQ zmq(zmq_handler, zmq_encryption_key, true);
+      ZMQ zmq(zmq_handler, zmq_encryption_key);
 
-      trace->traceEvent(TRACE_NORMAL, "Sent message on topic %s to %s",
+      trace->traceEvent(TRACE_NORMAL, "Sending message on topic %s to %s. Hold on..",
 			ZMQ_TOPIC_NAME, zmq_handler);
 
-      sleep(1); /* Wait until ZMQ is setup */
+      sleep(2); /* Wait until ZMQ is setup */
+
+      trace->traceEvent(TRACE_NORMAL, "Sending data...");
       
-      for(int i=0; i<100; i++)
+      for(int i=0; i<10; i++)
 	zmq.sendMessage(ZMQ_TOPIC_NAME, zmq_test_msg);
       
       return(0);

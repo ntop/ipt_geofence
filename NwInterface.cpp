@@ -77,7 +77,7 @@ NwInterface::NwInterface(u_int nf_device_id,
   nf_fd = nfq_fd(nfHandle);
 
   if(zmq_handler != NULL) {
-    zmq = new ZMQ(zmq_handler, zmq_encryption_key, false);
+    zmq = new ZMQ(zmq_handler, zmq_encryption_key);
   } else
     zmq = NULL;
 
