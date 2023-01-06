@@ -56,7 +56,7 @@ int main(int argc, char *argv[]) {
   // printf("zmq_bind() returned %d\n", rc);
   assert(rc == 0);
 
-  const char *topic = "";
+  const char *topic = ""; /* Use an empty string to match all topics */
   errno = 0;
   rc = zmq_setsockopt(subscriber, ZMQ_SUBSCRIBE, topic, strlen(topic));
   // printf("zmq_setsockopt(%s) returned %d [%d/%s]\n", topic, rc, errno, strerror(errno));
