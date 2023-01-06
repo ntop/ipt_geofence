@@ -21,7 +21,6 @@
 
 #include "include.h"
 
-#include <assert.h>
 
 #ifdef HAVE_ZMQ
 

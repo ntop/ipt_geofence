@@ -1,5 +1,25 @@
+/*
+ *
+ * (C) 2021-22 - ntop.org
+ *
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software Foundation,
+ * Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+ *
+ */
+
 #include "include.h"
-#include <assert.h>
 
 #define USE_ENCRYPTION
 
@@ -9,9 +29,11 @@ int main(int argc, char *argv[]) {
   void *subscriber = zmq_socket(context, ZMQ_SUB);
   int rc;
   char sub_public_key[41];
+  char sub_public_key_hex[83];
   char sub_secret_key[41];
   char message[13];
-
+  const char *url = "tcp://127.0.0.1:5556";
+  
 #ifdef USE_ENCRYPTION
   rc = zmq_curve_keypair(sub_public_key, sub_secret_key);
   assert(rc == 0);
@@ -24,21 +46,24 @@ int main(int argc, char *argv[]) {
   
   rc = zmq_setsockopt(subscriber, ZMQ_CURVE_SERVER,    &is_server,     sizeof(is_server));
   assert(rc == 0);
-  
-  printf("Use ZMQ server key: %s\n", sub_public_key);
+
+  Utils::toHex(sub_public_key, strlen(sub_public_key),
+	       sub_public_key_hex, sizeof(sub_public_key)-1);
+  printf("Use ZMQ server key: %s\n", sub_public_key_hex);
 #endif
   
-  rc = zmq_bind(subscriber, "tcp://127.0.0.1:5556");
-  printf("zmq_bind() returned %d\n", rc);
+  rc = zmq_bind(subscriber, url);
+  // printf("zmq_bind() returned %d\n", rc);
   assert(rc == 0);
 
   const char *topic = "";
   errno = 0;
   rc = zmq_setsockopt(subscriber, ZMQ_SUBSCRIBE, topic, strlen(topic));
-  printf("zmq_setsockopt(%s) returned %d [%d/%s]\n", topic, rc, errno, strerror(errno));
+  // printf("zmq_setsockopt(%s) returned %d [%d/%s]\n", topic, rc, errno, strerror(errno));
   assert(rc == 0);
 
-
+  printf("Listening at %s\n", url);
+  
   while(1) {
     struct zmq_msg_hdr hdr;
     char buffer[1024];
@@ -50,7 +75,7 @@ int main(int argc, char *argv[]) {
     rc = zmq_recv(subscriber, buffer, hdr.size, 0);
     assert(rc != -1);
     
-    buffer[hdr.size] = '\0';
+    buffer[rc] = '\0';
     printf("[topic: %s] %s\n", hdr.url, buffer);
   }
   

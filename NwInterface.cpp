@@ -709,60 +709,12 @@ void NwInterface::harvestWatches() {
   }
 }
 
-/* ****************************************************** */
-
-char* NwInterface::intoaV4(unsigned int addr, char* buf, u_short bufLen) {
-  char *cp;
-  int n;
-
-  cp = &buf[bufLen];
-  *--cp = '\0';
-
-  n = 4;
-  do {
-    u_int byte = addr & 0xff;
-
-    *--cp = byte % 10 + '0';
-    byte /= 10;
-    if(byte > 0) {
-      *--cp = byte % 10 + '0';
-      byte /= 10;
-      if(byte > 0)
-	*--cp = byte + '0';
-    }
-    if(n > 1)
-      *--cp = '.';
-    addr >>= 8;
-  } while(--n > 0);
-
-  return(cp);
-}
-
-/* ****************************************************** */
-
-char* NwInterface::intoaV6(struct ndpi_in6_addr ipv6,
-			   u_int8_t bitmask, char* buf, u_short bufLen) {
-  char *ret;
-
-  for(int32_t i = bitmask, j = 0; i > 0; i -= 8, ++j)
-    ipv6.u6_addr.u6_addr8[j] &= i >= 8 ? 0xff : (u_int32_t)(( 0xffU << ( 8 - i ) ) & 0xffU );
-
-  ret = (char*)inet_ntop(AF_INET6, &ipv6, buf, bufLen);
-
-  if(ret == NULL) {
-    /* Internal error (buffer too short) */
-    buf[0] = '\0';
-    return(buf);
-  } else
-    return(ret);
-}
-
 /* **************************************************** */
 
 void NwInterface::ban_ipv4(u_int32_t ip4 /* network byte order */, bool ban_ip) {
   char ipbuf[32], cmdbuf[128], *host;
 
-  host = intoaV4(ntohl(ip4), ipbuf, sizeof(ipbuf));
+  host = Utils::intoaV4(ntohl(ip4), ipbuf, sizeof(ipbuf));
   snprintf(cmdbuf, sizeof(cmdbuf), "/usr/sbin/iptables %s IPT_GEOFENCE_BLACKLIST -s %s -j DROP",
 	   ban_ip ? "-I" : "-D", host);
 
@@ -780,7 +732,7 @@ void NwInterface::ban_ipv4(u_int32_t ip4 /* network byte order */, bool ban_ip) 
 void NwInterface::ban_ipv6(struct ndpi_in6_addr ip6, bool ban_ip) {
   char ipbuf[64], cmdbuf[128], *host;
 
-  host = intoaV6(ip6, 128, ipbuf, sizeof(ipbuf));
+  host = Utils::intoaV6(ip6, 128, ipbuf, sizeof(ipbuf));
   snprintf(cmdbuf, sizeof(cmdbuf), "/usr/sbin/ip6tables %s IPT_GEOFENCE_BLACKLIST -s %s -j DROP",
 	   ban_ip ? "-I" : "-D", host);
 

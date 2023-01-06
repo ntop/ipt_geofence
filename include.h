@@ -52,7 +52,7 @@
 #include <maxminddb.h>
 #include <ndpi_api.h>
 #include <curl/curl.h>
-
+#include <assert.h>
 #include <inttypes.h>
 #include <netinet/ip6.h>
 
@@ -72,15 +72,6 @@
 
 /* ********************************************** */
 
-class Marker{
- private:
-  u_int16_t value;
-
- public:
-  inline void setValue(u_int16_t v){value=v;}
-  operator u_int16_t() {return value;}
-};
-
 //#if !defined(__mips__)
 #define HAVE_NFQ_SET_VERDICT2 1
 //#endif
@@ -93,7 +84,9 @@ class Marker{
 /* ********************************************** */
 
 #include "Trace.h"
+#include "Utils.h"
 #include "Blacklists.h"
+#include "Marker.h"
 #include "Configuration.h"
 #include "ZMQ.h"
 #include "GeoIP.h"

@@ -8,16 +8,17 @@ CPPFLAGS= -O2 @INCS@ # -g
 TARGET=ipt_geofence
 LIBS=@LIBS@
 
-OBJECTS = Blacklists.o Configuration.o  GeoIP.o  NwInterface.o  Trace.o  ZMQ.o  main.o
+
+OBJECTS = Blacklists.o Configuration.o  GeoIP.o  NwInterface.o  Trace.o  Utils.o ZMQ.o
 HEADERS = $(wildcard *.h)
 
 all: $(TARGET) zmqReceiver
 
-$(TARGET): $(OBJECTS)
-	$(CXX) $(CPPFLAGS) $(OBJECTS) -o ipt_geofence $(LIBS)
+$(TARGET): $(OBJECTS) main.o
+	$(CXX) $(CPPFLAGS) $(OBJECTS) main.o -o ipt_geofence $(LIBS)
 
-zmqReceiver: zmqReceiver.cpp Makefile
-	$(CXX) $(CPPFLAGS) zmqReceiver.cpp -o zmqReceiver $(LIBS)
+zmqReceiver: zmqReceiver.cpp Utils.o Trace.o Makefile
+	$(CXX) $(CPPFLAGS) zmqReceiver.cpp -o zmqReceiver $(LIBS) Utils.o Trace.o
 
 %.o: %.cpp $(HEADERS) Makefile
 	$(CXX) $(CPPFLAGS) -c $< -o $@

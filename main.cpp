@@ -58,7 +58,7 @@ static void help() {
   printf("-c <config>       | Specify the configuration file\n");
   printf("-m <city>         | Local mmdb_city MMDB file\n");
   printf("-z <zmq>          | ZMQ collector to which events are sent (producer)\n");
-  printf("-k <zmq enc key>  | ZMQ encryption key\n");
+  printf("-k <zmq enc key>  | ZMQ encryption key (hex format)\n");
   printf("-T <message>      | [Debug] Send ZMQ test message and exits.\n");
 
   printf("\nExample: ipt_geofence -c sample_config.json -m dbip-country-lite.mmdb -z tcp://182.168.1.1:1234\n");
@@ -85,7 +85,7 @@ int main(int argc, char *argv[]) {
   };
   Configuration *config;
   GeoIP geoip;
-  char *zmq_handler = NULL, *zmq_encryption_key = NULL;
+  char *zmq_handler = NULL, *zmq_encryption_key_hex = NULL, _zmq_encryption_key[41], *zmq_encryption_key = NULL;;
   const char *zmq_test_msg = NULL;
   
   trace = new Trace();
@@ -99,7 +99,7 @@ int main(int argc, char *argv[]) {
       break;
 
     case 'k':
-      zmq_encryption_key = optarg;
+      zmq_encryption_key_hex = optarg;
       break;
       
     case 'm':
@@ -128,6 +128,12 @@ int main(int argc, char *argv[]) {
     }
   }
 
+  if(zmq_encryption_key_hex != NULL) {
+    Utils::fromHex(zmq_encryption_key_hex, strlen(zmq_encryption_key_hex),
+		   _zmq_encryption_key, sizeof(_zmq_encryption_key));
+    zmq_encryption_key = _zmq_encryption_key;
+  }
+  
   if(zmq_test_msg) {
     if(zmq_handler) {
       ZMQ zmq(zmq_handler, zmq_encryption_key);
