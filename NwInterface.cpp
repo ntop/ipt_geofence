@@ -53,7 +53,7 @@ NwInterface::NwInterface(u_int nf_device_id,
     trace->traceEvent(TRACE_ERROR, "Unable to bind [queueId=%d]", queueId);
     throw 1;
   }
-  
+
   if((queueHandle = nfq_create_queue(nfHandle, queueId, &netfilter_callback, this)) == NULL) {
     trace->traceEvent(TRACE_ERROR, "Unable to attach to NF_QUEUE %d: is it already in use?", queueId);
     throw 1;
@@ -99,12 +99,11 @@ NwInterface::~NwInterface() {
 
   flush_ban();
 
+  if(queueHandle) nfq_destroy_queue(queueHandle);
+  if(nfHandle)    nfq_close(nfHandle);
+  if(zmq)         delete zmq;
+
   logStartStop(false /* stop */);
-
-  //if(queueHandle) nfq_destroy_queue(queueHandle);
-  // if(nfHandle)    nfq_close(nfHandle);
-
-  if(zmq)         delete zmq; 
 }
 
 /* **************************************************** */
@@ -164,7 +163,7 @@ void NwInterface::packetPollLoop() {
 
   ifaceRunning = true;
   logStartStop(true /* start */);
-  
+
   h = get_nfHandle();
   fd = get_fd();
 
@@ -544,7 +543,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
 
   /* Step 2.0 - Check honeypot ports and (eventually) ban host */
   bool drop = false;
-  
+
   if(!saddr_private && conf->isProtectedPort(dport)){
     drop = true, honey_banned.addAddress(src_host); // add banned host to patricia tree
     std::string h(src_host);  // string cast
@@ -815,7 +814,7 @@ std::string NwInterface::execCmd(const char* cmd) {
 
   try {
     char buffer[128];
-    
+
     while(fgets(buffer, sizeof buffer, pipe) != NULL)
       result += buffer;
   } catch (...) {
