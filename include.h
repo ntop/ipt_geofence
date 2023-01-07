@@ -49,6 +49,7 @@
 #include <libnfnetlink/libnfnetlink.h>
 #include <libnetfilter_queue/libnetfilter_queue.h>
 #include <jsoncpp/json/json.h>
+#include <curl/curl.h>
 #include <maxminddb.h>
 #include <ndpi_api.h>
 #include <curl/curl.h>
@@ -61,14 +62,16 @@
 #endif
 
 /* ***** C++ ***** */
-
 #include <unordered_map>
 #include <fstream>
 #include <iostream>
-
+#include <algorithm>
+#include <functional>
 #include <thread>
 #include <list>
 #include <set>
+#include <mutex>
+#include <queue>
 
 /* ********************************************** */
 

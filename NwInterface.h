@@ -55,7 +55,7 @@ class NwInterface {
 	       char *src_host, u_int16_t sport, char *src_country, char *src_continent, bool src_blacklisted,
 	       char *dst_host, u_int16_t dport, char *dst_country, char *dst_continent, bool dst_blacklisted,
 	       bool pass_verdict);
-  void logHostBan(char *host_ip, bool ban_ip);
+  void logHostBan(char *host_ip, bool ban_ip, std::string reason);
   
   bool isPrivateIPv4(u_int32_t addr /* network byte order */);
   bool isPrivateIPv6(const char *ip6addr);
@@ -66,14 +66,16 @@ class NwInterface {
   void harvestWatches();
   char* intoaV4(unsigned int addr, char* buf, u_short bufLen);
   char* intoaV6(struct ndpi_in6_addr ipv6, u_int8_t bitmask, char* buf, u_short bufLen);
-
+  void ban(char *host, bool is_ipv4, bool ban_ip);
   void ban_ipv4(u_int32_t ip4 /* network byte order */, bool ban_ip);
   void ban_ipv6(struct ndpi_in6_addr ipv6, bool ban_ip);
   std::string execCmd(const char* cmd);
+  void addCommonJSON(Json::Value *root);
+  void logStartStop(bool start);
+  int sendTelegramMessage(std::string message);
   
  public:
-  NwInterface(u_int nf_device_id, Configuration *_c, GeoIP *_g, std::string c_path,
-	      char *zmq_handler, char *zmq_encryption_key);
+  NwInterface(u_int nf_device_id, Configuration *_c, GeoIP *_g, std::string c_path);
   ~NwInterface();
 
   inline int getQueueId()                       { return(queueId);                     };

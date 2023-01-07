@@ -18,7 +18,7 @@ $(TARGET): $(OBJECTS) main.o
 	$(CXX) $(CPPFLAGS) $(OBJECTS) main.o -o ipt_geofence $(LIBS)
 
 zmqReceiver: zmqReceiver.cpp Utils.o Trace.o Makefile
-	$(CXX) $(CPPFLAGS) zmqReceiver.cpp -o zmqReceiver $(LIBS) Utils.o Trace.o
+	$(CXX) $(CPPFLAGS) zmqReceiver.cpp -o zmqReceiver Utils.o Trace.o $(LIBS)
 
 %.o: %.cpp $(HEADERS) Makefile
 	$(CXX) $(CPPFLAGS) -c $< -o $@

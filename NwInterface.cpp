@@ -33,10 +33,10 @@ int netfilter_callback(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg,
 
 NwInterface::NwInterface(u_int nf_device_id,
 			 Configuration *_c,
-			 GeoIP *_g, std::string c_path,
-			 char *zmq_handler, char *zmq_encryption_key) {
+			 GeoIP *_g, std::string c_path) {
   conf = _c, geoip = _g, confPath = c_path;
   reloaderThread = NULL;
+  ifaceRunning = false;
   queueId = nf_device_id, nfHandle = nfq_open();
 
   if(nfHandle == NULL) {
@@ -53,7 +53,7 @@ NwInterface::NwInterface(u_int nf_device_id,
     trace->traceEvent(TRACE_ERROR, "Unable to bind [queueId=%d]", queueId);
     throw 1;
   }
-
+  
   if((queueHandle = nfq_create_queue(nfHandle, queueId, &netfilter_callback, this)) == NULL) {
     trace->traceEvent(TRACE_ERROR, "Unable to attach to NF_QUEUE %d: is it already in use?", queueId);
     throw 1;
@@ -76,8 +76,10 @@ NwInterface::NwInterface(u_int nf_device_id,
 
   nf_fd = nfq_fd(nfHandle);
 
-  if(zmq_handler != NULL) {
-    zmq = new ZMQ(zmq_handler, zmq_encryption_key);
+  if(!conf->getZMQUrl().empty()) {
+    std::string url = conf->getZMQUrl();
+    std::string enc = conf->getZMQEncryptionKey();
+    zmq = new ZMQ(url.c_str(), enc.c_str());
   } else
     zmq = NULL;
 
@@ -93,14 +95,16 @@ NwInterface::~NwInterface() {
     delete reloaderThread;
   }
 
-  if(queueHandle) nfq_destroy_queue(queueHandle);
-  if(nfHandle)    nfq_close(nfHandle);
-  if(conf)        delete conf;
-  if(zmq)         delete zmq;
-  
   nf_fd = 0;
 
   flush_ban();
+
+  logStartStop(false /* stop */);
+
+  //if(queueHandle) nfq_destroy_queue(queueHandle);
+  // if(nfHandle)    nfq_close(nfHandle);
+
+  if(zmq)         delete zmq; 
 }
 
 /* **************************************************** */
@@ -159,7 +163,8 @@ void NwInterface::packetPollLoop() {
   }
 
   ifaceRunning = true;
-
+  logStartStop(true /* start */);
+  
   h = get_nfHandle();
   fd = get_fd();
 
@@ -256,7 +261,8 @@ void NwInterface::packetPollLoop() {
   for(u_int i=0, s = pipes.size(); i < s; i++)
     pclose(pipes[i]);
 
-  for(std::unordered_map<u_int32_t, WatchMatches*>::iterator it = watches_blacklist.begin(); it != watches_blacklist.end(); it++)
+  for(std::unordered_map<u_int32_t, WatchMatches*>::iterator it = watches_blacklist.begin();
+      it != watches_blacklist.end(); it++)
     delete it->second;
 
   trace->traceEvent(TRACE_NORMAL, "Leaving netfilter packet poll loop");
@@ -378,12 +384,21 @@ bool NwInterface::isPrivateIPv6(const char *ip6addr) {
 
 /* **************************************************** */
 
-void NwInterface::logHostBan(char *host_ip, bool ban_ip) {
+void NwInterface::addCommonJSON(Json::Value *root) {
+  (*root)["source"]["ip"]    = conf->getHostIP();
+  (*root)["source"]["name"]  = conf->getHostName();
+  (*root)["source"]["epoch"] = (unsigned int)time(NULL);
+}
+
+/* **************************************************** */
+
+void NwInterface::logHostBan(char *host_ip, bool ban_ip, std::string reason) {
   Json::Value root;
   std::string json_txt;
   Json::FastWriter writer;
 
-  root["reason"] = "watch-host-ban";
+  addCommonJSON(&root);
+  root["reason"] = (reason.size() > 0) ? reason.c_str() : "watch-host-ban";
   root["host"]   = host_ip;
   root["action"] = ban_ip ? "ban" : "unban";
 
@@ -393,6 +408,28 @@ void NwInterface::logHostBan(char *host_ip, bool ban_ip) {
 
   if(zmq)
     zmq->sendMessage(ZMQ_TOPIC_NAME, json_txt.c_str());
+
+  sendTelegramMessage(json_txt);
+}
+
+/* **************************************************** */
+
+void NwInterface::logStartStop(bool start) {
+  Json::Value root;
+  std::string json_txt;
+  Json::FastWriter writer;
+
+  addCommonJSON(&root);
+  root["reason"] = start ? "start" : "stop";
+
+  json_txt = writer.write(root);
+
+  trace->traceEvent(TRACE_ERROR, "%s", json_txt.c_str());
+
+  if(zmq)
+    zmq->sendMessage(ZMQ_TOPIC_NAME, json_txt.c_str());
+
+  sendTelegramMessage(json_txt);
 }
 
 /* **************************************************** */
@@ -405,6 +442,7 @@ void NwInterface::logFlow(const char *proto_name,
   std::string json_txt;
   Json::FastWriter writer;
 
+  addCommonJSON(&root);
   root["reason"] = "flow-ban";
   root["proto"]  = proto_name;
   root["src"]["host"] = src_host;
@@ -430,6 +468,8 @@ void NwInterface::logFlow(const char *proto_name,
 
     if(zmq)
       zmq->sendMessage(ZMQ_TOPIC_NAME, json_txt.c_str());
+
+    // sendTelegramMessage(json_txt);
   }
 }
 
@@ -504,6 +544,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
 
   /* Step 2.0 - Check honeypot ports and (eventually) ban host */
   bool drop = false;
+  
   if(!saddr_private && conf->isProtectedPort(dport)){
     drop = true, honey_banned.addAddress(src_host); // add banned host to patricia tree
     std::string h(src_host);  // string cast
@@ -519,6 +560,9 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
 	    src_host, sport, src_ctry, src_cont, false,
 	    dst_host, dport, dst_ctry, dst_cont, false,
 	    false /* drop */);
+
+    ban(src_host, ipv4 ? true : false, true /* ban */);
+    return(conf->getMarkerDrop());
   }
 
   /* Step 2 - For TCP/UDP ignore traffic for non-monitored ports */
@@ -711,14 +755,14 @@ void NwInterface::harvestWatches() {
 
 /* **************************************************** */
 
-void NwInterface::ban_ipv4(u_int32_t ip4 /* network byte order */, bool ban_ip) {
-  char ipbuf[32], cmdbuf[128], *host;
+void NwInterface::ban(char *host, bool is_ipv4, bool ban_ip) {
+  char cmdbuf[128];
 
-  host = Utils::intoaV4(ntohl(ip4), ipbuf, sizeof(ipbuf));
-  snprintf(cmdbuf, sizeof(cmdbuf), "/usr/sbin/iptables %s IPT_GEOFENCE_BLACKLIST -s %s -j DROP",
+  snprintf(cmdbuf, sizeof(cmdbuf), "/usr/sbin/ip%stables %s IPT_GEOFENCE_BLACKLIST -s %s -j DROP",
+	   is_ipv4 ? "" : "6",
 	   ban_ip ? "-I" : "-D", host);
 
-  logHostBan(host, ban_ip);
+  logHostBan(host, ban_ip, "");
 
   try {
     execCmd(cmdbuf);
@@ -729,20 +773,22 @@ void NwInterface::ban_ipv4(u_int32_t ip4 /* network byte order */, bool ban_ip) 
 
 /* **************************************************** */
 
+void NwInterface::ban_ipv4(u_int32_t ip4 /* network byte order */, bool ban_ip) {
+  char ipbuf[32], *host;
+
+  host = Utils::intoaV4(ntohl(ip4), ipbuf, sizeof(ipbuf));
+
+  ban(host, true, ban_ip);
+}
+
+/* **************************************************** */
+
 void NwInterface::ban_ipv6(struct ndpi_in6_addr ip6, bool ban_ip) {
-  char ipbuf[64], cmdbuf[128], *host;
+  char ipbuf[64], *host;
 
   host = Utils::intoaV6(ip6, 128, ipbuf, sizeof(ipbuf));
-  snprintf(cmdbuf, sizeof(cmdbuf), "/usr/sbin/ip6tables %s IPT_GEOFENCE_BLACKLIST -s %s -j DROP",
-	   ban_ip ? "-I" : "-D", host);
 
-  logHostBan(host, ban_ip);
-
-  try {
-    execCmd(cmdbuf);
-  } catch (...) {
-    trace->traceEvent(TRACE_ERROR, "Error while executing '%s'", cmdbuf);
-  }
+  ban(host, false, ban_ip);
 }
 
 /* **************************************************** */
@@ -762,7 +808,7 @@ std::string NwInterface::execCmd(const char* cmd) {
   std::string result = "";
   FILE* pipe = popen(cmd, "r");
 
-  trace->traceEvent(TRACE_ERROR, "Executing %s", cmd);
+  trace->traceEvent(TRACE_INFO, "Executing %s", cmd);
 
   if(!pipe)
     throw std::runtime_error("popen() failed!");
@@ -780,4 +826,10 @@ std::string NwInterface::execCmd(const char* cmd) {
   pclose(pipe);
 
   return(result);
+}
+
+/* **************************************************** */
+
+int NwInterface::sendTelegramMessage(std::string message) {
+  return(conf->sendTelegramMessage(message));
 }

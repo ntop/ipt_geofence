@@ -32,5 +32,13 @@
     "watches": [
 	{ "name" : "postfix",   "cmd": "tail -n 0 -F /var/log/mail.log | grep --line-buffered 'failure'          | sed -u 's/.*\\[\\([^]]*\\)\\].*/\\1/g'" },
 	{ "name" : "postfix-2", "cmd": "tail -n 0 -F /var/log/mail.log | grep --line-buffered 'no auth attempts' | sed -u 's/.*\\[\\([^]]*\\)\\].*/\\1/g'" }
-    ]
+    ],
+    "telegram": {
+	"bot_token": "",
+        "chat_id": ""
+    },
+    "zmq": {
+	"url": "",
+        "encryption_key": ""
+    }
 }

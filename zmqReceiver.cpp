@@ -33,6 +33,7 @@ int main(int argc, char *argv[]) {
   char sub_secret_key[41];
   char message[13];
   const char *url = "tcp://127.0.0.1:5556";
+  Trace trace;
   
 #ifdef USE_ENCRYPTION
   rc = zmq_curve_keypair(sub_public_key, sub_secret_key);
@@ -49,20 +50,20 @@ int main(int argc, char *argv[]) {
 
   Utils::toHex(sub_public_key, strlen(sub_public_key),
 	       sub_public_key_hex, sizeof(sub_public_key)-1);
-  printf("Use ZMQ server key: %s\n", sub_public_key_hex);
+  trace.traceEvent(TRACE_NORMAL, "Use ZMQ server key: %s\n", sub_public_key_hex);
 #endif
   
   rc = zmq_bind(subscriber, url);
-  // printf("zmq_bind() returned %d\n", rc);
+  // trace.traceEvent(TRACE_NORMAL, "zmq_bind() returned %d\n", rc);
   assert(rc == 0);
 
   const char *topic = ""; /* Use an empty string to match all topics */
   errno = 0;
   rc = zmq_setsockopt(subscriber, ZMQ_SUBSCRIBE, topic, strlen(topic));
-  // printf("zmq_setsockopt(%s) returned %d [%d/%s]\n", topic, rc, errno, strerror(errno));
+  // trace.traceEvent(TRACE_NORMAL, "zmq_setsockopt(%s) returned %d [%d/%s]\n", topic, rc, errno, strerror(errno));
   assert(rc == 0);
 
-  printf("Listening at %s\n", url);
+  trace.traceEvent(TRACE_NORMAL, "Listening at %s\n", url);
   
   while(1) {
     struct zmq_msg_hdr hdr;
@@ -76,7 +77,7 @@ int main(int argc, char *argv[]) {
     assert(rc != -1);
     
     buffer[rc] = '\0';
-    printf("[topic: %s] %s\n", hdr.url, buffer);
+    trace.traceEvent(TRACE_NORMAL, "[topic: %s] %s\n", hdr.url, buffer);
   }
   
   zmq_close(subscriber);

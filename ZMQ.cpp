@@ -32,7 +32,7 @@
 
 /* ******************************* */
 
-ZMQ::ZMQ(char *endpoint, char *server_public_key) {
+ZMQ::ZMQ(const char *endpoint, const char *server_public_key) {
   context = zmq_ctx_new();
 
   if(context == NULL) {
@@ -57,7 +57,7 @@ ZMQ::ZMQ(char *endpoint, char *server_public_key) {
       goto no_encrypt;
     }
 
-    trace->traceEvent(TRACE_NORMAL, "Setting ZMQ server curve key to '%s'", server_public_key);
+    trace->traceEvent(TRACE_INFO, "Setting ZMQ server curve key to '%s'", server_public_key);
 
     /* (1) - Generate client keypairs */
     rc = zmq_curve_keypair(client_public_key, client_secret_key);

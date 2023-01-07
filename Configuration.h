@@ -40,11 +40,16 @@ class Configuration {
   Marker marker_drop;
   Marker default_policy;
   Blacklists blacklists;
-  
+  std::string host_ip, host_name;
+  std::string telegram_bot_token, telegram_chat_id;
   bool configured, all_tcp_ports, all_udp_ports;
-
+  std::string zmq_encryption_key, zmq_url;
+  std::thread *telegramThread;
+  std::mutex telegram_queue_lock;
+  std::queue<std::string> telegram_queue;
   std::set<port_range> hp_ranges;
-  
+  bool running;
+
   u_int16_t ctry_cont2u16(char *country_code);
   bool mergePortRanges (port_range r1, port_range r2, port_range *ret);
   void addPortRange(port_range r);
@@ -52,18 +57,17 @@ class Configuration {
   bool parsePortRange(std::string s, port_range *r);
   bool parseAllExcept(std::string s, u_int16_t *port);
   bool isIncludedInRange(u_int16_t port);
-  
+  void sendTelegramMessages();
+
  public:
-  Configuration() { nfq_queue_id = 0, marker_unknown.setValue(0); 
-                    marker_pass.setValue(1000); marker_drop.setValue(2000);
-                    default_policy = marker_pass; configured = false, 
-                    all_tcp_ports = all_udp_ports = true; }
+  Configuration();
+  ~Configuration();
 
   bool readConfigFile(const char *path);
 
   inline unsigned int getQueueId() { return(nfq_queue_id); }
   inline bool isConfigured()       { return(configured);   }
-  
+
   inline void setQueueId(int nfq_id)                        { nfq_queue_id = nfq_id;  }
   inline void setCountryMarker(u_int16_t country, Marker m) { ctrs_conts[country] = m;}
   inline Marker getMarkerUnknown()                          { return marker_unknown;  }
@@ -77,8 +81,13 @@ class Configuration {
   bool isProtectedPort(u_int16_t port);
   inline bool isBlacklistedIPv4(struct in_addr *addr)     { return(blacklists.isBlacklistedIPv4(addr)) ;}
   inline bool isBlacklistedIPv6(struct in6_addr *addr6)   { return(blacklists.isBlacklistedIPv6(addr6));}
-  inline void loadIPsetFromURL(const char* url)  { blacklists.loadIPsetFromURL(url);}
-  inline std::unordered_map<std::string,std::string>* get_watches() { return(&watches); }
+  inline void loadIPsetFromURL(const char* url)                     { blacklists.loadIPsetFromURL(url); }
+  inline std::unordered_map<std::string,std::string>* get_watches() { return(&watches);                 }
+  inline const char *getHostIP()                                    { return(host_ip.c_str());          }
+  inline const char *getHostName()                                  { return(host_name.c_str());        }
+  int sendTelegramMessage(std::string msg);
+  inline std::string getZMQUrl()                                    { return(zmq_url);                  }
+  inline std::string getZMQEncryptionKey()                          { return(zmq_encryption_key);       }
 };
 
 

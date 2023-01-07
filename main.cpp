@@ -57,11 +57,9 @@ static void help() {
   printf("-s                | Log to syslog\n");
   printf("-c <config>       | Specify the configuration file\n");
   printf("-m <city>         | Local mmdb_city MMDB file\n");
-  printf("-z <zmq>          | ZMQ collector to which events are sent (producer)\n");
-  printf("-k <zmq enc key>  | ZMQ encryption key (hex format)\n");
   printf("-T <message>      | [Debug] Send ZMQ test message and exits.\n");
 
-  printf("\nExample: ipt_geofence -c sample_config.json -m dbip-country-lite.mmdb -z tcp://182.168.1.1:1234\n");
+  printf("\nExample: ipt_geofence -c sample_config.json -m dbip-country-lite.mmdb\n");
 
   exit(0);
 }
@@ -76,32 +74,25 @@ int main(int argc, char *argv[]) {
     { "mmdb_city",   required_argument,    NULL, 'm' },
     { "help",        no_argument,          NULL, 'h' },
     { "syslog",      no_argument,          NULL, 's' },
-    { "zmq",         required_argument,    NULL, 'z' },
-    { "zmq-enc-key", required_argument,    NULL, 'k' },
     { "zmq-test",    required_argument,    NULL, 'T' },
     { "verbose",     no_argument,          NULL, 'v' },
     /* End of options */
     { NULL,          no_argument,          NULL,  0 }
   };
-  Configuration *config;
   GeoIP geoip;
-  char *zmq_handler = NULL, *zmq_encryption_key_hex = NULL, _zmq_encryption_key[41], *zmq_encryption_key = NULL;;
   const char *zmq_test_msg = NULL;
+  Configuration *conf;
   
   trace = new Trace();
-  config = new Configuration();
-
-  while((c = getopt_long(argc, argv, "c:k:u:l:m:svVz:T:h", long_options, NULL)) != 255) {
+  conf = new Configuration();
+  
+  while((c = getopt_long(argc, argv, "c:u:l:m:svVT:h", long_options, NULL)) != 255) {
     switch(c) {
     case 'c':
       confPath = (optarg);
-      config->readConfigFile(confPath.c_str());
+      conf->readConfigFile(confPath.c_str());
       break;
 
-    case 'k':
-      zmq_encryption_key_hex = optarg;
-      break;
-      
     case 'm':
       geoip.loadCountry(optarg);
       break;
@@ -118,28 +109,20 @@ int main(int argc, char *argv[]) {
       trace->set_trace_level(6);
       break;
 
-    case 'z':
-      zmq_handler = optarg;
-      break;
-
     default:
       trace->traceEvent(TRACE_WARNING, "Unknown command line option -%c", c);
       help();
     }
   }
 
-  if(zmq_encryption_key_hex != NULL) {
-    Utils::fromHex(zmq_encryption_key_hex, strlen(zmq_encryption_key_hex),
-		   _zmq_encryption_key, sizeof(_zmq_encryption_key));
-    zmq_encryption_key = _zmq_encryption_key;
-  }
-  
   if(zmq_test_msg) {
-    if(zmq_handler) {
-      ZMQ zmq(zmq_handler, zmq_encryption_key);
+    if(!conf->getZMQUrl().empty()) {
+      std::string url = conf->getZMQUrl();
+      std::string enc = conf->getZMQEncryptionKey();
+      ZMQ zmq(url.c_str(), enc.c_str());
 
       trace->traceEvent(TRACE_NORMAL, "Sending message on topic %s to %s. Hold on..",
-			ZMQ_TOPIC_NAME, zmq_handler);
+			ZMQ_TOPIC_NAME, conf->getZMQUrl().c_str());
 
       sleep(2); /* Wait until ZMQ is setup */
 
@@ -147,17 +130,18 @@ int main(int argc, char *argv[]) {
       
       for(int i=0; i<10; i++)
 	zmq.sendMessage(ZMQ_TOPIC_NAME, zmq_test_msg);
+
+      conf->sendTelegramMessage(zmq_test_msg);
       
       return(0);
-    } else
-      trace->traceEvent(TRACE_ERROR, "Ignored -T as -z was not specified");
+    }
   }
   
-  if(!config->isConfigured()) {
-    trace->traceEvent(TRACE_ERROR, "Please check the JSON configuration file");
+  if(!conf->isConfigured()) {
+    trace->traceEvent(TRACE_ERROR, "Please check the JSON confuration file");
     help();
   } else if(!geoip.isLoaded()) {
-    trace->traceEvent(TRACE_ERROR, "Please check the GeoIP configuration");
+    trace->traceEvent(TRACE_ERROR, "Please check the GeoIP confuration");
     help();
   }
 
@@ -165,14 +149,15 @@ int main(int argc, char *argv[]) {
   signal(SIGINT,  sigproc);
 
   try {
-    iface = new NwInterface(config->getQueueId(), config, &geoip, confPath, zmq_handler, zmq_encryption_key);
+    iface = new NwInterface(conf->getQueueId(), conf, &geoip, confPath);
 
     iface->packetPollLoop();
-
-    delete iface;
   } catch(int err) {
     trace->traceEvent(TRACE_ERROR, "Interface creation error: please fix the reported errors and try again");
   }
+  
+  delete iface;
+  delete conf;
 
   return(0);
 }

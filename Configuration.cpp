@@ -23,6 +23,28 @@
 
 /* ******************************************************* */
 
+Configuration::Configuration() {
+  nfq_queue_id = 0, marker_unknown.setValue(0); 
+  marker_pass.setValue(1000); marker_drop.setValue(2000);
+  default_policy = marker_pass; configured = false;
+  all_tcp_ports = all_udp_ports = true;
+  host_ip   = Utils::execCmd("/bin/hostname -I");
+  host_name = Utils::execCmd("/bin/hostname");
+  running = true;
+
+  telegramThread = new std::thread(&Configuration::sendTelegramMessages, this);
+}
+
+/* ******************************************************* */
+
+Configuration::~Configuration() {
+  running = false;
+  telegramThread->join();
+  delete telegramThread;
+}
+
+/* *************************2****************************** */
+
 u_int16_t Configuration::ctry_cont2u16(char *ctry_cont_code) {
   if(ctry_cont_code == NULL || strlen(ctry_cont_code) < 2) return 0;
 
@@ -53,26 +75,26 @@ bool Configuration::readConfigFile(const char *path) {
     nfq_queue_id = root["queue_id"].asUInt();
 
   if(!root["markers"].empty()) {
-    if(root["markers"]["pass"].empty()){
+    if(root["markers"]["pass"].empty()) {
       trace->traceEvent(TRACE_INFO, "Missing %s from %s: using default %u", "pass", path, DEFAULT_PASS_MARKER);
       marker_pass.setValue(DEFAULT_PASS_MARKER);
     } else {
       marker_pass.setValue(root["markers"]["pass"].asUInt());
     }
 
-    if(root["markers"]["drop"].empty()){
+    if(root["markers"]["drop"].empty()) {
       trace->traceEvent(TRACE_INFO, "Missing %s from %s: using default %u", "drop", path, DEFAULT_DROP_MARKER);
       marker_drop.setValue(DEFAULT_DROP_MARKER);
     } else {
       marker_drop.setValue(root["markers"]["drop"].asUInt());
     }
 
-    if(marker_drop==marker_pass ){
+    if(marker_drop==marker_pass ) {
       trace->traceEvent(TRACE_ERROR, "Markers values must be distinct in %s", path);
       return(false);
     }
 
-    if(marker_drop<=0 || marker_pass<=0 ){
+    if(marker_drop<=0 || marker_pass<=0 ) {
       trace->traceEvent(TRACE_ERROR, "Markers values must be greater than 0 in %s", path);
       return(false);
     }
@@ -86,7 +108,6 @@ bool Configuration::readConfigFile(const char *path) {
     std::string m = root["default_policy"].asString();
     trace->traceEvent(TRACE_INFO, "Default policy: %s", m.c_str());
     default_policy = (m == "PASS") ? marker_pass : marker_drop;
-
   }
 
   all_tcp_ports = all_udp_ports = true;
@@ -207,6 +228,30 @@ bool Configuration::readConfigFile(const char *path) {
     }
   }
 
+  if(!root["telegram"].empty()) {
+    if(!root["telegram"]["bot_token"].empty())
+      telegram_bot_token = root["telegram"]["bot_token"].asString();
+
+    if(!root["telegram"]["chat_id"].empty())
+      telegram_chat_id = root["telegram"]["chat_id"].asString();
+  }
+  
+  if(!root["zmq"].empty()) {
+    if(!root["zmq"]["url"].empty())
+      zmq_url = root["zmq"]["url"].asString();
+
+    if(!root["zmq"]["encryption_key"].empty()) {
+      std::string encryption_key = root["zmq"]["encryption_key"].asString();
+      const char *zmq_encryption_key_hex = encryption_key.c_str();
+      char _zmq_encryption_key[42];
+      
+      Utils::fromHex((char*)zmq_encryption_key_hex, strlen(zmq_encryption_key_hex),
+		     _zmq_encryption_key, sizeof(_zmq_encryption_key));
+      
+      zmq_encryption_key = std::string(_zmq_encryption_key);
+    }
+  }
+  
   return(configured = true);
 }
 
@@ -240,7 +285,7 @@ Marker Configuration::getMarker(char *country, char *continent) {
  * @param ret pointer to structure which will hold the merged range
  * @return true if mergeable, false otherwise
  */
-bool Configuration::mergePortRanges (port_range r1, port_range r2, port_range *ret){
+bool Configuration::mergePortRanges (port_range r1, port_range r2, port_range *ret) {
   if(r1.first < r1.second || r2.first < r2.second || !ret)
     return false; // r1 || r2 || ret is invalid
   port_range
@@ -261,6 +306,8 @@ bool Configuration::mergePortRanges (port_range r1, port_range r2, port_range *r
 		    );
   return true;
 }
+
+/* **************************************************** */
 
 /**
  * @brief adds a range to hp_ranges, making sure that all
@@ -292,27 +339,32 @@ void Configuration::addPortRange(port_range r) {
     hp_ranges.insert(curr);
     trace->traceEvent(TRACE_INFO, "Protecting range [%u-%u]",merged.second,merged.first);
   }
-
 }
+
+/* **************************************************** */
 
 bool Configuration::parsePortRange(std::string s, port_range *r) {
   if(!r) return false;
   size_t delim;
-  if( (delim = s.find("-")) != std::string::npos){
+  if( (delim = s.find("-")) != std::string::npos) {
     std::string s_l = s.substr(0,delim), s_r = s.substr(delim + 1, std::string::npos);
     return (stringToU16(s_l, &(r->first)) && stringToU16(s_r, &(r->second)));
   }
   return false;
 }
 
-bool Configuration::parseAllExcept(std::string s, u_int16_t *port){
+/* **************************************************** */
+
+bool Configuration::parseAllExcept(std::string s, u_int16_t *port) {
   if(!port) return false;
   size_t delim;
-  if( (delim = s.find("!")) != std::string::npos){
+  if( (delim = s.find("!")) != std::string::npos) {
     return (stringToU16(s.substr(delim + 1, std::string::npos), port));
   }
   return false;
 }
+
+/* **************************************************** */
 
 bool Configuration::stringToU16(std::string s, u_int16_t *toRet) {
   if(!toRet) return false;
@@ -328,6 +380,8 @@ bool Configuration::stringToU16(std::string s, u_int16_t *toRet) {
   return false;
 }
 
+/* **************************************************** */
+
 bool Configuration::isProtectedPort(u_int16_t port) {
   if  (hp_ports.find(port) != hp_ports.end() ||                      // single port match
        // included by a "!port"
@@ -339,6 +393,8 @@ bool Configuration::isProtectedPort(u_int16_t port) {
   return false;
 }
 
+/* **************************************************** */
+
 bool Configuration::isIncludedInRange(u_int16_t port) {
   port_range toSearch {port, 0}; // we don't care about .second
   std::set<port_range>::iterator it = hp_ranges.lower_bound(toSearch);
@@ -348,3 +404,39 @@ bool Configuration::isIncludedInRange(u_int16_t port) {
     return true;
   /* else */ return false;
 }
+
+/* **************************************************** */
+
+int Configuration::sendTelegramMessage(std::string msg) {
+  if((!telegram_bot_token.empty()) && (!telegram_chat_id.empty())) {
+    telegram_queue_lock.lock();
+    telegram_queue.push(msg);
+    telegram_queue_lock.unlock();
+    return(0);
+  }
+
+  return(-1);
+}
+
+/* **************************************************** */
+
+void Configuration::sendTelegramMessages() {
+  while(true) {
+    if(telegram_queue.size() > 0) {
+      std::string message;
+      
+      telegram_queue_lock.lock();
+      message = telegram_queue.front();
+      telegram_queue.pop();
+      telegram_queue_lock.unlock();
+
+      Utils::sendTelegramMessage(telegram_bot_token, telegram_chat_id, message);
+    } else {
+      if(!running)
+	break;
+      else
+	sleep(1);
+    }
+  }
+}
+   
