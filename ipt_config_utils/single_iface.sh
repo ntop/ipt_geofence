@@ -42,7 +42,7 @@ for i in {1,2}; do
     # Return to the original chain
     $IPTABLES -A IPT_GEOFENCE_BLACKLIST -j RETURN
     # Jump to the blacklist chain
-    $IPTABLES -A INPUT  -j IPT_GEOFENCE_BLACKLIST
+    $IPTABLES -I INPUT  -j IPT_GEOFENCE_BLACKLIST
     
     # Read CONNMARK and set it in mark
     # (A) For incoming packets

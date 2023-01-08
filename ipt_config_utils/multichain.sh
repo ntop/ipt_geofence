@@ -46,15 +46,15 @@ for i in {1,2}; do
     # Flush chains (if present)
     $IPTABLES -t mangle -F GEO_PREROUTING
     $IPTABLES -t mangle -F GEO_POSTROUTING
-    $IPTABLES -t mangle -F GEO_OUTPUT
+    #$IPTABLES -t mangle -F GEO_OUTPUT
     $IPTABLES -t mangle -X GEO_PREROUTING
     $IPTABLES -t mangle -X GEO_POSTROUTING
-    $IPTABLES -t mangle -X GEO_OUTPUT
+    #$IPTABLES -t mangle -X GEO_OUTPUT
 
     # Create chains
     $IPTABLES -t mangle -N GEO_PREROUTING
     $IPTABLES -t mangle -N GEO_POSTROUTING
-    $IPTABLES -t mangle -N GEO_OUTPUT
+    #$IPTABLES -t mangle -N GEO_OUTPUT
 
     # Flush all if already there
     $IPTABLES -F IPT_GEOFENCE_BLACKLIST
@@ -64,14 +64,14 @@ for i in {1,2}; do
     # Return to the original chain
     $IPTABLES -A IPT_GEOFENCE_BLACKLIST -j RETURN
     # Jump to the blacklist chain
-    $IPTABLES -A INPUT  -j IPT_GEOFENCE_BLACKLIST
+    $IPTABLES -I INPUT  -j IPT_GEOFENCE_BLACKLIST
 
     # Read CONNMARK and set it in mark
     # (A) For incoming packets
     $IPTABLES -t mangle -A GEO_PREROUTING -j CONNMARK --restore-mark
 
     # (B) For locally generated packets
-    $IPTABLES -t mangle -A GEO_OUTPUT -j CONNMARK --restore-mark
+    #$IPTABLES -t mangle -A GEO_OUTPUT -j CONNMARK --restore-mark
 
     # Save CONNMARK (1st rule of POSTROUTING)
     $IPTABLES -t mangle -A GEO_POSTROUTING -j CONNMARK --save-mark
@@ -84,27 +84,27 @@ for i in {1,2}; do
 
     # Send traffic to NFQUEUE
     $IPTABLES -t mangle -A GEO_PREROUTING  -p tcp --match mark --mark 0 -j NFQUEUE --queue-num $QUEUE_ID --queue-bypass
-    $IPTABLES -t mangle -A GEO_OUTPUT      -p tcp --match mark --mark 0 -j NFQUEUE --queue-num $QUEUE_ID --queue-bypass
+    #$IPTABLES -t mangle -A GEO_OUTPUT      -p tcp --match mark --mark 0 -j NFQUEUE --queue-num $QUEUE_ID --queue-bypass
 
     $IPTABLES -t mangle -A GEO_PREROUTING  -p udp --match mark --mark 0 -j NFQUEUE --queue-num $QUEUE_ID --queue-bypass
-    $IPTABLES -t mangle -A GEO_OUTPUT      -p udp --match mark --mark 0 -j NFQUEUE --queue-num $QUEUE_ID --queue-bypass
+    #$IPTABLES -t mangle -A GEO_OUTPUT      -p udp --match mark --mark 0 -j NFQUEUE --queue-num $QUEUE_ID --queue-bypass
 
     $IPTABLES -t mangle -A GEO_PREROUTING  -p icmp --match mark --mark 0 -j NFQUEUE --queue-num $QUEUE_ID --queue-bypass
-    $IPTABLES -t mangle -A GEO_OUTPUT      -p icmp --match mark --mark 0 -j NFQUEUE --queue-num $QUEUE_ID --queue-bypass
+    #$IPTABLES -t mangle -A GEO_OUTPUT      -p icmp --match mark --mark 0 -j NFQUEUE --queue-num $QUEUE_ID --queue-bypass
 
     ###################################################
 
     # Add final return
     $IPTABLES -t mangle -A GEO_PREROUTING  -j RETURN
     $IPTABLES -t mangle -A GEO_POSTROUTING -j RETURN
-    $IPTABLES -t mangle -A GEO_OUTPUT      -j RETURN
+    #$IPTABLES -t mangle -A GEO_OUTPUT      -j RETURN
 
     ###################################################
 
     # Append chains
     $IPTABLES -t mangle -A PREROUTING  -j GEO_PREROUTING
     $IPTABLES -t mangle -A POSTROUTING -j GEO_POSTROUTING
-    $IPTABLES -t mangle -A OUTPUT      -j GEO_OUTPUT
+    #$IPTABLES -t mangle -A OUTPUT      -j GEO_OUTPUT
 
     ###################################################
 
@@ -113,7 +113,7 @@ for i in {1,2}; do
 
     $IPTABLES -t mangle -L GEO_PREROUTING
     $IPTABLES -t mangle -L GEO_POSTROUTING
-    $IPTABLES -t mangle -L GEO_OUTPUT
+    #$IPTABLES -t mangle -L GEO_OUTPUT
 
     # Same code but using IPv6
     IPTABLES="ip6tables"

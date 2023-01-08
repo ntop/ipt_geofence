@@ -41,7 +41,7 @@ class NwInterface {
   std::map<std::string, std::pair<time_t, list_it>> honey_banned_time;
   Blacklists honey_banned;
   double banTimeout = 900.0; // 15 minutes
-  std::unordered_map<u_int32_t /* IPv4 [TODO add IPv6] */, WatchMatches*> watches_blacklist;
+  std::unordered_map<std::string, WatchMatches*> watches_blacklist;
   std::string confPath;
   ZMQ *zmq;
   
@@ -67,7 +67,7 @@ class NwInterface {
   void harvestWatches();
   char* intoaV4(unsigned int addr, char* buf, u_short bufLen);
   char* intoaV6(struct ndpi_in6_addr ipv6, u_int8_t bitmask, char* buf, u_short bufLen);
-  void ban(char *host, bool is_ipv4, bool ban_ip, std::string reason, std::string country);
+  void ban(char *host, bool ban_ip, std::string reason, std::string country);
   void ban_ipv4(u_int32_t ip4 /* network byte order */, bool ban_ip, std::string reason, std::string country);
   void ban_ipv6(struct ndpi_in6_addr ipv6, bool ban_ip, std::string reason, std::string country);
   std::string execCmd(const char* cmd);

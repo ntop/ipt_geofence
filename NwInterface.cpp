@@ -98,12 +98,12 @@ NwInterface::~NwInterface() {
   nf_fd = 0;
 
   flush_ban();
-
+    
   if(queueHandle) nfq_destroy_queue(queueHandle);
   if(nfHandle)    nfq_close(nfHandle);
-  if(zmq)         delete zmq;
 
   logStartStop(false /* stop */);
+  if(zmq)         delete zmq;
 }
 
 /* **************************************************** */
@@ -217,29 +217,11 @@ void NwInterface::packetPollLoop() {
 	    char ip[64];
 
 	    while(fgets(ip, sizeof(ip), pipes[i]) != NULL) {
-	      u_int32_t key = inet_addr(ip);
-
 #ifdef DEBUG
-	      trace->traceEvent(TRACE_ERROR, "Watch received %s", ip);
+	      trace->traceEvent(TRACE_ERROR, "Watch %s received %s", pipes_fileno[i].second, ip);
 #endif
-
-	      std::unordered_map<u_int32_t, WatchMatches*>::iterator it = watches_blacklist.find(key);
-
-	      if(it == watches_blacklist.end()) {
-		watches_blacklist[key] = new WatchMatches();
-#ifdef DEBUG
-		trace->traceEvent(TRACE_ERROR, "NEW %s", ip);
-#endif
-
-		ban_ipv4(key, true /* ban */, "ban-" + pipes_fileno[i].second, "");
-	      } else {
-		WatchMatches *m = it->second;
-
-		m->inc_matches();
-#ifdef DEBUG
-		trace->traceEvent(TRACE_ERROR, "UPDATE %s [%u macthes]", ip, m->get_num_matches());
-#endif
-	      }
+	      ip[strlen(ip)-1] = '\0'; /* Zap trailing /n */
+	      ban(ip, true, "ban-" + pipes_fileno[i].second, "");	     
 	    }
 	  }
 	}
@@ -263,7 +245,7 @@ void NwInterface::packetPollLoop() {
   for(u_int i=0, s = pipes.size(); i < s; i++)
     pclose(pipes[i]);
 
-  for(std::unordered_map<u_int32_t, WatchMatches*>::iterator it = watches_blacklist.begin();
+  for(std::unordered_map<std::string, WatchMatches*>::iterator it = watches_blacklist.begin();
       it != watches_blacklist.end(); it++)
     delete it->second;
 
@@ -506,8 +488,11 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
   bool daddr_private = (ipv4 ? isPrivateIPv4(daddr) : isPrivateIPv6(dst_host));
   Marker m, src_marker, dst_marker;
   u_int16_t _dport = dport;
-
+  bool drop = false;
+  
   sport = ntohs(sport), dport = ntohs(dport);
+ 
+  /* ******************************************************* */
   
   /* Check if sender/recipient are blacklisted */
   if(ipv4) {
@@ -517,7 +502,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
 
     in.s_addr = saddr;
     
-    /* Step 1 - For all ports/protocols, check if sender/recipient are blacklisted and if so, block this flow */
+    /* For all ports/protocols, check if sender/recipient are blacklisted and if so, block this flow */
     if((!saddr_private) && (conf->isBlacklistedIPv4(&in) || isBanned(src_host, &in, NULL))) {
       logFlow(proto_name,
 	      src_host, sport, src_country, src_cont, true,
@@ -528,7 +513,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
     }
 
     in.s_addr = daddr;
-    if((!daddr_private) && (conf->isBlacklistedIPv4(&in) || isBanned(src_host, &in, NULL))) {
+    if((!daddr_private) && (conf->isBlacklistedIPv4(&in) || isBanned(dst_host, &in, NULL))) {
       logFlow(proto_name,
 	      src_host, sport, src_country, src_cont, false,
 	      dst_host, dport, dst_country, dst_cont, true,
@@ -551,7 +536,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
     }
 
     inet_pton(AF_INET6, dst_host, &a);
-    if((!daddr_private) && (conf->isBlacklistedIPv6(&a) || isBanned(src_host,NULL,&a))) {
+    if((!daddr_private) && (conf->isBlacklistedIPv6(&a) || isBanned(dst_host,NULL,&a))) {
       logFlow(proto_name,
               src_host, sport, src_country, src_cont, false,
               dst_host, dport, dst_country, dst_cont, true,
@@ -561,10 +546,22 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
     }
   }
 
-  /* Step 2.0 - Check honeypot ports and (eventually) ban host */
-  bool drop = false;
+  /* ******************************************************* */
+  
+  /* Pass flows on ignored ports */
+  if(conf->isIgnoredPort(sport) || conf->isIgnoredPort(dport)) {
+    logFlow(proto_name,
+	    src_host, sport, src_country, src_cont, false,
+	    dst_host, dport, dst_country, dst_cont, false,
+	    true /* pass */);
 
-  if(!saddr_private && conf->isProtectedPort(dport)){
+    return(conf->getMarkerPass());
+  }
+
+  /* ******************************************************* */
+  
+  /* Check honeypot ports and (eventually) ban host */
+  if((!saddr_private) && conf->isProtectedPort(dport)) {
     drop = true, honey_banned.addAddress(src_host); // add banned host to patricia tree
     std::string h(src_host);  // string cast
     honey_banned_timesorted.push_back(h); // h is the "less older" banned host
@@ -580,11 +577,13 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
 	    dst_host, dport, dst_country, dst_cont, false,
 	    false /* drop */);
 
-    ban(src_host, ipv4 ? true : false, true /* ban */, "ban-honeypot", src_country);
+    ban(src_host, true /* ban */, "ban-honeypot", src_country);
     return(conf->getMarkerDrop());
   }
 
-  /* Step 2 - For TCP/UDP ignore traffic for non-monitored ports */
+  /* ******************************************************* */
+  
+  /* On TCP/UDP ignore traffic for non-monitored ports (country blacklists won't apply here) */
   switch(proto) {
   case IPPROTO_TCP:
     if((conf->isMonitoredTCPPort(sport)) || conf->isMonitoredTCPPort(dport))
@@ -605,11 +604,13 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
     break;
   }
 
+  /* ******************************************************* */
+  
   m = src_marker = dst_marker = conf->getDefaultPolicy();
 
-  /* Step 3 - For monitored TCP/UDP ports (and ICMP) check the country blacklist */
+  /* For monitored TCP/UDP ports (and ICMP) check the country blacklist */
   if((!saddr_private) && (geoip->lookup(src_host, src_country, sizeof(src_country), src_cont, sizeof(src_cont)))) {
-    src_marker = conf->getMarker(src_country,src_cont);
+    src_marker = conf->getMarker(src_country, src_cont);
   } else {
     /* Unknown or private IP address  */
     src_marker = conf->getMarkerPass();
@@ -621,10 +622,9 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
     /* Unknown or private IP address */
     dst_marker = conf->getMarkerPass();
   }
-
+  
   /* Final step: compute the flow verdict */
-  if((conf->isIgnoredPort(sport) || conf->isIgnoredPort(dport))
-     || ((src_marker == conf->getMarkerPass()) && (dst_marker == conf->getMarkerPass()))) {
+  if((src_marker == conf->getMarkerPass()) && (dst_marker == conf->getMarkerPass())) {
     m = conf->getMarkerPass();
 
     logFlow(proto_name,
@@ -632,12 +632,17 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
 	    dst_host, dport, dst_country, dst_cont, false,
 	    true /* pass */);
   } else {
+    std::string msg = "ban-monitored-port-" + std::to_string(dport);
+  
     m = conf->getMarkerDrop();
 
     logFlow(proto_name,
 	    src_host, sport, src_country, src_cont, false,
 	    dst_host, dport, dst_country, dst_cont, false,
 	    false /* drop */);
+
+    if((proto == IPPROTO_TCP) || (proto == IPPROTO_UDP)) /* Ignore non TCP/UDP */
+      ban(src_host, true /* ban */, msg, src_country);
   }
 
   return(m);
@@ -735,11 +740,12 @@ bool NwInterface::isBanned(char *host, struct in_addr *a4, struct in6_addr *a6){
 void NwInterface::honeyHarvesting(int n){
   list_it it;
   int x = n;
-
+  time_t now = time(NULL);
+		   
   while(x--) {
     // if( {list is empty} || {there aren't elements to be cleaned})
     if((it = honey_banned_timesorted.begin()) == honey_banned_timesorted.end() ||
-	difftime(time(NULL),honey_banned_time.find(*it)->second.first) <= banTimeout)
+	difftime(now,honey_banned_time.find(*it)->second.first) <= banTimeout)
       break;
 
     // else remove banned host
@@ -762,9 +768,9 @@ void NwInterface::honeyHarvesting(int n){
 void NwInterface::harvestWatches() {
   u_int32_t when = time(NULL) - MAX_IDLENESS;
 
-  for(std::unordered_map<u_int32_t, WatchMatches*>::iterator it = watches_blacklist.begin();  it != watches_blacklist.end();) {
+  for(std::unordered_map<std::string, WatchMatches*>::iterator it = watches_blacklist.begin();  it != watches_blacklist.end();) {
     if(it->second->ready_to_harvest(when)) {
-      ban_ipv4(it->first, false /* unban */, "unban", "");
+      ban((char*)it->first.c_str(), false /* unban */, "unban", "");
       delete it->second;
       watches_blacklist.erase(it++);    // or "it = m.erase(it)" since C++11
     } else
@@ -774,19 +780,29 @@ void NwInterface::harvestWatches() {
 
 /* **************************************************** */
 
-void NwInterface::ban(char *host, bool is_ipv4, bool ban_ip, std::string reason, std::string country) {
+void NwInterface::ban(char *host, bool ban_ip, std::string reason, std::string country) {
   char cmdbuf[128];
+  bool is_ipv4 = (strchr(host, ':') == NULL) ? true /* IPv4 */ : false /* IPv6 */;
+  std::unordered_map<std::string, WatchMatches*>::iterator it = watches_blacklist.find(std::string(host));
+  
+  if(it == watches_blacklist.end()) {
+    watches_blacklist[host] = new WatchMatches();
 
-  snprintf(cmdbuf, sizeof(cmdbuf), "/usr/sbin/ip%stables %s IPT_GEOFENCE_BLACKLIST -s %s -j DROP",
-	   is_ipv4 ? "" : "6",
-	   ban_ip ? "-I" : "-D", host);
-
-  logHostBan(host, ban_ip, reason, country);
-
-  try {
-    execCmd(cmdbuf);
-  } catch (...) {
-    trace->traceEvent(TRACE_ERROR, "Error while executing '%s'", cmdbuf);
+    snprintf(cmdbuf, sizeof(cmdbuf), "/usr/sbin/ip%stables %s IPT_GEOFENCE_BLACKLIST -s %s -j DROP",
+	     is_ipv4 ? "" : "6",
+	     ban_ip ? "-I" : "-D", host);
+    
+    logHostBan(host, ban_ip, reason, country);
+    
+    try {
+      execCmd(cmdbuf);
+    } catch (...) {
+      trace->traceEvent(TRACE_ERROR, "Error while executing '%s'", cmdbuf);
+    }    
+  } else {
+    WatchMatches *m = it->second;
+    
+    m->inc_matches(); /* TODO increment unban time */
   }
 }
 
@@ -794,22 +810,18 @@ void NwInterface::ban(char *host, bool is_ipv4, bool ban_ip, std::string reason,
 
 void NwInterface::ban_ipv4(u_int32_t ip4 /* network byte order */, bool ban_ip,
 			   std::string reason, std::string country) {
-  char ipbuf[32], *host;
+  char ipbuf[32], *host = Utils::intoaV4(ntohl(ip4), ipbuf, sizeof(ipbuf));
 
-  host = Utils::intoaV4(ntohl(ip4), ipbuf, sizeof(ipbuf));
-
-  ban(host, true, ban_ip, reason, country);
+  ban(host, ban_ip, reason, country);
 }
 
 /* **************************************************** */
 
 void NwInterface::ban_ipv6(struct ndpi_in6_addr ip6, bool ban_ip,
 			   std::string reason, std::string country) {
-  char ipbuf[64], *host;
+  char ipbuf[64], *host = Utils::intoaV6(ip6, 128, ipbuf, sizeof(ipbuf));
 
-  host = Utils::intoaV6(ip6, 128, ipbuf, sizeof(ipbuf));
-
-  ban(host, false, ban_ip, reason, country);
+  ban(host, ban_ip, reason, country);
 }
 
 /* **************************************************** */
