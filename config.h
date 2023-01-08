@@ -51,7 +51,7 @@
 #define HAVE_ZMQ 1
 
 /* release version */
-#define IPT_RELEASE "1.0.230107"
+#define IPT_RELEASE "1.0.230108"
 
 /* Define to the address where bug reports for this package should be sent. */
 #define PACKAGE_BUGREPORT ""

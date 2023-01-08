@@ -121,7 +121,7 @@ void ZMQ::sendMessage(const char *topic, const char *msg) {
   if(zmq_send(zmq_socket_handler, msg, msg_hdr.size, 0) != msg_hdr.size)
     trace->traceEvent(TRACE_WARNING, "ZMQ send errror");
   else
-    trace->traceEvent(TRACE_NORMAL, "Sent [topic: %s][msg: %s]", msg_hdr.url, msg);
+    trace->traceEvent(TRACE_INFO, "Sent [topic: %s][msg: %s]", msg_hdr.url, msg);
 }
 
 /* ******************************* */

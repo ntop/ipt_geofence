@@ -28,7 +28,7 @@ Configuration::Configuration() {
   marker_pass.setValue(1000); marker_drop.setValue(2000);
   default_policy = marker_pass; configured = false;
   all_tcp_ports = all_udp_ports = true;
-  host_ip   = Utils::execCmd("/bin/hostname -I");
+  host_ip   = Utils::execCmd("/bin/hostname -I | cut -f 1 -d ' '"); /* Pick only the first IP address of the list */
   host_name = Utils::execCmd("/bin/hostname");
   running = true;
 

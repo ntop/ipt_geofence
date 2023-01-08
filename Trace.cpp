@@ -91,6 +91,8 @@ void Trace::traceEvent(int eventTraceLevel, const char* _file,
 	syslog(LOG_ERR, "%s", out_buf);
       else if(eventTraceLevel == 1 /* TRACE_WARNING */)
 	syslog(LOG_WARNING, "%s", out_buf);
+      else if(eventTraceLevel == 2 /* TRACE_NORMAL */)
+	syslog(LOG_NOTICE, "%s", out_buf);
     }
 
     va_end(va_ap);

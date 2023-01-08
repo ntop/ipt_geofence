@@ -55,9 +55,10 @@ class NwInterface {
 	       char *src_host, u_int16_t sport, char *src_country, char *src_continent, bool src_blacklisted,
 	       char *dst_host, u_int16_t dport, char *dst_country, char *dst_continent, bool dst_blacklisted,
 	       bool pass_verdict);
-  void logHostBan(char *host_ip, bool ban_ip, std::string reason);
+  void logHostBan(char *host_ip, bool ban_ip, std::string reason, std::string country);
   
   bool isPrivateIPv4(u_int32_t addr /* network byte order */);
+  bool isBroadMulticastIPv4(u_int32_t addr /* network byte order */);
   bool isPrivateIPv6(const char *ip6addr);
   void reloadConfLoop();
   u_int32_t computeNextReloadTime();
@@ -66,9 +67,9 @@ class NwInterface {
   void harvestWatches();
   char* intoaV4(unsigned int addr, char* buf, u_short bufLen);
   char* intoaV6(struct ndpi_in6_addr ipv6, u_int8_t bitmask, char* buf, u_short bufLen);
-  void ban(char *host, bool is_ipv4, bool ban_ip);
-  void ban_ipv4(u_int32_t ip4 /* network byte order */, bool ban_ip);
-  void ban_ipv6(struct ndpi_in6_addr ipv6, bool ban_ip);
+  void ban(char *host, bool is_ipv4, bool ban_ip, std::string reason, std::string country);
+  void ban_ipv4(u_int32_t ip4 /* network byte order */, bool ban_ip, std::string reason, std::string country);
+  void ban_ipv6(struct ndpi_in6_addr ipv6, bool ban_ip, std::string reason, std::string country);
   std::string execCmd(const char* cmd);
   void addCommonJSON(Json::Value *root);
   void logStartStop(bool start);

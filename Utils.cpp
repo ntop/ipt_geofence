@@ -137,7 +137,7 @@ std::string Utils::execCmd(const char *cmd) {
 
 /* ****************************************************** */
 
-#define CURL_DEBUG
+/* #define CURL_DEBUG */
 
 int Utils::sendTelegramMessage(std::string bot_token, std::string chat_id, std::string message) {
   CURL *curl = curl_easy_init();
