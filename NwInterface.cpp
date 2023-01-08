@@ -21,7 +21,8 @@
 
 #include "include.h"
 
-#define TOO_MANY_INVALID_ATTEMPTS   3
+#define TOO_MANY_INVALID_ATTEMPTS    3
+#define NUM_PURGE_LOOP             300
 
 /* #define DEBUG */
 
@@ -140,7 +141,8 @@ void NwInterface::packetPollLoop() {
   std::unordered_map<std::string,std::string> *watches = conf->get_watches();
   std::vector<FILE*> pipes;
   std::vector<std::pair<int, std::string>> pipes_fileno;
-
+  u_int num_loops = 0;
+  
   /* Spawn reload config thread in background */
   reloaderThread = new std::thread(&NwInterface::reloadConfLoop, this);
 
@@ -170,7 +172,7 @@ void NwInterface::packetPollLoop() {
   while(isRunning()) {
     fd_set mask;
     struct timeval wait_time;
-    int max_fd = fd, num;
+    int max_fd = fd, num, id;
 
     FD_ZERO(&mask);
     FD_SET(fd, &mask);
@@ -185,9 +187,10 @@ void NwInterface::packetPollLoop() {
     }
 
     wait_time.tv_sec = 1, wait_time.tv_usec = 0;
-
-    num = select(max_fd+1, &mask, 0, 0, &wait_time);
-
+    
+    id = num = select(max_fd+1, &mask, 0, 0, &wait_time);
+    num_loops++;
+    
     if(num > 0) {
       if(FD_ISSET(fd, &mask)) {
 	/* Socket data */
@@ -226,9 +229,12 @@ void NwInterface::packetPollLoop() {
 	  }
 	}
       }
-    } else {
+    }
+
+    if((id == 0) || (num_loops > NUM_PURGE_LOOP)) {
       honeyHarvesting(10);
       harvestWatches();
+      num_loops = 0;
     }
 
     if(shadowConf != NULL) {
@@ -768,8 +774,22 @@ void NwInterface::honeyHarvesting(int n){
 void NwInterface::harvestWatches() {
   u_int32_t when = time(NULL) - MAX_IDLENESS;
 
-  for(std::unordered_map<std::string, WatchMatches*>::iterator it = watches_blacklist.begin();  it != watches_blacklist.end();) {
-    if(it->second->ready_to_harvest(when)) {
+#ifdef DEBUG
+  trace->traceEvent(TRACE_NORMAL, "NwInterface::harvestWatches()");
+#endif
+  
+  for(std::unordered_map<std::string, WatchMatches*>::iterator it = watches_blacklist.begin(); it != watches_blacklist.end();) {
+    WatchMatches *match = it->second;
+
+#ifdef DEBUG
+    trace->traceEvent(TRACE_NORMAL, "last_match=%u / now=%u [to go: %d]",
+		      match->get_last_match(), when, (match->get_last_match() - when));
+#endif
+    
+    if(match->ready_to_harvest(when)) {
+#ifdef DEBUG
+      trace->traceEvent(TRACE_NORMAL, "Harvesting");
+#endif
       ban((char*)it->first.c_str(), false /* unban */, "unban", "");
       delete it->second;
       watches_blacklist.erase(it++);    // or "it = m.erase(it)" since C++11
@@ -784,25 +804,47 @@ void NwInterface::ban(char *host, bool ban_ip, std::string reason, std::string c
   char cmdbuf[128];
   bool is_ipv4 = (strchr(host, ':') == NULL) ? true /* IPv4 */ : false /* IPv6 */;
   std::unordered_map<std::string, WatchMatches*>::iterator it = watches_blacklist.find(std::string(host));
-  
-  if(it == watches_blacklist.end()) {
-    watches_blacklist[host] = new WatchMatches();
 
-    snprintf(cmdbuf, sizeof(cmdbuf), "/usr/sbin/ip%stables %s IPT_GEOFENCE_BLACKLIST -s %s -j DROP",
-	     is_ipv4 ? "" : "6",
-	     ban_ip ? "-I" : "-D", host);
+  if(ban_ip) {
+    /* Ban */
     
-    logHostBan(host, ban_ip, reason, country);
+    if(it == watches_blacklist.end()) {
+      watches_blacklist[host] = new WatchMatches();
+      
+      snprintf(cmdbuf, sizeof(cmdbuf), "/usr/sbin/ip%stables -I IPT_GEOFENCE_BLACKLIST -s %s -j DROP",
+	       is_ipv4 ? "" : "6", host);
+
+#ifdef DEBUG
+      trace->traceEvent(TRACE_NORMAL, "%s", cmdbuf);
+#endif
+      
+      logHostBan(host, ban_ip, reason, country);
+    
+      try {
+	execCmd(cmdbuf);
+      } catch (...) {
+	trace->traceEvent(TRACE_ERROR, "Error while executing '%s'", cmdbuf);
+      }    
+    } else {
+      WatchMatches *m = it->second;
+      
+      m->inc_matches(); /* TODO increment unban time */
+    }
+  } else {
+    /* Unban */
+
+    snprintf(cmdbuf, sizeof(cmdbuf), "/usr/sbin/ip%stables -D IPT_GEOFENCE_BLACKLIST -s %s -j DROP",
+	     is_ipv4 ? "" : "6", host);
+
+#ifdef DEBUG
+    trace->traceEvent(TRACE_NORMAL, "%s", cmdbuf);
+#endif
     
     try {
       execCmd(cmdbuf);
     } catch (...) {
       trace->traceEvent(TRACE_ERROR, "Error while executing '%s'", cmdbuf);
-    }    
-  } else {
-    WatchMatches *m = it->second;
-    
-    m->inc_matches(); /* TODO increment unban time */
+    }        
   }
 }
 
