@@ -27,8 +27,8 @@ class Marker {
   u_int16_t value;
 
  public:
-  inline void setValue(u_int16_t v) { value=v;       }
-  operator u_int16_t()              { return(value); }
+  inline void      set(u_int16_t v) { value=v;       }
+  inline u_int16_t get()            { return(value); }
 };
 
 

@@ -37,9 +37,6 @@ class NwInterface {
   Configuration *conf, *shadowConf = NULL;
   GeoIP *geoip;
   std::thread *reloaderThread;
-  std::list<std::string> honey_banned_timesorted;
-  std::map<std::string, std::pair<time_t, list_it>> honey_banned_time;
-  Blacklists honey_banned;
   double banTimeout = 900.0; // 15 minutes
   std::unordered_map<std::string, WatchMatches*> watches_blacklist;
   std::string confPath;
@@ -58,12 +55,11 @@ class NwInterface {
   void logHostBan(char *host_ip, bool ban_ip, std::string reason, std::string country);
   
   bool isPrivateIPv4(u_int32_t addr /* network byte order */);
+  bool isPrivateIPv6(struct in6_addr ip6addr);
   bool isBroadMulticastIPv4(u_int32_t addr /* network byte order */);
-  bool isPrivateIPv6(const char *ip6addr);
   void reloadConfLoop();
   u_int32_t computeNextReloadTime();
   bool isBanned(char *host, struct in_addr *a4, struct in6_addr *a6);
-  void honeyHarvesting(int n);
   void harvestWatches();
   char* intoaV4(unsigned int addr, char* buf, u_short bufLen);
   char* intoaV6(struct ndpi_in6_addr ipv6, u_int8_t bitmask, char* buf, u_short bufLen);

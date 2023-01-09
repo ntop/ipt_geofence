@@ -33,7 +33,7 @@ class Configuration {
  private:
   std::unordered_map<u_int16_t, Marker> ctrs_conts;
   std::unordered_map<u_int16_t, bool>   tcp_ports, udp_ports, ignored_ports, hp_ports, hp_all_except_ports;
-  std::unordered_map<std::string /* name */, std::string /* cmd */> watches;
+  std::unordered_map<std::string /* name */, std::pair<std::string /* cmd */, bool /* true=geo-ip, false=block IP */> > watches;
   unsigned int nfq_queue_id;
   Marker marker_unknown;
   Marker marker_pass;
@@ -82,7 +82,8 @@ class Configuration {
   inline bool isBlacklistedIPv4(struct in_addr *addr)     { return(blacklists.isBlacklistedIPv4(addr)) ;}
   inline bool isBlacklistedIPv6(struct in6_addr *addr6)   { return(blacklists.isBlacklistedIPv6(addr6));}
   inline void loadIPsetFromURL(const char* url)                     { blacklists.loadIPsetFromURL(url); }
-  inline std::unordered_map<std::string,std::string>* get_watches() { return(&watches);                 }
+  inline std::unordered_map<std::string, std::pair<std::string, bool> >* get_watches()
+                                                                    { return(&watches);                 }
   inline const char *getHostIP()                                    { return(host_ip.c_str());          }
   inline const char *getHostName()                                  { return(host_name.c_str());        }
   int sendTelegramMessage(std::string msg);

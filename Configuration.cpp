@@ -24,8 +24,8 @@
 /* ******************************************************* */
 
 Configuration::Configuration() {
-  nfq_queue_id = 0, marker_unknown.setValue(0); 
-  marker_pass.setValue(1000); marker_drop.setValue(2000);
+  nfq_queue_id = 0;
+  marker_unknown.set(0), marker_pass.set(1000); marker_drop.set(2000);
   default_policy = marker_pass; configured = false;
   all_tcp_ports = all_udp_ports = true;
   host_ip   = Utils::execCmd("/bin/hostname -I | cut -f 1 -d ' '"); /* Pick only the first IP address of the list */
@@ -77,24 +77,24 @@ bool Configuration::readConfigFile(const char *path) {
   if(!root["markers"].empty()) {
     if(root["markers"]["pass"].empty()) {
       trace->traceEvent(TRACE_INFO, "Missing %s from %s: using default %u", "pass", path, DEFAULT_PASS_MARKER);
-      marker_pass.setValue(DEFAULT_PASS_MARKER);
+      marker_pass.set(DEFAULT_PASS_MARKER);
     } else {
-      marker_pass.setValue(root["markers"]["pass"].asUInt());
+      marker_pass.set(root["markers"]["pass"].asUInt());
     }
 
     if(root["markers"]["drop"].empty()) {
       trace->traceEvent(TRACE_INFO, "Missing %s from %s: using default %u", "drop", path, DEFAULT_DROP_MARKER);
-      marker_drop.setValue(DEFAULT_DROP_MARKER);
+      marker_drop.set(DEFAULT_DROP_MARKER);
     } else {
-      marker_drop.setValue(root["markers"]["drop"].asUInt());
+      marker_drop.set(root["markers"]["drop"].asUInt());
     }
 
-    if(marker_drop==marker_pass ) {
+    if(marker_drop.get() == marker_pass.get()) {
       trace->traceEvent(TRACE_ERROR, "Markers values must be distinct in %s", path);
       return(false);
     }
 
-    if(marker_drop<=0 || marker_pass<=0 ) {
+    if((marker_drop.get() == 0) || (marker_pass.get() == 0)) {
       trace->traceEvent(TRACE_ERROR, "Markers values must be greater than 0 in %s", path);
       return(false);
     }
@@ -179,7 +179,7 @@ bool Configuration::readConfigFile(const char *path) {
   if(all_tcp_ports) trace->traceEvent(TRACE_INFO, "All TCP ports will be monitored");
   if(all_udp_ports) trace->traceEvent(TRACE_INFO, "All UDP ports will be monitored");
 
-  std::string json_policy_str = default_policy == marker_drop ? "drop" : "pass";
+  std::string json_policy_str = (default_policy.get() == marker_drop.get()) ? "drop" : "pass";
 
   if(!root["policy"].empty() && !root["policy"][json_policy_str].empty()) {
     Json::Value json_policy_obj = root["policy"][json_policy_str];
@@ -207,12 +207,16 @@ bool Configuration::readConfigFile(const char *path) {
       Json::Value item = root["watches"][i];
       std::string name = item["name"].asString();
       std::string cmd  = item["cmd"].asString();
+      bool geo_ip      = false;
 
+      if((!item["mode"].empty()) && (item["mode"].asString() == "geo-ip"))
+	geo_ip = true;
+      
       if(name.empty() || cmd.empty()) {
 	trace->traceEvent(TRACE_WARNING, "Invalid watch format");
 	break;
       } else
-	watches[name] = cmd;
+	watches[name] = std::make_pair(cmd, geo_ip);
     }
   }
 
