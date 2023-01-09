@@ -10,10 +10,12 @@ pkg:
 	cd ../..; make; cd -
 	if test -e "${IPT_GEOFENCE_BUILD}"; then /bin/rm -fr ${IPT_GEOFENCE_BUILD}; fi
 	mkdir -p ${IPT_GEOFENCE_BUILD}/usr/sbin
-	mkdir -p ${IPT_GEOFENCE_BUILD}/usr/share/doc/ipt_geofence/examples
+	mkdir -p ${IPT_GEOFENCE_BUILD}/usr/share/ipt_geofence/examples
+	mkdir -p ${IPT_GEOFENCE_BUILD}/usr/share/ipt_geofence/scripts/
 	install -m755 ../../ipt_geofence ${IPT_GEOFENCE_BUILD}/usr/sbin/
 	strip ${IPT_GEOFENCE_BUILD}/usr/sbin/ipt_geofence
-	install -m644 ../../ipt_config_utils/* ${IPT_GEOFENCE_BUILD}/usr/share/doc/ipt_geofence/examples/
+	install -m644 ../../ipt_config_utils/* ${IPT_GEOFENCE_BUILD}/usr/share/ipt_geofence/examples/
+	install -m755 ../../scripts/*.py ${IPT_GEOFENCE_BUILD}/usr/share/ipt_geofence/scripts/
 	@/bin/rm -f ../ipt_geofence*.deb
 	dpkg-buildpackage -rfakeroot -d -us -uc @BUILDPACKAGE_EXTRA@
 	dpkg-sig --sign builder -k D1EB60BE ../ipt-geofence_*deb

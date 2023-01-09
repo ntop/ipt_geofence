@@ -30,12 +30,8 @@
 	"https://sslbl.abuse.ch/blacklist/sslipblacklist.txt"
     ],
     "watches": [
-	{ "name" : "postfix",   "cmd": "tail -n 0 -F /var/log/mail.log | grep --line-buffered 'failure'          | sed -u 's/.*\\[\\([^]]*\\)\\].*/\\1/g'" },
-	{ "name" : "postfix-2", "cmd": "tail -n 0 -F /var/log/mail.log | grep --line-buffered 'no auth attempts' | sed -u 's/.*\\[\\([^]]*\\)\\].*/\\1/g'" },
-        { "name" : "ssh",       "cmd": "tail -n 0 -F /var/log/auth.log | grep --line-buffered 'Connection closed by authenticating user' | stdbuf --output=L awk '{print $12}'" },
-	{ "name" : "ssh-2",     "cmd": "tail -n 0 -F /var/log/auth.log | grep --line-buffered 'authentication failure' | stdbuf --output=L awk -F'[/= ]' '{print $21}'"         },
-	{ "name" : "ssh-3",     "cmd": "tail -n 0 -F /var/log/auth.log | grep --line-buffered 'Failed password for invalid' | stdbuf --output=L awk -F'[/= ]' '{print $14}'"    },
-	{ "name" : "ssh-4",     "cmd": "tail -n 0 -F /var/log/auth.log | grep -v --line-buffered 'invalid' | grep --line-buffered 'Failed password for' | stdbuf --output=L awk -F'[/= ]' '{print $12}'" }
+	{ "name" : "mail", "cmd": "/usr/share/ipt_geofence/scripts/mail.py" },
+	{ "name" : "auth", "cmd": "/usr/share/ipt_geofence/scripts/auth.py" }
     ],
     "telegram": {
 	"bot_token": "",
