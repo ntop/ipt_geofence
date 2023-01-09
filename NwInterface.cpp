@@ -455,7 +455,7 @@ void NwInterface::logStartStop(bool start) {
   Json::FastWriter writer;
 
   addCommonJSON(&root);
-  root["reason"] = start ? "start" : "stop";
+  root["action"] = start ? "start" : "stop";
 
   json_txt = writer.write(root);
 
