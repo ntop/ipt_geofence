@@ -32,5 +32,12 @@ try:
             res = re.findall(r'rip=.*? ', line)
             ip = res[0][4:-2].strip()
             print(ip, flush=True)
+        elif("too many errors after RCPT" in line):
+            # postfix/smtpd[2659725]: too many errors after RCPT from unknown[13.110.231.232]
+            #print(line)
+            res = re.findall(r'\[.*?\]', line)
+            ip = res[1][1:-1]
+            print(ip, flush=True)
+            
 except:
     print("")
