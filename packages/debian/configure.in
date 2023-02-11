@@ -9,7 +9,7 @@ SHORT_MACHINE=`uname -m | cut -b1-3`
 
 DEBIAN_VERSION=`cat /etc/debian_version | grep "^8" | wc -l`
 
-EXTRA_DEP="libnetfilter-queue1, libmaxminddb0, libjsoncpp1, libcurl4, conntrack"
+EXTRA_DEP="libnetfilter-queue1, libmaxminddb0, libjsoncpp25, libcurl4, conntrack"
 BUILDPACKAGE_EXTRA=
 
 AC_CHECK_LIB([zmq], [zmq_socket_monitor])
