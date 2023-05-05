@@ -32,7 +32,7 @@ if [ ! -f /etc/ipt_geofence/config.json ]; then
 fi
 
 if [ ! -f /etc/ipt_geofence/ipt_setup.sh ]; then
-    cp /usr/share/doc/ipt_geofence/examples/multichain.sh /etc/ipt_geofence/ipt_setup.sh
+    cp /usr/share/ipt_geofence/examples/multichain.sh /etc/ipt_geofence/ipt_setup.sh
     chmod gou+x /etc/ipt_geofence/ipt_setup.sh
 fi
 
