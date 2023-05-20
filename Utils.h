@@ -24,6 +24,7 @@
 
 class Utils {
  public:
+  static std::string ltrim(std::string &s);
   static bool  toHex(char *in, u_int in_len, char *out, u_int out_len);
   static bool  fromHex(char *in, u_int in_len, char *out, u_int out_len);
   static char* intoaV4(unsigned int addr, char* buf, u_short bufLen);

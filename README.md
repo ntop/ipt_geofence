@@ -4,9 +4,13 @@ Geographical host protection for Linux
 This tool allows you to protect your host/network by preventing communications with unwanted countries (aka geofencing). Furthermore it allows you to specify a list of blacklists that enable you to drop well-known attackers.
 
 # Prerequisites
-You need to install GeoIP libraries, Netfilter Queue, curl and JSONCPP packages in addition to the compiler. For Ubuntu/Debian based systems do:
+You need to install GeoIP libraries, Netfilter Queue, curl and JSONCPP packages in addition to the compiler.
 
+For Ubuntu/Debian based systems do:
 ``sudo apt-get install build-essential autoconf automake autogen libmaxminddb-dev libcurl4-openssl-dev libnetfilter-queue-dev libjsoncpp-dev``
+
+On FreeBSD
+``pkg install -y autoconf automake curl libmaxminddb jsoncpp libzmq4``
 
 The tool also needs a GeoIP database that you can obtain from sites such as [db-ip](https://db-ip.com/db/download/ip-to-country-lite) or [maxmind](https://dev.maxmind.com/geoip/geolite2-free-geolocation-data?lang=en).
 

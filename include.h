@@ -35,7 +35,9 @@
 #include <errno.h>
 #include <pthread.h>
 #include <signal.h>
+#ifdef __linux__
 #include <linux/types.h>
+#endif
 #include <netinet/ip.h>
 #include <netinet/udp.h>
 #include <netinet/tcp.h>
@@ -45,10 +47,18 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/mman.h>
+#ifdef __linux__
 #include <linux/netfilter.h> /* for NF_ACCEPT */
 #include <libnfnetlink/libnfnetlink.h>
 #include <libnetfilter_queue/libnetfilter_queue.h>
+#endif
+
+#ifdef __linux__
 #include <jsoncpp/json/json.h>
+#else
+#include <json/json.h>
+#endif
+
 #include <curl/curl.h>
 #include <maxminddb.h>
 #include <ndpi_api.h>

@@ -27,8 +27,10 @@
 /* #define DEBUG */
 
 /* Forward */
+#ifdef __linux__
 int netfilter_callback(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg,
 		       struct nfq_data *nfa, void *data);
+#endif
 
 /* **************************************************** */
 
@@ -38,6 +40,8 @@ NwInterface::NwInterface(u_int nf_device_id,
   conf = _c, geoip = _g, confPath = c_path;
   reloaderThread = NULL;
   ifaceRunning = false;
+
+#ifdef __linux__
   queueId = nf_device_id, nfHandle = nfq_open();
 
   if(nfHandle == NULL) {
@@ -76,7 +80,8 @@ NwInterface::NwInterface(u_int nf_device_id,
   }
 
   nf_fd = nfq_fd(nfHandle);
-
+#endif
+  
   if(!conf->getZMQUrl().empty()) {
     std::string url = conf->getZMQUrl();
     std::string enc = conf->getZMQEncryptionKey();
@@ -96,19 +101,24 @@ NwInterface::~NwInterface() {
     delete reloaderThread;
   }
 
+#ifdef __linux__
   nf_fd = 0;
+#endif
 
   flush_ban();
 
+#ifdef __linux__
   if(queueHandle) nfq_destroy_queue(queueHandle);
   if(nfHandle)    nfq_close(nfHandle);
-
+#endif
+  
   logStartStop(false /* stop */);
   if(zmq)         delete zmq;
 }
 
 /* **************************************************** */
 
+#ifdef __linux__
 int netfilter_callback(struct nfq_q_handle *qh,
 		       struct nfgenmsg *nfmsg,
 		       struct nfq_data *nfa,
@@ -132,6 +142,7 @@ int netfilter_callback(struct nfq_q_handle *qh,
 
   return(nfq_set_verdict2(qh, id, NF_ACCEPT, marker, 0, NULL));
 }
+#endif
 
 /* **************************************************** */
 
@@ -169,9 +180,11 @@ void NwInterface::packetPollLoop() {
   ifaceRunning = true;
   logStartStop(true /* start */);
 
+#ifdef __linux__
   h = get_nfHandle();
   fd = get_fd();
-
+#endif
+  
   while(isRunning()) {
     fd_set mask;
     struct timeval wait_time;
@@ -195,6 +208,7 @@ void NwInterface::packetPollLoop() {
     num_loops++;
 
     if(num > 0) {
+#ifdef __linux__
       if(FD_ISSET(fd, &mask)) {
 	/* Socket data */
 	char pktBuf[8192] __attribute__ ((aligned));
@@ -214,7 +228,8 @@ void NwInterface::packetPollLoop() {
 
 	num--;
       }
-
+#endif
+      
       if(num > 0) {
 	/* Watches */
 
@@ -247,7 +262,7 @@ void NwInterface::packetPollLoop() {
 		    ban(ip, true, "ban-" + pipes_fileno[i].second, ip_country);
 		} else {
 		  /* IPv6 */
-		  struct in6_addr ip_addr;
+		  struct ndpi_in6_addr ip_addr;
 
 		  inet_pton(AF_INET6, ip, &ip_addr);
 
@@ -303,19 +318,19 @@ Marker NwInterface::dissectPacket(const u_char *payload, u_int payload_len) {
   u_int16_t ip_offset = 0, vlan_id = 0 /* FIX */;
 
   if(payload_len >= ip_offset) {
-    struct iphdr *iph = (struct iphdr *)&payload[ip_offset];
+    struct ndpi_iphdr *iph = (struct ndpi_iphdr *)&payload[ip_offset];
     bool ipv4 = false, ipv6 = false;
-
-    struct tcphdr *tcph = NULL;
-    struct udphdr *udph = NULL;
+    struct ndpi_tcphdr *tcph = NULL;
+    struct ndpi_udphdr *udph = NULL;
     u_int16_t src_port, dst_port;
     u_int8_t proto, ip_payload_offset = 40 /* ipv6 is 40B long */;
     char src[INET6_ADDRSTRLEN] = {}, dst[INET6_ADDRSTRLEN] = {};
 
     if(iph->version == 6) {
+      struct ndpi_ipv6hdr *ip6h = (struct ndpi_ipv6hdr *)&payload[ip_offset];
+
       ipv6 = true;
-      struct ip6_hdr *ip6h = (struct ip6_hdr *)&payload[ip_offset];
-      proto = ip6h->ip6_nxt;
+      proto = ip6h->ip6_hdr.ip6_un1_nxt;
 
       // ipv6 address stringification
       inet_ntop(AF_INET6, &(ip6h->ip6_src), src, sizeof(src));
@@ -343,11 +358,11 @@ Marker NwInterface::dissectPacket(const u_char *payload, u_int payload_len) {
 
     switch (proto) {
     case IPPROTO_TCP:
-      tcph = (struct tcphdr *)(nxt);
+      tcph = (struct ndpi_tcphdr *)(nxt);
       src_port = tcph->source, dst_port = tcph->dest;
       break;
     case IPPROTO_UDP:
-      udph = (struct udphdr *)(nxt);
+      udph = (struct ndpi_udphdr *)(nxt);
       src_port = udph->source, dst_port = udph->dest;
       break;
     default:
@@ -405,9 +420,9 @@ bool NwInterface::isBroadMulticastIPv4(u_int32_t addr /* network byte order */) 
 
 /* **************************************************** */
 
-bool NwInterface::isPrivateIPv6(struct in6_addr addr) {
+bool NwInterface::isPrivateIPv6(struct ndpi_in6_addr addr) {
   bool is_link_local, is_unique_local;
-  u_int32_t first_byte = ntohl(addr.s6_addr32[0]);
+  u_int32_t first_byte = ntohl(addr.u6_addr.u6_addr32[0]);
   
   is_link_local   = (first_byte & (0xffc00000)) == (0xfe800000); // check the first 10 bits
   is_unique_local = (first_byte & (0xfe000000)) == (0xfc000000); // check the first 7 bits
@@ -563,7 +578,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
       return(conf->getMarkerDrop());
     }
   } else if(ipv6) {
-    struct in6_addr a;
+    struct ndpi_in6_addr a;
 
     inet_pton(AF_INET6, src_host, &a);
 

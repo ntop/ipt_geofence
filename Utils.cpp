@@ -112,6 +112,13 @@ char* Utils::intoaV6(struct ndpi_in6_addr ipv6, u_int8_t bitmask, char* buf, u_s
 
 /* ****************************************************** */
 
+std::string Utils::ltrim(std::string &s) {
+  s.erase(s.begin(), std::find_if(s.begin(), s.end(), [](int c) {return !std::isspace(c);}));
+  return s;
+}
+
+/* ****************************************************** */
+
 std::string Utils::execCmd(const char *cmd) {
   std::string command(cmd);
   std::array<char, 128> buffer;
@@ -127,11 +134,8 @@ std::string Utils::execCmd(const char *cmd) {
     pclose(pipe);
   }
 
-  /* ltrim */
-  result.erase(std::find_if(result.rbegin(), result.rend(),
-			    std::not1(std::ptr_fun<int, int>(std::isspace))).base(),
-	       result.end());
-  
+  ltrim(result);
+	       
   return(result);
 }
 

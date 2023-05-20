@@ -76,10 +76,10 @@ bool Blacklists::isBlacklistedIPv4(struct in_addr *addr) {
 
 /* ****************************************** */
 
-bool Blacklists::isBlacklistedIPv6(struct in6_addr *addr6) {
+bool Blacklists::isBlacklistedIPv6(struct ndpi_in6_addr *addr6) {
   ndpi_prefix_t prefix;
 
-  ndpi_fill_prefix_v6(&prefix, addr6, 128, ptree_v6->maxbits);
+  ndpi_fill_prefix_v6(&prefix, (const struct in6_addr*)addr6, 128, ptree_v6->maxbits);
 
   if(ndpi_patricia_search_best(ptree_v6, &prefix) != NULL)
     return(true);
@@ -93,7 +93,7 @@ bool Blacklists::findAddress(char *addr) {
   ndpi_prefix_t prefix;
 
   if(strchr(addr, ':') != NULL) {
-    struct in6_addr addr6;
+    struct ndpi_in6_addr addr6;
 
     if(inet_pton(AF_INET6, addr, &addr6))
       return(isBlacklistedIPv6(&addr6));
@@ -117,7 +117,7 @@ void Blacklists::addAddress(char *net) {
     bits = atoi(&_bits[1]), _bits[0] = '\0';
 
   if(strchr(net, ':') != NULL) {
-    struct in6_addr addr6;
+    struct ndpi_in6_addr addr6;
 
     if(bits == 0) bits = 128;
 
@@ -135,7 +135,7 @@ void Blacklists::addAddress(char *net) {
 
 /* ****************************************** */
 
-void Blacklists::removeAddress(char *net){
+void Blacklists::removeAddress(char *net) {
   char *_bits = strchr(net, '/');
   u_int bits = 0;
   ndpi_prefix_t prefix;
@@ -144,12 +144,12 @@ void Blacklists::removeAddress(char *net){
     bits = atoi(&_bits[1]), _bits[0] = '\0';
 
   if(strchr(net, ':') != NULL) {
-    struct in6_addr addr6;
+    struct ndpi_in6_addr addr6;
 
     if(bits == 0) bits = 128;
 
     if(inet_pton(AF_INET6, net, &addr6)){
-      ndpi_fill_prefix_v6(&prefix, &addr6, bits, ptree_v6->maxbits);
+      ndpi_fill_prefix_v6(&prefix, (const struct in6_addr*)&addr6, bits, ptree_v6->maxbits);
       ndpi_patricia_node_t *n = ndpi_patricia_search_best(ptree_v6, &prefix);
       if (n) ndpi_patricia_remove(ptree_v6,n);
     }

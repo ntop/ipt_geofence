@@ -28,10 +28,12 @@ typedef std::list<std::string>::iterator list_it;
 
 class NwInterface {
  private:
+#ifdef __linux__
   int queueId;
   struct nfq_handle *nfHandle;
   struct nfq_q_handle *queueHandle;
   int nf_fd;
+#endif
   pthread_t pollLoop;
   bool ifaceRunning;
   Configuration *conf, *shadowConf = NULL;
@@ -55,14 +57,14 @@ class NwInterface {
   void logHostBan(char *host_ip, bool ban_ip, std::string reason, std::string country);
   
   bool isPrivateIPv4(u_int32_t addr /* network byte order */);
-  bool isPrivateIPv6(struct in6_addr ip6addr);
+  bool isPrivateIPv6(struct ndpi_in6_addr ip6addr);
   bool isBroadMulticastIPv4(u_int32_t addr /* network byte order */);
   void reloadConfLoop();
   u_int32_t computeNextReloadTime();
-  bool isBanned(char *host, struct in_addr *a4, struct in6_addr *a6);
+  bool isBanned(char *host, struct in_addr *a4, struct ndpi_in6_addr *a6);
   void harvestWatches();
   char* intoaV4(unsigned int addr, char* buf, u_short bufLen);
-  char* intoaV6(struct ndpi_in6_addr ipv6, u_int8_t bitmask, char* buf, u_short bufLen);
+  char* intoaV6(struct ndpi_ndpi_in6_addr ipv6, u_int8_t bitmask, char* buf, u_short bufLen);
   void ban(char *host, bool ban_ip, std::string reason, std::string country);
   void ban_ipv4(u_int32_t ip4 /* network byte order */, bool ban_ip, std::string reason, std::string country);
   void ban_ipv6(struct ndpi_in6_addr ipv6, bool ban_ip, std::string reason, std::string country);
@@ -75,13 +77,16 @@ class NwInterface {
   NwInterface(u_int nf_device_id, Configuration *_c, GeoIP *_g, std::string c_path);
   ~NwInterface();
 
+#ifdef __linux__
   inline int getQueueId()                       { return(queueId);                     };
-  inline void stopPolling()                     { ifaceRunning = false;                };
-  Marker dissectPacket(const u_char *payload, u_int payload_len);
-  inline bool isRunning()                       { return(ifaceRunning);                };
   inline int get_fd()                           { return(nf_fd);                       };
   inline struct nfq_handle*   get_nfHandle()    { return(nfHandle);                    };
   inline struct nfq_q_handle* get_queueHandle() { return(queueHandle);                 };
+#endif
+  
+  inline void stopPolling()                     { ifaceRunning = false;                };
+  Marker dissectPacket(const u_char *payload, u_int payload_len);
+  inline bool isRunning()                       { return(ifaceRunning);                };
   void packetPollLoop();
   void flush_ban();
 };
