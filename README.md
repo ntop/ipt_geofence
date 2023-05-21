@@ -28,5 +28,5 @@ Supposing the you have configure the firewall as described above, you need to st
 ``ipt_geofence -c config.json -m dbip-country-lite.mmdb``
 
 # Performance
-As only one packet per connection is sent to user-space, you will basically not observe any noticeable performance degradation.
+On Linux as only one packet per connection is sent to user-space, you will basically not observe any noticeable performance degradation. On FreeBSD instead, all packets have to pas through the application.
 

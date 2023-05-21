@@ -1,0 +1,3 @@
+(Simplified) Clone of https://github.com/luigirizzo/netmap/
+
+cd libnetmap; gmake

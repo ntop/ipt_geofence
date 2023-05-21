@@ -49,7 +49,10 @@ class Configuration {
   std::queue<std::string> telegram_queue;
   std::set<port_range> hp_ranges;
   bool running;
-
+#if defined __FreeBSD__
+  std::string ifname;
+#endif
+  
   u_int16_t ctry_cont2u16(char *country_code);
   bool mergePortRanges (port_range r1, port_range r2, port_range *ret);
   void addPortRange(port_range r);
@@ -89,6 +92,12 @@ class Configuration {
   int sendTelegramMessage(std::string msg);
   inline std::string getZMQUrl()                                    { return(zmq_url);                  }
   inline std::string getZMQEncryptionKey()                          { return(zmq_encryption_key);       }
+
+#if defined __FreeBSD__
+  void setInterfaceName(char *_ifname)                              { ifname.assign(_ifname);           }
+  const char* getInterfaceName()                                    { return(ifname.c_str());           }
+#endif
+
 };
 
 

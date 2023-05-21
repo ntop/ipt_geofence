@@ -1,4 +1,4 @@
-AC_INIT([ipt_geofence], 1.0)
+AC_INIT([ipt_geofence],[1.0])
 AC_LANG(C)
 
 AC_PROG_CPP
@@ -18,7 +18,7 @@ LDFLAGS="${LDFLAGS} -L/usr/local/lib"
 IPT_RELEASE="${VERSION}.${DATE}"
 AC_DEFINE_UNQUOTED(IPT_RELEASE, "$IPT_RELEASE", [release version])
 
-AC_LANG_CPLUSPLUS
+AC_LANG([C++])
 
 AC_CHECK_LIB([curl], [curl_easy_perform], [LIBS="${LIBS} -lcurl"])
 if test ${ac_cv_lib_curl_curl_easy_perform} = "no"; then
@@ -48,7 +48,7 @@ fi
 
 dnl> GeoIP
 AC_CHECK_LIB([maxminddb], [MMDB_lookup_sockaddr])
-dnl> AC_HAVE_HEADERS(maxminddb.h)
+dnl> AC_CHECK_HEADERS([maxminddb.h])
 dnl>if ! (test ".${ac_cv_lib_maxminddb_MMDB_lookup_sockaddr}" = ".yes" && test ".${ac_cv_header_maxminddb_h}" = ".yes"); then
 if ! test ".${ac_cv_lib_maxminddb_MMDB_lookup_sockaddr}" = ".yes"; then
   echo "Please do apt-get install libmaxminddb-dev and try again"
@@ -96,11 +96,17 @@ fi
 AC_MSG_CHECKING([PF_RING nBPF])
 NBPF_HOME=../PF_RING/userland/nbpf
 LIBNBPF=${NBPF_HOME}/libnbpf.a
+
 if test -f ${LIBNBPF}; then :
    LIBS="${LIBS} ${LIBNBPF}"
    AC_MSG_RESULT(yes)
 else
    AC_MSG_RESULT(no)
+fi
+
+if test $SYSTEM == "FreeBSD"; then
+   cd FreeBSD/libnetmap/; gmake; cd -
+   LIBS="FreeBSD/libnetmap/libnetmap.a ${LIBS}"
 fi
 
 AC_SUBST(VERSION)

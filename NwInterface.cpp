@@ -26,10 +26,16 @@
 
 /* #define DEBUG */
 
-/* Forward */
 #ifdef __linux__
+/* Forward */
 int netfilter_callback(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg,
 		       struct nfq_data *nfa, void *data);
+#endif
+
+#if defined __FreeBSD__
+extern "C" {
+#include "FreeBSD/bridge.c"
+};
 #endif
 
 /* **************************************************** */
@@ -184,6 +190,11 @@ void NwInterface::packetPollLoop() {
   h = get_nfHandle();
   fd = get_fd();
 #endif
+
+#if defined __FreeBSD__
+  if(netmapBridgeSetup(conf->getInterfaceName()) != 0)
+    return;
+#endif
   
   while(isRunning()) {
     fd_set mask;
@@ -284,6 +295,10 @@ void NwInterface::packetPollLoop() {
       }
     }
 
+#if defined __FreeBSD__
+    netmapBridgeProcessPacket(this, conf);
+#endif
+    
     if((id == 0) || (num_loops > NUM_PURGE_LOOP)) {
       harvestWatches();
       num_loops = 0;
@@ -306,8 +321,12 @@ void NwInterface::packetPollLoop() {
   for(std::unordered_map<std::string, WatchMatches*>::iterator it = watches_blacklist.begin();
       it != watches_blacklist.end(); it++)
     delete it->second;
+  
+#if defined __FreeBSD__
+  netmapBridgeShutdown();
+#endif
 
-  trace->traceEvent(TRACE_NORMAL, "Leaving netfilter packet poll loop");
+  trace->traceEvent(TRACE_NORMAL, "Leaving packet poll loop");
   ifaceRunning = false;
 }
 

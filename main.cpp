@@ -48,18 +48,28 @@ void sigproc(int sig) {
 
 static void help() {
   printf("Welcome to ipt_geofence v.%s\n", version);
-  printf("Copyright 2021-22 ntop.org\n");
+  printf("Copyright 2021-23 ntop\n");
 
   printf("\nUsage:\n");
-  printf("ipt_geofence [-h][-v][-s] -c <config file> -m <city>\n\n");
+  printf("ipt_geofence [-h][-v][-s] -c <config file> -m <city>\n");
+#if defined __FreeBSD__
+  printf("             -i <ifname>\n\n");
+#endif
   printf("-h                | Print this help\n");
   printf("-v                | Verbose\n");
   printf("-s                | Log to syslog\n");
   printf("-c <config>       | Specify the configuration file\n");
   printf("-m <city>         | Local mmdb_city MMDB file\n");
   printf("-T <message>      | [Debug] Send ZMQ test message and exits.\n");
+#if defined __FreeBSD__
+  printf("-i <ifname>       | Interfce name\n");
+#endif
 
-  printf("\nExample: ipt_geofence -c sample_config.json -m dbip-country-lite.mmdb\n");
+  printf("\nExample: ipt_geofence -c sample_config.json -m dbip-country-lite.mmdb"
+#if defined __FreeBSD__
+	 " -i em0"
+#endif
+	 "\n");
 
   exit(0);
 }
@@ -73,6 +83,9 @@ int main(int argc, char *argv[]) {
     { "config",      required_argument,    NULL, 'c' },
     { "mmdb_city",   required_argument,    NULL, 'm' },
     { "help",        no_argument,          NULL, 'h' },
+#if defined __FreeBSD__
+    { "interface",   required_argument,    NULL, 'i' },
+#endif
     { "syslog",      no_argument,          NULL, 's' },
     { "zmq-test",    required_argument,    NULL, 'T' },
     { "verbose",     no_argument,          NULL, 'v' },
@@ -86,8 +99,18 @@ int main(int argc, char *argv[]) {
   trace = new Trace();
   conf = new Configuration();
   
-  while((c = getopt_long(argc, argv, "c:u:l:m:svVT:h", long_options, NULL)) != 255) {
+  while((c = getopt_long(argc, argv, "c:u:l:m:svVT:h"
+#if defined __FreeBSD__
+			 "i:"
+#endif
+			 , long_options, NULL)) != 255) {
     switch(c) {
+#if defined __FreeBSD__
+    case 'i':
+      conf->setInterfaceName(optarg);
+      break;
+#endif
+      
     case 'c':
       confPath = (optarg);
       conf->readConfigFile(confPath.c_str());
