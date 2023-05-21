@@ -1,6 +1,6 @@
 /*
  *
- * (C) 2021-22 - ntop.org
+ * (C) 2021-23 - ntop.org
  *
  *
  * This program is free software; you can redistribute it and/or modify
@@ -273,7 +273,7 @@ void NwInterface::packetPollLoop() {
 		    ban(ip, true, "ban-" + pipes_fileno[i].second, ip_country);
 		} else {
 		  /* IPv6 */
-		  struct ndpi_in6_addr ip_addr;
+		  struct in6_addr ip_addr;
 
 		  inet_pton(AF_INET6, ip, &ip_addr);
 
@@ -597,7 +597,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
       return(conf->getMarkerDrop());
     }
   } else if(ipv6) {
-    struct ndpi_in6_addr a;
+    struct in6_addr a;
 
     inet_pton(AF_INET6, src_host, &a);
 
@@ -611,6 +611,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
     }
 
     inet_pton(AF_INET6, dst_host, &a);
+    
     if(conf->isBlacklistedIPv6(&a)) {
       logFlow(proto_name,
               src_host, sport, src_country, src_continent, false,

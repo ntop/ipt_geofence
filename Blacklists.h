@@ -42,7 +42,7 @@ class Blacklists {
   bool loadIPsetFromURL(const char *url);
 
   bool isBlacklistedIPv4(struct in_addr *pin);
-  bool isBlacklistedIPv6(struct ndpi_in6_addr *addr6);
+  bool isBlacklistedIPv6(struct in6_addr *addr6);
   std::vector<std::string> urls_Blacklist;
 };
 
