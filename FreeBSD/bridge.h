@@ -3,13 +3,15 @@
  *
  *  http://www.ntop.org/
  *
- * This code is proprietary code subject to the terms and conditions
- * defined in LICENSE file which is part of this source code package.
+ * BSD license
+ *
  */
 
-#ifndef _NETMAP_POLL_H_
-#define _NETMAP_POLL_H_
+#ifndef _BRIDGE_H_
+#define _BRIDGE_H_
 
-extern void* fetchNetmapBridgePackets(void* notUsed);
+extern int netmapBridgeSetup(const char *ifname);
+extern void netmapBridgeProcessPacket(NwInterface *iface, Configuration *conf);
+extern void netmapBridgeShutdown();
 
-#endif /* _NETMAP_POLL_H_ */
+#endif /* _BRIDGE_H_ */

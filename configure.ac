@@ -71,7 +71,7 @@ if ! test -f "$HOME/nDPI/src/lib/libndpi.a"; then :
   echo "- ./autogen.sh"
   echo "- make"
   echo ""
-  echo "And run this configure again"  
+  echo "And run this configure again"
   exit 0
 else
   LIBS="$LIBS $HOME/nDPI/src/lib/libndpi.a"
@@ -84,7 +84,7 @@ EXTN=
 if test $MACHINE = "x86_64"; then
    EXTN="amd64"
 else
-   if test $MACHINE = "i686"; then 
+   if test $MACHINE = "i686"; then
      EXTN="i386"
    else
      if test $MACHINE = "aarch64"; then
@@ -107,6 +107,7 @@ fi
 if test $SYSTEM == "FreeBSD"; then
    cd FreeBSD/libnetmap/; gmake; cd -
    LIBS="FreeBSD/libnetmap/libnetmap.a ${LIBS}"
+   CXX=c++
 fi
 
 AC_SUBST(VERSION)
