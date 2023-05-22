@@ -24,6 +24,7 @@ zmqReceiver: zmqReceiver.cpp Utils.o Trace.o Makefile
 %.o: %.cpp $(HEADERS) Makefile
 	$(CXX) $(CPPFLAGS) -c $< -o $@
 
+NwInterface.cpp : FreeBSD/bridge.c
 
 clean:
 	/bin/rm -rf *~ *~ *.o $(TARGET)

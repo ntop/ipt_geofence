@@ -121,8 +121,18 @@ rings_move(NwInterface *iface, Configuration *conf,
     struct netmap_slot *rs = &rxring->slot[j];
     struct netmap_slot *ts = &txring->slot[k];
     const u_char *rxbuf = (const u_char*)NETMAP_BUF(rxring, rs->buf_idx);
-    u_int16_t marker    = iface->dissectPacket(&rxbuf[sizeof(ndpi_ethhdr)],
-					       rs->len - sizeof(ndpi_ethhdr)).get();
+    u_int16_t marker;
+
+    if(rs->len > sizeof(ndpi_ethhdr)) {
+      struct ndpi_ethhdr *e = (struct ndpi_ethhdr*)rxbuf;
+
+      if((e->h_proto != ETHERTYPE_IP) && (e->h_proto != ETHERTYPE_IPV6))
+	return(m); /* Np IPv4 or IPv6 */
+    } else
+      return(m);
+    
+    marker = iface->dissectPacket(&rxbuf[sizeof(ndpi_ethhdr)],
+				  rs->len - sizeof(ndpi_ethhdr)).get();
     
     if(marker != conf->getMarkerDrop().get()) {
       /* swap packets */
@@ -141,6 +151,7 @@ rings_move(NwInterface *iface, Configuration *conf,
 	trace->traceEvent(TRACE_INFO, "%s: fwd len %u, rx[%d] -> tx[%d]",
 			  msg, rs->len, j, k);
       }
+
       ts->len = rs->len;
 
       if(zerocopy) {

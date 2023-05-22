@@ -10,7 +10,7 @@ For Ubuntu/Debian based systems do:
 ``sudo apt-get install build-essential autoconf automake autogen libmaxminddb-dev libcurl4-openssl-dev libnetfilter-queue-dev libjsoncpp-dev``
 
 On FreeBSD
-``pkg install -y autoconf automake curl libmaxminddb jsoncpp libzmq4``
+``pkg install -y autoconf automake curl libmaxminddb jsoncpp libzmq4 python3``
 
 The tool also needs a GeoIP database that you can obtain from sites such as [db-ip](https://db-ip.com/db/download/ip-to-country-lite) or [maxmind](https://dev.maxmind.com/geoip/geolite2-free-geolocation-data?lang=en).
 

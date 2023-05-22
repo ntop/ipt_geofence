@@ -213,7 +213,7 @@ void NwInterface::packetPollLoop() {
 	max_fd = fd;
     }
 
-    wait_time.tv_sec = 1, wait_time.tv_usec = 0;
+    wait_time.tv_sec = 0, wait_time.tv_usec = 0;
 
     id = num = select(max_fd+1, &mask, 0, 0, &wait_time);
     num_loops++;
@@ -874,8 +874,10 @@ void NwInterface::ban_ipv6(struct ndpi_in6_addr ip6, bool ban_ip,
 
 void NwInterface::flush_ban() {
   try {
+#ifdef __linux__
     execCmd("/usr/sbin/iptables  -F IPT_GEOFENCE_BLACKLIST");
     execCmd("/usr/sbin/ip6tables -F IPT_GEOFENCE_BLACKLIST");
+#endif
   } catch (...) {
     trace->traceEvent(TRACE_ERROR, "Error while flushing blacklists");
   }

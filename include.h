@@ -38,6 +38,7 @@
 #ifdef __linux__
 #include <linux/types.h>
 #endif
+#include <net/ethernet.h>
 #include <netinet/ip.h>
 #include <netinet/udp.h>
 #include <netinet/tcp.h>
