@@ -15,7 +15,7 @@ pkg:
 	install -m755 ../../ipt_geofence ${IPT_GEOFENCE_BUILD}/usr/sbin/
 	strip ${IPT_GEOFENCE_BUILD}/usr/sbin/ipt_geofence
 	install -m644 ../../ipt_config_utils/* ${IPT_GEOFENCE_BUILD}/usr/share/ipt_geofence/examples/
-	install -m755 ../../scripts/*.py ${IPT_GEOFENCE_BUILD}/usr/share/ipt_geofence/scripts/
+	install -m755 ../../scripts/*.py ../../scripts/*.sh ${IPT_GEOFENCE_BUILD}/usr/share/ipt_geofence/scripts/
 	@/bin/rm -f ../ipt_geofence*.deb
 	dpkg-buildpackage -rfakeroot -d -us -uc @BUILDPACKAGE_EXTRA@
 	dpkg-sig --sign builder -k D1EB60BE ../ipt-geofence_*deb

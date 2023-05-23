@@ -41,7 +41,7 @@
 	"ban": "",
 	"unban": ""
     },
-    "zmq": {
+h    "zmq": {
 	"url": "",
         "encryption_key": ""
     }

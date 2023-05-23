@@ -480,8 +480,11 @@ void NwInterface::logHostBan(char *host_ip, bool ban_ip, std::string reason,
 
   sendTelegramMessage(json_txt);
 
-  if(!conf->getCmd(ban_ip).empty())
-    execCmd(conf->getCmd(ban_ip).c_str());
+  if(!conf->getCmd(ban_ip).empty()) {
+    std::string cmd = conf->getCmd(ban_ip) + " " + host_ip;
+
+    conf->execDeferredCmd(cmd);
+  }
 }
 
 /* **************************************************** */
@@ -825,15 +828,15 @@ void NwInterface::ban(char *host, bool ban_ip, std::string reason, std::string c
 #endif
 #endif
       
-      logHostBan(host, ban_ip, reason, country);
-
 #ifdef __linux__
       try {
-	execCmd(cmdbuf);
+	Utils::execCmd(cmdbuf);
       } catch (...) {
 	trace->traceEvent(TRACE_ERROR, "Error while executing '%s'", cmdbuf);
       }
 #endif
+
+      logHostBan(host, ban_ip, reason, country);
     } else {
       WatchMatches *m = it->second;
 
@@ -855,7 +858,7 @@ void NwInterface::ban(char *host, bool ban_ip, std::string reason, std::string c
 
 #ifdef __linux__
     try {
-      execCmd(cmdbuf);
+      Utils::execCmd(cmdbuf);
     } catch (...) {
       trace->traceEvent(TRACE_ERROR, "Error while executing '%s'", cmdbuf);
     }
@@ -886,38 +889,12 @@ void NwInterface::ban_ipv6(struct ndpi_in6_addr ip6, bool ban_ip,
 void NwInterface::flush_ban() {
   try {
 #ifdef __linux__
-    execCmd("/usr/sbin/iptables  -F IPT_GEOFENCE_BLACKLIST");
-    execCmd("/usr/sbin/ip6tables -F IPT_GEOFENCE_BLACKLIST");
+    Utils::execCmd("/usr/sbin/iptables  -F IPT_GEOFENCE_BLACKLIST");
+    Utils::execCmd("/usr/sbin/ip6tables -F IPT_GEOFENCE_BLACKLIST");
 #endif
   } catch (...) {
     trace->traceEvent(TRACE_ERROR, "Error while flushing blacklists");
   }
-}
-
-/* **************************************************** */
-
-std::string NwInterface::execCmd(const char* cmd) {
-  std::string result = "";
-  FILE* pipe = popen(cmd, "r");
-
-  trace->traceEvent(TRACE_INFO, "Executing %s", cmd);
-
-  if(!pipe)
-    throw std::runtime_error("popen() failed!");
-
-  try {
-    char buffer[128];
-
-    while(fgets(buffer, sizeof buffer, pipe) != NULL)
-      result += buffer;
-  } catch (...) {
-    pclose(pipe);
-    throw;
-  }
-
-  pclose(pipe);
-
-  return(result);
 }
 
 /* **************************************************** */

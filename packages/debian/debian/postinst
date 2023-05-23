@@ -44,6 +44,8 @@ fi
 if [ -f /.dockerenv ]; then exit 0; fi
 
 # Reload rsyslog configuration
+chown root /etc/logrotate.d/ipt_geofence
+chmod 644 /etc/logrotate.d/ipt_geofence
 service rsyslog restart
 
 # Start service after upgrade/install

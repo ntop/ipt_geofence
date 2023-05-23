@@ -45,9 +45,9 @@ class Configuration {
   std::string telegram_bot_token, telegram_chat_id;
   bool configured, all_tcp_ports, all_udp_ports;
   std::string zmq_encryption_key, zmq_url;
-  std::thread *telegramThread;
-  std::mutex telegram_queue_lock;
-  std::queue<std::string> telegram_queue;
+  std::thread *telegramThread, *cmdThread;
+  std::mutex telegram_queue_lock, cmd_queue_lock;
+  std::queue<std::string> telegram_queue, cmd_queue;
   std::set<port_range> hp_ranges;
   bool running;
 #if defined __FreeBSD__
@@ -62,7 +62,8 @@ class Configuration {
   bool parseAllExcept(std::string s, u_int16_t *port);
   bool isIncludedInRange(u_int16_t port);
   void sendTelegramMessages();
-
+  void executeCommands();
+  
  public:
   Configuration();
   ~Configuration();
@@ -91,6 +92,7 @@ class Configuration {
   inline const char *getHostIP()                                    { return(host_ip.c_str());          }
   inline const char *getHostName()                                  { return(host_name.c_str());        }
   int sendTelegramMessage(std::string msg);
+  void execDeferredCmd(std::string cmd);
   inline std::string getZMQUrl()                                    { return(zmq_url);                  }
   inline std::string getZMQEncryptionKey()                          { return(zmq_encryption_key);       }
 

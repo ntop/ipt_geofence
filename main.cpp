@@ -28,7 +28,7 @@ const char *version = IPT_RELEASE;
 u_int32_t last_modification_time = 0;
 NwInterface *iface;
 
-#define DEBUG
+// #define DEBUG
 
 /* ************************************************* */
 
@@ -43,8 +43,12 @@ void sigproc(int sig) {
     called = 1;
   }
 
-  iface->stopPolling();  
+  iface->stopPolling();
+
+#ifdef DEBUG
   delete iface;
+  _exit(0);
+#endif
 }
 
 /* ************************************************* */
@@ -98,10 +102,10 @@ int main(int argc, char *argv[]) {
   GeoIP geoip;
   const char *zmq_test_msg = NULL;
   Configuration *conf;
-  
+
   trace = new Trace();
   conf = new Configuration();
-  
+
   while((c = getopt_long(argc, argv, "c:u:l:m:svVT:h"
 #if defined __FreeBSD__
 			 "i:"
@@ -113,7 +117,7 @@ int main(int argc, char *argv[]) {
       conf->setInterfaceName(optarg);
       break;
 #endif
-      
+
     case 'c':
       confPath = (optarg);
       conf->readConfigFile(confPath.c_str());
@@ -153,21 +157,21 @@ int main(int argc, char *argv[]) {
       sleep(2); /* Wait until ZMQ is setup */
 
       trace->traceEvent(TRACE_NORMAL, "Sending data...");
-      
+
       for(int i=0; i<10; i++)
 	zmq.sendMessage(ZMQ_TOPIC_NAME, zmq_test_msg);
 
       conf->sendTelegramMessage(zmq_test_msg);
-      
+
       return(0);
     }
   }
-  
+
   if(!conf->isConfigured()) {
-    trace->traceEvent(TRACE_ERROR, "Please check the JSON confuration file");
+    trace->traceEvent(TRACE_ERROR, "Please check the JSON configuration file");
     help();
   } else if(!geoip.isLoaded()) {
-    trace->traceEvent(TRACE_ERROR, "Please check the GeoIP confuration");
+    trace->traceEvent(TRACE_ERROR, "Please check the GeoIP configuration");
     help();
   }
 
@@ -178,7 +182,7 @@ int main(int argc, char *argv[]) {
   signal(SIGALRM, sigproc);
   alarm(60);
 #endif
-  
+
   try {
     iface = new NwInterface(conf->getQueueId(), conf, &geoip, confPath);
 
@@ -191,6 +195,6 @@ int main(int argc, char *argv[]) {
 
   delete iface;
   delete conf;
-  
+
   return(0);
 }

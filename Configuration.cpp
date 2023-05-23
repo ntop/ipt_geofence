@@ -38,6 +38,7 @@ Configuration::Configuration() {
   running = true;
 
   telegramThread = new std::thread(&Configuration::sendTelegramMessages, this);
+  cmdThread      = new std::thread(&Configuration::executeCommands, this);
 }
 
 /* ******************************************************* */
@@ -45,6 +46,7 @@ Configuration::Configuration() {
 Configuration::~Configuration() {
   running = false;
   telegramThread->join();
+  cmdThread->join();
   delete telegramThread;
 }
 
@@ -216,7 +218,7 @@ bool Configuration::readConfigFile(const char *path) {
 
       if((!item["mode"].empty()) && (item["mode"].asString() == "geo-ip"))
 	geo_ip = true;
-      
+
       if(name.empty() || cmd.empty()) {
 	trace->traceEvent(TRACE_WARNING, "Invalid watch format");
 	break;
@@ -244,7 +246,7 @@ bool Configuration::readConfigFile(const char *path) {
     if(!root["telegram"]["chat_id"].empty())
       telegram_chat_id = root["telegram"]["chat_id"].asString();
   }
-  
+
   if(!root["cmd"].empty()) {
     if(!root["cmd"]["ban"].empty())
       cmd_ban = root["cmd"]["ban"].asString();
@@ -252,7 +254,7 @@ bool Configuration::readConfigFile(const char *path) {
     if(!root["cmd"]["unban"].empty())
       cmd_unban = root["cmd"]["unban"].asString();
   }
-  
+
   if(!root["zmq"].empty()) {
     if(!root["zmq"]["url"].empty())
       zmq_url = root["zmq"]["url"].asString();
@@ -261,14 +263,14 @@ bool Configuration::readConfigFile(const char *path) {
       std::string encryption_key = root["zmq"]["encryption_key"].asString();
       const char *zmq_encryption_key_hex = encryption_key.c_str();
       char _zmq_encryption_key[42];
-      
+
       Utils::fromHex((char*)zmq_encryption_key_hex, strlen(zmq_encryption_key_hex),
 		     _zmq_encryption_key, sizeof(_zmq_encryption_key));
-      
+
       zmq_encryption_key = std::string(_zmq_encryption_key);
     }
   }
-  
+
   return(configured = true);
 }
 
@@ -441,7 +443,7 @@ void Configuration::sendTelegramMessages() {
   while(true) {
     if(telegram_queue.size() > 0) {
       std::string message;
-      
+
       telegram_queue_lock.lock();
       message = telegram_queue.front();
       telegram_queue.pop();
@@ -456,4 +458,33 @@ void Configuration::sendTelegramMessages() {
     }
   }
 }
-   
+
+/* **************************************************** */
+
+void Configuration::execDeferredCmd(std::string cmd) {
+  cmd_queue_lock.lock();
+  cmd_queue.push(cmd);
+  cmd_queue_lock.unlock();
+}
+
+/* **************************************************** */
+
+void Configuration::executeCommands() {
+  while(true) {
+    if(cmd_queue.size() > 0) {
+      std::string cmd;
+
+      cmd_queue_lock.lock();
+      cmd = cmd_queue.front();
+      cmd_queue.pop();
+      cmd_queue_lock.unlock();
+
+      Utils::execCmd(cmd.c_str());
+    } else {
+      if(!running)
+	break;
+      else
+	sleep(1);
+    }
+  }
+}
