@@ -37,6 +37,10 @@
 	"bot_token": "",
         "chat_id": ""
     },
+    "cmd": {
+	"ban": "",
+	"unban": ""
+    },
     "zmq": {
 	"url": "",
         "encryption_key": ""

@@ -41,6 +41,7 @@ class Configuration {
   Marker default_policy;
   Blacklists blacklists;
   std::string host_ip, host_name;
+  std::string cmd_ban, cmd_unban;
   std::string telegram_bot_token, telegram_chat_id;
   bool configured, all_tcp_ports, all_udp_ports;
   std::string zmq_encryption_key, zmq_url;
@@ -98,6 +99,7 @@ class Configuration {
   const char* getInterfaceName()                                    { return(ifname.c_str());           }
 #endif
 
+  inline std::string getCmd(bool ban_cmd)                           { return(ban_cmd ? cmd_ban : cmd_unban); }
 };
 
 

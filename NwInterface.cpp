@@ -459,7 +459,8 @@ void NwInterface::addCommonJSON(Json::Value *root) {
 
 /* **************************************************** */
 
-void NwInterface::logHostBan(char *host_ip, bool ban_ip, std::string reason, std::string country) {
+void NwInterface::logHostBan(char *host_ip, bool ban_ip, std::string reason,
+			     std::string country) {
   Json::Value root;
   std::string json_txt;
   Json::FastWriter writer;
@@ -472,12 +473,15 @@ void NwInterface::logHostBan(char *host_ip, bool ban_ip, std::string reason, std
 
   json_txt = writer.write(root);
 
-  trace->traceEvent(TRACE_NORMAL, "%s", json_txt.c_str());
+  trace->traceEvent(TRACE_INFO, "%s", json_txt.c_str());
 
   if(zmq)
     zmq->sendMessage(ZMQ_TOPIC_NAME, json_txt.c_str());
 
   sendTelegramMessage(json_txt);
+
+  if(!conf->getCmd(ban_ip).empty())
+    execCmd(conf->getCmd(ban_ip).c_str());
 }
 
 /* **************************************************** */

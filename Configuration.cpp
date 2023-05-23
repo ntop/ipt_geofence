@@ -245,6 +245,14 @@ bool Configuration::readConfigFile(const char *path) {
       telegram_chat_id = root["telegram"]["chat_id"].asString();
   }
   
+  if(!root["cmd"].empty()) {
+    if(!root["cmd"]["ban"].empty())
+      cmd_ban = root["cmd"]["ban"].asString();
+
+    if(!root["cmd"]["unban"].empty())
+      cmd_unban = root["cmd"]["unban"].asString();
+  }
+  
   if(!root["zmq"].empty()) {
     if(!root["zmq"]["url"].empty())
       zmq_url = root["zmq"]["url"].asString();
