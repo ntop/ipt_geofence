@@ -28,6 +28,8 @@ const char *version = IPT_RELEASE;
 u_int32_t last_modification_time = 0;
 NwInterface *iface;
 
+#define DEBUG
+
 /* ************************************************* */
 
 void sigproc(int sig) {
@@ -41,7 +43,8 @@ void sigproc(int sig) {
     called = 1;
   }
 
-  iface->stopPolling();
+  iface->stopPolling();  
+  delete iface;
 }
 
 /* ************************************************* */
@@ -62,7 +65,7 @@ static void help() {
   printf("-m <city>         | Local mmdb_city MMDB file\n");
   printf("-T <message>      | [Debug] Send ZMQ test message and exits.\n");
 #if defined __FreeBSD__
-  printf("-i <ifname>       | Interfce name\n");
+  printf("-i <ifname>       | Interface name\n");
 #endif
 
   printf("\nExample: ipt_geofence -c sample_config.json -m dbip-country-lite.mmdb"
@@ -171,16 +174,23 @@ int main(int argc, char *argv[]) {
   signal(SIGTERM, sigproc);
   signal(SIGINT,  sigproc);
 
+#ifdef DEBUG
+  signal(SIGALRM, sigproc);
+  alarm(60);
+#endif
+  
   try {
     iface = new NwInterface(conf->getQueueId(), conf, &geoip, confPath);
 
     iface->packetPollLoop();
   } catch(int err) {
-    trace->traceEvent(TRACE_ERROR, "Interface creation error: please fix the reported errors and try again");
+    trace->traceEvent(TRACE_ERROR,
+		      "Interface creation error: please fix the reported "
+		      "errors and try again");
   }
-  
+
   delete iface;
   delete conf;
-
+  
   return(0);
 }

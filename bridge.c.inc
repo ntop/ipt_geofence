@@ -96,15 +96,11 @@ filter_packet(char *buf, int len)
  * Move up to 'limit' pkts from rxring to txring, swapping buffers
  * if zerocopy is possible. Otherwise fall back on packet copying.
  */
-static int
-rings_move(NwInterface *iface, Configuration *conf,
-	   struct netmap_ring *rxring, struct netmap_ring *txring,
-	   u_int limit, const char *msg, u_int8_t direction)
-{
+static int rings_move(NwInterface *iface, Configuration *conf,
+		      struct netmap_ring *rxring, struct netmap_ring *txring,
+		      u_int limit, const char *msg) {
   u_int j, k, m = 0;
 
-  /* print a warning if any of the ring flags is set (e.g. NM_REINIT) */
-  // if(rxring->flags || txring->flags) D("%s rxflags %x txflags %x",  msg, rxring->flags, txring->flags);
   j = rxring->head; /* RX */
   k = txring->head; /* TX */
 
@@ -121,19 +117,16 @@ rings_move(NwInterface *iface, Configuration *conf,
     struct netmap_slot *rs = &rxring->slot[j];
     struct netmap_slot *ts = &txring->slot[k];
     const u_char *rxbuf = (const u_char*)NETMAP_BUF(rxring, rs->buf_idx);
-    u_int16_t marker;
-
-    if(rs->len > sizeof(ndpi_ethhdr)) {
-      struct ndpi_ethhdr *e = (struct ndpi_ethhdr*)rxbuf;
-
-      if((e->h_proto != ETHERTYPE_IP) && (e->h_proto != ETHERTYPE_IPV6))
-	return(m); /* Np IPv4 or IPv6 */
+    u_int16_t marker = conf->getMarkerDrop().get();;
+    struct ndpi_ethhdr *e = (struct ndpi_ethhdr*)rxbuf;
+    u_int16_t l3_proto = ntohs(e->h_proto);
+    
+    if((l3_proto != ETHERTYPE_IP) && (l3_proto != ETHERTYPE_IPV6)) {
+      marker = conf->getMarkerPass().get(); /* No IPv4 or IPv6 */
     } else
-      return(m);
-    
-    marker = iface->dissectPacket(&rxbuf[sizeof(ndpi_ethhdr)],
-				  rs->len - sizeof(ndpi_ethhdr)).get();
-    
+      marker = iface->dissectPacket(&rxbuf[sizeof(ndpi_ethhdr)],
+				    rs->len - sizeof(ndpi_ethhdr)).get();
+
     if(marker != conf->getMarkerDrop().get()) {
       /* swap packets */
       if(ts->buf_idx < 2 || rs->buf_idx < 2) {
@@ -189,27 +182,30 @@ rings_move(NwInterface *iface, Configuration *conf,
   return(m);
 }
 
+/* ****************************************************** */
+
 /* Move packets from source port to destination port. */
 static int ports_move(NwInterface *iface, Configuration *conf,
 		      struct nmport_d *src, struct nmport_d *dst, u_int limit,
-		      const char *msg, u_int8_t direction)
-{
+		      const char *msg) {
   struct netmap_ring *txring, *rxring;
   u_int m = 0, si = src->first_rx_ring, di = dst->first_tx_ring;
-
+ 
   while (si <= src->last_rx_ring && di <= dst->last_tx_ring) {
     rxring = NETMAP_RXRING(src->nifp, si);
     txring = NETMAP_TXRING(dst->nifp, di);
+
     if(nm_ring_empty(rxring)) {
       si++;
       continue;
     }
+    
     if(nm_ring_empty(txring)) {
       di++;
       continue;
     }
     
-    m += rings_move(iface, conf, rxring, txring, limit, msg, direction);
+    m += rings_move(iface, conf, rxring, txring, limit, msg);
   }
 
   return(m);
@@ -270,16 +266,8 @@ int netmapBridgeSetup(const char *ifname) {
 
   trace->traceEvent(TRACE_NORMAL, "Ready to process packets...");
 
-  pa_sw_rings = (pa->reg.nr_mode == NR_REG_SW
-#ifdef NR_REG_ONE_SW
-		 || pa->reg.nr_mode == NR_REG_ONE_SW
-#endif
-		 );
-  pb_sw_rings = (pb->reg.nr_mode == NR_REG_SW
-#ifdef NR_REG_ONE_SW
-		 || pb->reg.nr_mode == NR_REG_ONE_SW
-#endif
-		 );
+  pa_sw_rings = (pa->reg.nr_mode == NR_REG_SW || pa->reg.nr_mode == NR_REG_ONE_SW);
+  pb_sw_rings = (pb->reg.nr_mode == NR_REG_SW || pb->reg.nr_mode == NR_REG_ONE_SW);
 
   snprintf(msg_a2b, sizeof(msg_a2b), "%s:%s --> %s:%s",
 	   pa->hdr.nr_name, pa_sw_rings ? "host" : "nic",
@@ -296,66 +284,42 @@ int netmapBridgeSetup(const char *ifname) {
 
 void netmapBridgeProcessPacket(NwInterface *iface, Configuration *conf) {
   int n0, n1, ret;
+  u_int num_loops = 100;
 
-  pollfd[0].events = pollfd[1].events = 0;
-  pollfd[0].revents = pollfd[1].revents = 0;
-  n0 = rx_slots_avail(pa);
-  n1 = rx_slots_avail(pb);
+  while(num_loops > 0) {
+    pollfd[0].events = pollfd[1].events = 0;
+    pollfd[0].revents = pollfd[1].revents = 0;
+    
+    n0 = rx_slots_avail(pa);
+    n1 = rx_slots_avail(pb);
 
-  if(n0)
-    pollfd[1].events |= POLLOUT;
-  else
-    pollfd[0].events |= POLLIN;
-  if(n1)
-    pollfd[0].events |= POLLOUT;
-  else
-    pollfd[1].events |= POLLIN;
+    if(n0)
+      pollfd[1].events |= POLLOUT;
+    else
+      pollfd[0].events |= POLLIN;
 
-  /* poll() also cause kernel to txsync/rxsync the NICs */
-  ret = poll(pollfd, 2, 100 /* ms */);
+    if(n1)
+      pollfd[0].events |= POLLOUT;
+    else
+      pollfd[1].events |= POLLIN;
 
-  if(ret <= 0 || verbose)
-    trace->traceEvent(TRACE_INFO, "poll %s [0] ev %x %x rx %d@%d tx %d,"
-		      " [1] ev %x %x rx %d@%d tx %d",
-		      ret <= 0 ? "timeout" : "ok",
-		      pollfd[0].events,
-		      pollfd[0].revents,
-		      rx_slots_avail(pa),
-		      NETMAP_RXRING(pa->nifp, pa->cur_rx_ring)->head,
-		      tx_slots_avail(pa),
-		      pollfd[1].events,
-		      pollfd[1].revents,
-		      rx_slots_avail(pb),
-		      NETMAP_RXRING(pb->nifp, pb->cur_rx_ring)->head,
-		      tx_slots_avail(pb)
-		      );
+    /* trace->traceEvent(TRACE_NORMAL, "poll (begin)"); */
 
-  if(ret < 0)
-    return;
+    /* poll() also cause kernel to txsync/rxsync the NICs */
+    ret = poll(pollfd, 2, 2500 /* ms */);
+    /* trace->traceEvent(TRACE_NORMAL, "poll (end) [ret: %d]", ret); */
 
-  if(pollfd[0].revents & POLLERR) {
-    struct netmap_ring *rx = NETMAP_RXRING(pa->nifp, pa->cur_rx_ring);
+    if(ret < 0)
+      break;
 
-    trace->traceEvent(TRACE_ERROR, "error on fd0, rx [%d,%d,%d)",
-		      rx->head, rx->cur, rx->tail);
+    if(pollfd[0].revents & POLLOUT)
+      ports_move(iface, conf, pb, pa, burst, msg_b2a);
+
+    if(pollfd[1].revents & POLLOUT)
+      ports_move(iface, conf, pa, pb, burst, msg_a2b);
+
+    num_loops--;
   }
-  if(pollfd[1].revents & POLLERR) {
-    struct netmap_ring *rx = NETMAP_RXRING(pb->nifp, pb->cur_rx_ring);
-
-    trace->traceEvent(TRACE_ERROR, "error on fd1, rx [%d,%d,%d)",
-		      rx->head, rx->cur, rx->tail);
-  }
-
-  if(pollfd[0].revents & POLLOUT)
-    ports_move(iface, conf, pb, pa, burst, msg_b2a, 1 /* RX */);
-
-  if(pollfd[1].revents & POLLOUT)
-    ports_move(iface, conf, pa, pb, burst, msg_a2b, 0 /* TX */);
-
-  /*
-   * We don't need ioctl(NIOCTXSYNC) on the two file descriptors.
-   * here. The kernel will txsync on next poll().
-   */  
 }
 
 /* ****************************************************** */

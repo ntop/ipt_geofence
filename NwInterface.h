@@ -43,6 +43,9 @@ class NwInterface {
   std::unordered_map<std::string, WatchMatches*> watches_blacklist;
   std::string confPath;
   ZMQ *zmq;
+  std::unordered_map<std::string, std::pair<std::string,bool> > *watches;
+  std::vector<FILE*> pipes;
+  std::vector<std::pair<int, std::string>> pipes_fileno;
   
   Marker makeVerdict(u_int8_t proto, u_int16_t vlanId,
 		     u_int16_t sport,

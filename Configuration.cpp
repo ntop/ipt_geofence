@@ -28,8 +28,13 @@ Configuration::Configuration() {
   marker_unknown.set(0), marker_pass.set(1000); marker_drop.set(2000);
   default_policy = marker_pass; configured = false;
   all_tcp_ports = all_udp_ports = true;
-  host_ip   = Utils::execCmd("/bin/hostname -I | cut -f 1 -d ' '"); /* Pick only the first IP address of the list */
   host_name = Utils::execCmd("/bin/hostname");
+#if defined __FreeBSD__
+  host_ip = host_name; /* To be improved */
+#else
+  host_ip   = Utils::execCmd("/bin/hostname -I | cut -f 1 -d ' '"); /* Pick only the first IP address of the list */
+#endif
+
   running = true;
 
   telegramThread = new std::thread(&Configuration::sendTelegramMessages, this);

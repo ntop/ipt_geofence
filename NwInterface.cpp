@@ -34,7 +34,7 @@ int netfilter_callback(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg,
 
 #if defined __FreeBSD__
 extern "C" {
-#include "FreeBSD/bridge.c"
+#include "bridge.c.inc"
 };
 #endif
 
@@ -101,6 +101,17 @@ NwInterface::NwInterface(u_int nf_device_id,
 /* **************************************************** */
 
 NwInterface::~NwInterface() {
+    for(u_int i=0, s = pipes.size(); i < s; i++)
+    pclose(pipes[i]);
+
+  for(std::unordered_map<std::string, WatchMatches*>::iterator it = watches_blacklist.begin();
+      it != watches_blacklist.end(); it++)
+    delete it->second;
+  
+#if defined __FreeBSD__
+  netmapBridgeShutdown();
+#endif
+
   /* Wait until the reload thread ends */
   if(reloaderThread) {
     reloaderThread->join();
@@ -155,12 +166,11 @@ int netfilter_callback(struct nfq_q_handle *qh,
 void NwInterface::packetPollLoop() {
   struct nfq_handle *h;
   int fd;
-  std::unordered_map<std::string, std::pair<std::string,bool> > *watches = conf->get_watches();
-  std::vector<FILE*> pipes;
-  std::vector<bool>  geo_ip_pipes;
-  std::vector<std::pair<int, std::string>> pipes_fileno;
+  std::vector<bool>  geo_ip_pipes;  
   u_int num_loops = 0;
 
+  watches = conf->get_watches();
+  
   /* Spawn reload config thread in background */
   reloaderThread = new std::thread(&NwInterface::reloadConfLoop, this);
 
@@ -216,6 +226,7 @@ void NwInterface::packetPollLoop() {
     wait_time.tv_sec = 0, wait_time.tv_usec = 0;
 
     id = num = select(max_fd+1, &mask, 0, 0, &wait_time);
+    
     num_loops++;
 
     if(num > 0) {
@@ -315,17 +326,6 @@ void NwInterface::packetPollLoop() {
     }
   }
 
-  for(u_int i=0, s = pipes.size(); i < s; i++)
-    pclose(pipes[i]);
-
-  for(std::unordered_map<std::string, WatchMatches*>::iterator it = watches_blacklist.begin();
-      it != watches_blacklist.end(); it++)
-    delete it->second;
-  
-#if defined __FreeBSD__
-  netmapBridgeShutdown();
-#endif
-
   trace->traceEvent(TRACE_NORMAL, "Leaving packet poll loop");
   ifaceRunning = false;
 }
@@ -354,7 +354,6 @@ Marker NwInterface::dissectPacket(const u_char *payload, u_int payload_len) {
       // ipv6 address stringification
       inet_ntop(AF_INET6, &(ip6h->ip6_src), src, sizeof(src));
       inet_ntop(AF_INET6, &(ip6h->ip6_dst), dst, sizeof(dst));
-
     } else if(iph->version == 4) {
       ipv4 = true;
       u_int8_t frag_off = ntohs(iph->frag_off);
@@ -813,20 +812,24 @@ void NwInterface::ban(char *host, bool ban_ip, std::string reason, std::string c
     if(it == watches_blacklist.end()) {
       watches_blacklist[host] = new WatchMatches();
 
+#ifdef __linux__
       snprintf(cmdbuf, sizeof(cmdbuf), "/usr/sbin/ip%stables -I IPT_GEOFENCE_BLACKLIST -s %s -j DROP",
 	       is_ipv4 ? "" : "6", host);
 
 #ifdef DEBUG
       trace->traceEvent(TRACE_NORMAL, "%s", cmdbuf);
 #endif
-
+#endif
+      
       logHostBan(host, ban_ip, reason, country);
 
+#ifdef __linux__
       try {
 	execCmd(cmdbuf);
       } catch (...) {
 	trace->traceEvent(TRACE_ERROR, "Error while executing '%s'", cmdbuf);
       }
+#endif
     } else {
       WatchMatches *m = it->second;
 
@@ -835,20 +838,24 @@ void NwInterface::ban(char *host, bool ban_ip, std::string reason, std::string c
   } else {
     /* Unban */
 
+#ifdef __linux__
     snprintf(cmdbuf, sizeof(cmdbuf), "/usr/sbin/ip%stables -D IPT_GEOFENCE_BLACKLIST -s %s -j DROP",
 	     is_ipv4 ? "" : "6", host);
 
 #ifdef DEBUG
     trace->traceEvent(TRACE_NORMAL, "%s", cmdbuf);
 #endif
-
-    logHostBan(host, ban_ip, reason, country);
+#endif
     
+    logHostBan(host, ban_ip, reason, country);
+
+#ifdef __linux__
     try {
       execCmd(cmdbuf);
     } catch (...) {
       trace->traceEvent(TRACE_ERROR, "Error while executing '%s'", cmdbuf);
     }
+#endif
   }
 }
 

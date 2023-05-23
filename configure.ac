@@ -106,7 +106,7 @@ fi
 
 if test $SYSTEM == "FreeBSD"; then
    cd FreeBSD/libnetmap/; gmake; cd -
-   LIBS="FreeBSD/libnetmap/libnetmap.a ${LIBS}"
+   LIBS="-lnetmap ${LIBS}"
    CXX=c++
 fi
 
