@@ -33,6 +33,7 @@ Configuration::Configuration() {
   host_ip = host_name; /* To be improved */
 #else
   host_ip   = Utils::execCmd("/bin/hostname -I | cut -f 1 -d ' '"); /* Pick only the first IP address of the list */
+  host_ip.erase(host_ip.size() - 1);
 #endif
 
   running = true;
