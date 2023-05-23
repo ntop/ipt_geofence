@@ -223,7 +223,7 @@ void NwInterface::packetPollLoop() {
 	max_fd = fd;
     }
 
-    wait_time.tv_sec = 0, wait_time.tv_usec = 0;
+    wait_time.tv_sec = 1, wait_time.tv_usec = 0;
 
     id = num = select(max_fd+1, &mask, 0, 0, &wait_time);
     
