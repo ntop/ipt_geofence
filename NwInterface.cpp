@@ -41,6 +41,16 @@ NwInterface::NwInterface(u_int nf_device_id,
   reloaderThread = NULL;
   ifaceRunning = false;
 
+  fw = NULL;
+  
+#ifdef __linux__
+  fw = new LinuxFirewall();
+#else
+#if defined __FreeBSD__
+  fw = new FreeBSDFirewall();
+#endif
+#endif
+  
 #ifdef __linux__
   queueId = nf_device_id, nfHandle = nfq_open();
 
@@ -125,7 +135,8 @@ NwInterface::~NwInterface() {
 #endif
 
   logStartStop(false /* stop */);
-  if(zmq)         delete zmq;
+  if(zmq) delete zmq;
+  if(fw)  delete fw;        
 }
 
 /* **************************************************** */
@@ -843,23 +854,7 @@ void NwInterface::ban(char *host, bool ban_ip, std::string reason, std::string c
     if(it == watches_blacklist.end()) {
       watches_blacklist[host] = new WatchMatches();
 
-#ifdef __linux__
-      snprintf(cmdbuf, sizeof(cmdbuf), "/usr/sbin/ip%stables -I IPT_GEOFENCE_BLACKLIST -s %s -j DROP",
-	       is_ipv4 ? "" : "6", host);
-
-#ifdef DEBUG
-      trace->traceEvent(TRACE_NORMAL, "%s", cmdbuf);
-#endif
-#endif
-
-#ifdef __linux__
-      try {
-	Utils::execCmd(cmdbuf);
-      } catch (...) {
-	trace->traceEvent(TRACE_ERROR, "Error while executing '%s'", cmdbuf);
-      }
-#endif
-
+      if(fw) fw->ban(host, is_ipv4);
       logHostBan(host, ban_ip, reason, country);
     } else {
       WatchMatches *m = it->second;
@@ -869,24 +864,8 @@ void NwInterface::ban(char *host, bool ban_ip, std::string reason, std::string c
   } else {
     /* Unban */
 
-#ifdef __linux__
-    snprintf(cmdbuf, sizeof(cmdbuf), "/usr/sbin/ip%stables -D IPT_GEOFENCE_BLACKLIST -s %s -j DROP",
-	     is_ipv4 ? "" : "6", host);
-
-#ifdef DEBUG
-    trace->traceEvent(TRACE_NORMAL, "%s", cmdbuf);
-#endif
-#endif
-
+    if(fw) fw->unban(host, is_ipv4);
     logHostBan(host, ban_ip, reason, country);
-
-#ifdef __linux__
-    try {
-      Utils::execCmd(cmdbuf);
-    } catch (...) {
-      trace->traceEvent(TRACE_ERROR, "Error while executing '%s'", cmdbuf);
-    }
-#endif
   }
 }
 

@@ -1,4 +1,4 @@
-CXX=@CXX@ -std=c++11
+CXX=@CXX@ -std=c++11 -fno-color-diagnostics
 
 PLATFORM = `uname -p`
 HERE=$(shell pwd)

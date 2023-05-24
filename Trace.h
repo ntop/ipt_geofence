@@ -61,5 +61,6 @@ class Trace {
   void traceToSyslogOnly() { syslogOnly = true; }
 };
 
+extern Trace *trace;
 
 #endif /* _TRACE_H_ */

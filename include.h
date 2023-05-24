@@ -109,6 +109,7 @@
 #include "ZMQ.h"
 #include "GeoIP.h"
 #include "WatchMatches.h"
+#include "Firewall.h"
+#include "LinuxFirewall.h"
+#include "FreeBSDFirewall.h"
 #include "NwInterface.h"
-
-extern Trace *trace;

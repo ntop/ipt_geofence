@@ -34,6 +34,7 @@ class NwInterface {
   struct nfq_q_handle *queueHandle;
   int nf_fd;
 #endif
+  Firewall *fw;
   pthread_t pollLoop;
   bool ifaceRunning;
   Configuration *conf, *shadowConf = NULL;
