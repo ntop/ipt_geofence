@@ -1,4 +1,4 @@
-CXX=@CXX@
+CXX=@CXX@ -std=c++11
 
 PLATFORM = `uname -p`
 HERE=$(shell pwd)

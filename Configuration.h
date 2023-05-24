@@ -50,7 +50,7 @@ class Configuration {
   std::queue<std::string> telegram_queue, cmd_queue;
   std::set<port_range> hp_ranges;
   bool running;
-#if defined __FreeBSD__
+#if defined __FreeBSD__ || defined __APPLE__
   std::string ifname;
 #endif
   
@@ -96,7 +96,7 @@ class Configuration {
   inline std::string getZMQUrl()                                    { return(zmq_url);                  }
   inline std::string getZMQEncryptionKey()                          { return(zmq_encryption_key);       }
 
-#if defined __FreeBSD__
+#if defined __FreeBSD__ || defined __APPLE__
   void setInterfaceName(char *_ifname)                              { ifname.assign(_ifname);           }
   const char* getInterfaceName()                                    { return(ifname.c_str());           }
 #endif

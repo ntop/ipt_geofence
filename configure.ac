@@ -35,7 +35,7 @@ else
   exit 1
 fi
 
-if test $SYSTEM != "FreeBSD"; then
+if test $SYSTEM != "FreeBSD" && test $SYSTEM != "Darwin"; then
   AC_CHECK_HEADERS([libnetfilter_queue/libnetfilter_queue.h], AC_DEFINE_UNQUOTED(HAVE_NETFILTER, 1, [nfq is present]))
 
   if test "x$ac_cv_header_libnetfilter_queue_libnetfilter_queue_h" = xyes; then :
@@ -106,7 +106,7 @@ else
    AC_MSG_RESULT(no)
 fi
 
-if test $SYSTEM == "FreeBSD"; then
+if test $SYSTEM == "FreeBSD" or test $SYSTEM == "Darwin"; then
    CXX=c++
 fi
 
