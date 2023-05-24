@@ -187,3 +187,9 @@ int Utils::sendTelegramMessage(std::string bot_token, std::string chat_id, std::
   return(response_code);
 }
 
+/* ****************************************************** */
+
+void Utils::zapNewline(std::string &s) {
+  if((!s.empty()) && s[s.length()-1] == '\n') 
+    s.erase(s.size() - 1);  
+}

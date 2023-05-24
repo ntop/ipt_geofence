@@ -35,7 +35,9 @@ Configuration::Configuration() {
   host_ip   = Utils::execCmd("/bin/hostname -I | cut -f 1 -d ' '"); /* Pick only the first IP address of the list */
 #endif
 
-  host_ip.erase(host_ip.size() - 1); /* Remove trailing \n */
+  /* Remove trailing \n */
+  Utils::zapNewline(host_name);
+  Utils::zapNewline(host_ip);
   
   running = true;
 

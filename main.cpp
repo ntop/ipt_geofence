@@ -73,8 +73,12 @@ static void help() {
 #endif
 
   printf("\nExample: ipt_geofence -c sample_config.json -m dbip-country-lite.mmdb"
-#if defined __FreeBSD__ || defined __APPLE__
+#if defined __FreeBSD__
 	 " -i em0"
+#else
+#if defined __APPLE__
+	 " -i en0"
+#endif
 #endif
 	 "\n");
 
