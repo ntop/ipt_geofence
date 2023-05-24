@@ -29,13 +29,14 @@ Configuration::Configuration() {
   default_policy = marker_pass; configured = false;
   all_tcp_ports = all_udp_ports = true;
   host_name = Utils::execCmd("/bin/hostname");
-#if defined __FreeBSD__
+#if defined __FreeBSD__ || defined __APPLE__
   host_ip = host_name; /* To be improved */
 #else
   host_ip   = Utils::execCmd("/bin/hostname -I | cut -f 1 -d ' '"); /* Pick only the first IP address of the list */
-  host_ip.erase(host_ip.size() - 1);
 #endif
 
+  host_ip.erase(host_ip.size() - 1); /* Remove trailing \n */
+  
   running = true;
 
   telegramThread = new std::thread(&Configuration::sendTelegramMessages, this);

@@ -59,7 +59,7 @@ static void help() {
 
   printf("\nUsage:\n");
   printf("ipt_geofence [-h][-v][-s] -c <config file> -m <city>\n");
-#if defined __FreeBSD__
+#if defined __FreeBSD__ || defined __APPLE__
   printf("             -i <ifname>\n\n");
 #endif
   printf("-h                | Print this help\n");
@@ -73,7 +73,7 @@ static void help() {
 #endif
 
   printf("\nExample: ipt_geofence -c sample_config.json -m dbip-country-lite.mmdb"
-#if defined __FreeBSD__
+#if defined __FreeBSD__ || defined __APPLE__
 	 " -i em0"
 #endif
 	 "\n");
@@ -90,7 +90,7 @@ int main(int argc, char *argv[]) {
     { "config",      required_argument,    NULL, 'c' },
     { "mmdb_city",   required_argument,    NULL, 'm' },
     { "help",        no_argument,          NULL, 'h' },
-#if defined __FreeBSD__
+#if defined __FreeBSD__ || defined __APPLE__
     { "interface",   required_argument,    NULL, 'i' },
 #endif
     { "syslog",      no_argument,          NULL, 's' },
@@ -107,12 +107,12 @@ int main(int argc, char *argv[]) {
   conf = new Configuration();
 
   while((c = getopt_long(argc, argv, "c:u:l:m:svVT:h"
-#if defined __FreeBSD__
+#if defined __FreeBSD__ || defined __APPLE__
 			 "i:"
 #endif
 			 , long_options, NULL)) != 255) {
     switch(c) {
-#if defined __FreeBSD__
+#if defined __FreeBSD__ || defined __APPLE__
     case 'i':
       conf->setInterfaceName(optarg);
       break;
