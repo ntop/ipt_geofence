@@ -12,8 +12,8 @@ GIT_HASH=`git log --pretty=format:"%H (%ad)"|head -1`
 MACHINE=`uname -m`
 SYSTEM=`uname -s`
 
-CFLAGS="${CFLAGS} -I/usr/local/include"
-LDFLAGS="${LDFLAGS} -L/usr/local/lib"
+CFLAGS="${CFLAGS} -I/usr/local/include -I/opt/homebrew/include"
+LDFLAGS="${LDFLAGS} -L/usr/local/lib -L/opt/homebrew/lib"
 
 IPT_RELEASE="${VERSION}.${DATE}"
 AC_DEFINE_UNQUOTED(IPT_RELEASE, "$IPT_RELEASE", [release version])
@@ -66,15 +66,20 @@ fi
 
 dnl nDPI
 if ! test -f "$HOME/nDPI/src/lib/libndpi.a"; then :
-  echo "nDPI missing. Please do:"
-  echo "- cd $HOME"
-  echo "- git clone https://github.com/ntop/nDPI.git"
-  echo "- cd nDPI"
-  echo "- ./autogen.sh"
-  echo "- make"
-  echo ""
-  echo "And run this configure again"
-  exit 0
+  if ! test -f "..//nDPI/src/lib/libndpi.a"; then :
+    echo "nDPI missing. Please do:"
+    echo "- cd $HOME"
+    echo "- git clone https://github.com/ntop/nDPI.git"
+    echo "- cd nDPI"
+    echo "- ./autogen.sh"
+    echo "- make"
+    echo ""
+    echo "And run this configure again"
+    exit 0
+  else
+    LIBS="$LIBS ../nDPI/src/lib/libndpi.a"
+    INCS="$INCS -I ../nDPI/src/include"    
+  fi
 else
   LIBS="$LIBS $HOME/nDPI/src/lib/libndpi.a"
   INCS="$INCS -I $HOME/nDPI/src/include"
@@ -106,7 +111,7 @@ else
    AC_MSG_RESULT(no)
 fi
 
-if test $SYSTEM == "FreeBSD" or test $SYSTEM == "Darwin"; then
+if test $SYSTEM == "FreeBSD" || test $SYSTEM == "Darwin"; then
    CXX=c++
 fi
 

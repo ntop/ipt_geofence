@@ -3,11 +3,11 @@ CXX=@CXX@ -std=c++11
 PLATFORM = `uname -p`
 HERE=$(shell pwd)
 
-CPPFLAGS= -O2 @INCS@ -I /usr/local/include # -g
+CPPFLAGS= -O2 @INCS@ @CFLAGS@ # -g
 CFLAGS=$(CPPFLAGS)
 
 TARGET=ipt_geofence
-LIBS=-L/usr/local/lib @LIBS@
+LIBS=@LDFLAGS@ @LIBS@
 
 
 OBJECTS = Blacklists.o Configuration.o  GeoIP.o  NwInterface.o  Trace.o  Utils.o ZMQ.o
