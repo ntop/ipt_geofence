@@ -44,6 +44,8 @@ if test $SYSTEM != "FreeBSD"; then
     echo "Please do apt-get install libnetfilter-queue-dev and try again"
     exit 0
   fi
+else
+  LIBS="$LIBS -lpcap"
 fi
 
 dnl> GeoIP
@@ -105,8 +107,6 @@ else
 fi
 
 if test $SYSTEM == "FreeBSD"; then
-   cd FreeBSD/libnetmap/; gmake; cd -
-   LIBS="-lnetmap ${LIBS}"
    CXX=c++
 fi
 

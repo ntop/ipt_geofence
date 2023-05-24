@@ -68,6 +68,10 @@
 #include <inttypes.h>
 #include <netinet/ip6.h>
 
+#ifndef __linux__
+#include <pcap/pcap.h>
+#endif
+
 #ifdef HAVE_ZMQ
 #include <zmq.h>
 #endif

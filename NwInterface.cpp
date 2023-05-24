@@ -32,12 +32,6 @@ int netfilter_callback(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg,
 		       struct nfq_data *nfa, void *data);
 #endif
 
-#if defined __FreeBSD__
-extern "C" {
-#include "bridge.c.inc"
-};
-#endif
-
 /* **************************************************** */
 
 NwInterface::NwInterface(u_int nf_device_id,
@@ -87,7 +81,7 @@ NwInterface::NwInterface(u_int nf_device_id,
 
   nf_fd = nfq_fd(nfHandle);
 #endif
-  
+
   if(!conf->getZMQUrl().empty()) {
     std::string url = conf->getZMQUrl();
     std::string enc = conf->getZMQEncryptionKey();
@@ -101,16 +95,17 @@ NwInterface::NwInterface(u_int nf_device_id,
 /* **************************************************** */
 
 NwInterface::~NwInterface() {
-    for(u_int i=0, s = pipes.size(); i < s; i++)
+#ifndef __linux__
+  if(pcap_handle != NULL)
+    pcap_close(pcap_handle);
+#endif
+  
+  for(u_int i=0, s = pipes.size(); i < s; i++)
     pclose(pipes[i]);
 
   for(std::unordered_map<std::string, WatchMatches*>::iterator it = watches_blacklist.begin();
       it != watches_blacklist.end(); it++)
     delete it->second;
-  
-#if defined __FreeBSD__
-  netmapBridgeShutdown();
-#endif
 
   /* Wait until the reload thread ends */
   if(reloaderThread) {
@@ -128,7 +123,7 @@ NwInterface::~NwInterface() {
   if(queueHandle) nfq_destroy_queue(queueHandle);
   if(nfHandle)    nfq_close(nfHandle);
 #endif
-  
+
   logStartStop(false /* stop */);
   if(zmq)         delete zmq;
 }
@@ -166,11 +161,11 @@ int netfilter_callback(struct nfq_q_handle *qh,
 void NwInterface::packetPollLoop() {
   struct nfq_handle *h;
   int fd;
-  std::vector<bool>  geo_ip_pipes;  
+  std::vector<bool>  geo_ip_pipes;
   u_int num_loops = 0;
 
   watches = conf->get_watches();
-  
+
   /* Spawn reload config thread in background */
   reloaderThread = new std::thread(&NwInterface::reloadConfLoop, this);
 
@@ -199,13 +194,19 @@ void NwInterface::packetPollLoop() {
 #ifdef __linux__
   h = get_nfHandle();
   fd = get_fd();
+#else
+  char errbuf[PCAP_ERRBUF_SIZE];
+
+  pcap_handle = pcap_open_live(conf->getInterfaceName(), 1600, 0 /* promisc */, 1000, errbuf);
+
+  if(pcap_handle == NULL) {
+    trace->traceEvent(TRACE_ERROR, "Unable to open %s: %s",
+		      conf->getInterfaceName(), errbuf);
+    exit(1);
+  } else
+    pcap_handle_fileno = pcap_fileno(pcap_handle);
 #endif
 
-#if defined __FreeBSD__
-  if(netmapBridgeSetup(conf->getInterfaceName()) != 0)
-    return;
-#endif
-  
   while(isRunning()) {
     fd_set mask;
     struct timeval wait_time;
@@ -223,10 +224,18 @@ void NwInterface::packetPollLoop() {
 	max_fd = fd;
     }
 
-    wait_time.tv_sec = 1, wait_time.tv_usec = 0;
+#ifndef __linux__
+    if(pcap_handle_fileno != -1) {
+      FD_SET(pcap_handle_fileno, &mask);
 
-    id = num = select(max_fd+1, &mask, 0, 0, &wait_time);
+      if(pcap_handle_fileno > max_fd)
+	max_fd = pcap_handle_fileno;
+    }
+#endif
     
+    wait_time.tv_sec = 1, wait_time.tv_usec = 0;
+    id = num = select(max_fd+1, &mask, 0, 0, &wait_time);
+
     num_loops++;
 
     if(num > 0) {
@@ -251,65 +260,80 @@ void NwInterface::packetPollLoop() {
 	num--;
       }
 #endif
-      
-      if(num > 0) {
-	/* Watches */
 
-	for(u_int i=0, s = pipes_fileno.size(); i < s; i++) {
-	  if(FD_ISSET(pipes_fileno[i].first, &mask)) {
-	    char ip[64];
+      /* Watches */
+      for(u_int i=0, s = pipes_fileno.size(); i < s; i++) {
+	if(FD_ISSET(pipes_fileno[i].first, &mask)) {
+	  char ip[64];
 
-	    while(fgets(ip, sizeof(ip), pipes[i]) != NULL) {
-	      char ip_country[3]={}, ip_continent[3]={};
-	      
+	  while(fgets(ip, sizeof(ip), pipes[i]) != NULL) {
+	    char ip_country[3]={}, ip_continent[3]={};
+
 #ifdef DEBUG
-	      trace->traceEvent(TRACE_ERROR, "Watch %s received %s", pipes_fileno[i].second, ip);
+	    trace->traceEvent(TRACE_ERROR, "Watch %s received %s", pipes_fileno[i].second, ip);
 #endif
-	      ip[strlen(ip)-1] = '\0'; /* Zap trailing /n */
-	      geoip->lookup(ip, ip_country, sizeof(ip_country), ip_continent, sizeof(ip_continent));
-	      
-	      if(geo_ip_pipes[i] == true /* geo-ip */) {
-		/*
-		   In this case we need to check if the returned IP
-		   has to be geographically banned or not
-		*/
+	    ip[strlen(ip)-1] = '\0'; /* Zap trailing /n */
+	    geoip->lookup(ip, ip_country, sizeof(ip_country), ip_continent, sizeof(ip_continent));
 
-		if(strchr(ip, ':') == NULL) {
-		  /* IPv4 */
-		  struct in_addr ip_addr;
-		  
-		  ip_addr.s_addr = inet_addr(ip);
-		  
-		  if(conf->isBlacklistedIPv4(&ip_addr))
-		    ban(ip, true, "ban-" + pipes_fileno[i].second, ip_country);
-		} else {
-		  /* IPv6 */
-		  struct in6_addr ip_addr;
+	    if(geo_ip_pipes[i] == true /* geo-ip */) {
+	      /*
+		In this case we need to check if the returned IP
+		has to be geographically banned or not
+	      */
 
-		  inet_pton(AF_INET6, ip, &ip_addr);
+	      if(strchr(ip, ':') == NULL) {
+		/* IPv4 */
+		struct in_addr ip_addr;
 
-		  if(conf->isBlacklistedIPv6(&ip_addr))
-		    ban(ip, true, "ban-" + pipes_fileno[i].second, ip_country);
-		}
+		ip_addr.s_addr = inet_addr(ip);
 
-		if(ip_country[0] != '\0') {
-		  if(conf->getMarker(ip_country, ip_continent).get() != conf->getMarkerPass().get())
-		    ban(ip, true, "ban-" + pipes_fileno[i].second, ip_country);
-		}				
+		if(conf->isBlacklistedIPv4(&ip_addr))
+		  ban(ip, true, "ban-" + pipes_fileno[i].second, ip_country);
 	      } else {
-		/* In this case the IP has to be banned immediately */
-		ban(ip, true, "ban-" + pipes_fileno[i].second, ip_country);
+		/* IPv6 */
+		struct in6_addr ip_addr;
+
+		inet_pton(AF_INET6, ip, &ip_addr);
+
+		if(conf->isBlacklistedIPv6(&ip_addr))
+		  ban(ip, true, "ban-" + pipes_fileno[i].second, ip_country);
+	      }
+
+	      if(ip_country[0] != '\0') {
+		if(conf->getMarker(ip_country, ip_continent).get() != conf->getMarkerPass().get())
+		  ban(ip, true, "ban-" + pipes_fileno[i].second, ip_country);
+	      }
+	    } else {
+	      /* In this case the IP has to be banned immediately */
+	      ban(ip, true, "ban-" + pipes_fileno[i].second, ip_country);
+	    }
+	  }
+	}
+      } /* for */
+
+#ifndef __linux__
+	if(FD_ISSET(pcap_handle_fileno, &mask)) {
+	  struct pcap_pkthdr hdr;
+	  const u_char *packet = pcap_next(pcap_handle, &hdr);
+
+	  if(packet != NULL) {
+	    struct ndpi_ethhdr *e = (struct ndpi_ethhdr*)packet;
+	    u_int16_t l3_proto = ntohs(e->h_proto);
+
+	    if((l3_proto == ETHERTYPE_IP) || (l3_proto == ETHERTYPE_IPV6)) {
+	      /* IPv4 or IPv6 */
+	      u_int16_t marker = dissectPacket(&packet[sizeof(ndpi_ethhdr)],
+					       hdr.caplen - sizeof(ndpi_ethhdr)).get();
+
+	      if(marker == conf->getMarkerDrop().get()) {
+		/* Eventually do an action */
 	      }
 	    }
 	  }
 	}
-      }
+#endif
     }
 
-#if defined __FreeBSD__
-    netmapBridgeProcessPacket(this, conf);
-#endif
-    
     if((id == 0) || (num_loops > NUM_PURGE_LOOP)) {
       harvestWatches();
       num_loops = 0;
@@ -389,8 +413,8 @@ Marker NwInterface::dissectPacket(const u_char *payload, u_int payload_len) {
     }
 
     return(makeVerdict(proto, vlan_id,
-                        src_port, dst_port,
-                        src, dst, ipv4, ipv6));
+		       src_port, dst_port,
+		       src, dst, ipv4, ipv6));
   }
 
   return(conf->getMarkerPass());
@@ -441,7 +465,7 @@ bool NwInterface::isBroadMulticastIPv4(u_int32_t addr /* network byte order */) 
 bool NwInterface::isPrivateIPv6(struct ndpi_in6_addr addr) {
   bool is_link_local, is_unique_local;
   u_int32_t first_byte = ntohl(addr.u6_addr.u6_addr32[0]);
-  
+
   is_link_local   = (first_byte & (0xffc00000)) == (0xfe800000); // check the first 10 bits
   is_unique_local = (first_byte & (0xfe000000)) == (0xfc000000); // check the first 7 bits
 
@@ -617,7 +641,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
     }
 
     inet_pton(AF_INET6, dst_host, &a);
-    
+
     if(conf->isBlacklistedIPv6(&a)) {
       logFlow(proto_name,
               src_host, sport, src_country, src_continent, false,
@@ -827,7 +851,7 @@ void NwInterface::ban(char *host, bool ban_ip, std::string reason, std::string c
       trace->traceEvent(TRACE_NORMAL, "%s", cmdbuf);
 #endif
 #endif
-      
+
 #ifdef __linux__
       try {
 	Utils::execCmd(cmdbuf);
@@ -853,7 +877,7 @@ void NwInterface::ban(char *host, bool ban_ip, std::string reason, std::string c
     trace->traceEvent(TRACE_NORMAL, "%s", cmdbuf);
 #endif
 #endif
-    
+
     logHostBan(host, ban_ip, reason, country);
 
 #ifdef __linux__

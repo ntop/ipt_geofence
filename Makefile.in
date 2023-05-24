@@ -24,8 +24,6 @@ zmqReceiver: zmqReceiver.cpp Utils.o Trace.o Makefile
 %.o: %.cpp $(HEADERS) Makefile
 	$(CXX) $(CPPFLAGS) -c $< -o $@
 
-NwInterface.cpp : bridge.c.inc
-
 clean:
 	/bin/rm -rf *~ *~ *.o $(TARGET)
 

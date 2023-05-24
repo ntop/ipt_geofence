@@ -43,6 +43,10 @@ class NwInterface {
   std::unordered_map<std::string, WatchMatches*> watches_blacklist;
   std::string confPath;
   ZMQ *zmq;
+#ifndef __linux__
+  pcap_t *pcap_handle;
+  int pcap_handle_fileno;
+#endif
   std::unordered_map<std::string, std::pair<std::string,bool> > *watches;
   std::vector<FILE*> pipes;
   std::vector<std::pair<int, std::string>> pipes_fileno;
