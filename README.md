@@ -1,7 +1,7 @@
 # ipt_geofence
-Geographical host protection for Linux
+Geographical host protection for Linux and FreeBSD
 
-This tool allows you to protect your host/network by preventing communications with unwanted countries (aka geofencing). Furthermore it allows you to specify a list of blacklists that enable you to drop well-known attackers.
+This tool allows you to protect your host/network by preventing communications with unwanted countries (aka geofencing). Furthermore, it allows you to specify a list of blacklists that enable you to drop well-known attackers.
 
 # Prerequisites
 You need to install GeoIP libraries, Netfilter Queue, curl and JSONCPP packages in addition to the compiler.
