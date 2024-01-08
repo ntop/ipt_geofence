@@ -2,7 +2,7 @@
 /* config.h.in.  Generated from configure.ac by autoheader.  */
 
 /* Define to 1 if you have the <inttypes.h> header file. */
-/* #undef HAVE_INTTYPES_H */
+#define HAVE_INTTYPES_H 1
 
 /* Define to 1 if you have the `jsoncpp' library (-ljsoncpp). */
 #define HAVE_LIBJSONCPP 1
@@ -12,43 +12,43 @@
 
 /* Define to 1 if you have the <libnetfilter_queue/libnetfilter_queue.h>
    header file. */
-/* #undef HAVE_LIBNETFILTER_QUEUE_LIBNETFILTER_QUEUE_H */
+#define HAVE_LIBNETFILTER_QUEUE_LIBNETFILTER_QUEUE_H 1
 
 /* Define to 1 if you have the `zmq' library (-lzmq). */
 #define HAVE_LIBZMQ 1
 
+/* Define to 1 if you have the <memory.h> header file. */
+#define HAVE_MEMORY_H 1
+
 /* nfq is present */
-/* #undef HAVE_NETFILTER */
+#define HAVE_NETFILTER 1
 
 /* Define to 1 if you have the <stdint.h> header file. */
-/* #undef HAVE_STDINT_H */
-
-/* Define to 1 if you have the <stdio.h> header file. */
-/* #undef HAVE_STDIO_H */
+#define HAVE_STDINT_H 1
 
 /* Define to 1 if you have the <stdlib.h> header file. */
-/* #undef HAVE_STDLIB_H */
+#define HAVE_STDLIB_H 1
 
 /* Define to 1 if you have the <strings.h> header file. */
-/* #undef HAVE_STRINGS_H */
+#define HAVE_STRINGS_H 1
 
 /* Define to 1 if you have the <string.h> header file. */
-/* #undef HAVE_STRING_H */
+#define HAVE_STRING_H 1
 
 /* Define to 1 if you have the <sys/stat.h> header file. */
-/* #undef HAVE_SYS_STAT_H */
+#define HAVE_SYS_STAT_H 1
 
 /* Define to 1 if you have the <sys/types.h> header file. */
-/* #undef HAVE_SYS_TYPES_H */
+#define HAVE_SYS_TYPES_H 1
 
 /* Define to 1 if you have the <unistd.h> header file. */
-/* #undef HAVE_UNISTD_H */
+#define HAVE_UNISTD_H 1
 
 /* ZMQ is present */
 #define HAVE_ZMQ 1
 
 /* release version */
-#define IPT_RELEASE "1.0.230524"
+#define IPT_RELEASE "1.0.240108"
 
 /* Define to the address where bug reports for this package should be sent. */
 #define PACKAGE_BUGREPORT ""
@@ -68,7 +68,5 @@
 /* Define to the version of this package. */
 #define PACKAGE_VERSION "1.0"
 
-/* Define to 1 if all of the C90 standard headers exist (not just the ones
-   required in a freestanding environment). This macro is provided for
-   backward compatibility; new code need not use it. */
-/* #undef STDC_HEADERS */
+/* Define to 1 if you have the ANSI C header files. */
+#define STDC_HEADERS 1

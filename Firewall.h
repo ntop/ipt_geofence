@@ -19,8 +19,8 @@
  *
  */
 
-#ifndef _LINUX_FIREWALL_H_
-#define _LINUX_FIREWALL_H_
+#ifndef _FIREWALL_H_
+#define _FIREWALL_H_
 
 /* ********************************************** */
 
@@ -44,6 +44,6 @@ public:
 
 };
 
-#endif /* _LINUX_FIREWALL_H_ */
+#endif /* _FIREWALL_H_ */
 
   

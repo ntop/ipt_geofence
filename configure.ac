@@ -46,6 +46,7 @@ if test $SYSTEM != "FreeBSD" && test $SYSTEM != "Darwin"; then
   fi
 else
   LIBS="$LIBS -lpcap"
+  CXX="$CXX -fno-color-diagnostics"
 fi
 
 dnl> GeoIP
