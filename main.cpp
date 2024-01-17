@@ -34,13 +34,18 @@ cloud_handler *cloud = NULL;
 static int get_uuid(char *buf, u_int buf_len) {
   const char *cmd = "/bin/ls /dev/disk/by-uuid | sort -u|head -1";
   FILE *fp;
+  int l;
   
   fp = popen(cmd, "r");
   if (fp == NULL)
     return(-1);
 
   memset(buf, 0, buf_len);
+  fgets(buf, buf_len, fp);
 
+  if((l = strlen(buf)) > 0)
+    buf[l-1] = '\0';
+  
   pclose(fp);
 
   return(0);
@@ -216,7 +221,7 @@ int main(int argc, char *argv[]) {
 					  (char*)"ipt_geofence")) == NULL) {
       trace->traceEvent(TRACE_ERROR, "Unable to connect to the ntop cloud");
     } else {
-      trace->traceEvent(TRACE_NORMAL, "Successfully connected to ntop cloud");
+      trace->traceEvent(TRACE_NORMAL, "Successfully connected to ntop cloud [%s]", uuid);
       
       /* Advertise the application is up */
       if(!ntop_cloud_register_msg(cloud,				  
@@ -233,6 +238,8 @@ int main(int argc, char *argv[]) {
 	trace->traceEvent(TRACE_NORMAL, "Unique id %s", cloud->my_topic);
       }
     }
+  } else {
+    trace->traceEvent(TRACE_ERROR, "Unable to connect to ntop cloud [%s]", uuid);
   }
 #endif
   
