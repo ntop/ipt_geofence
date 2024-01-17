@@ -32,6 +32,10 @@ int netfilter_callback(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg,
 		       struct nfq_data *nfa, void *data);
 #endif
 
+#ifdef HAVE_NTOP_CLOUD
+extern cloud_handler *cloud;
+#endif
+
 /* **************************************************** */
 
 NwInterface::NwInterface(u_int nf_device_id,
@@ -299,7 +303,7 @@ void NwInterface::packetPollLoop() {
 		ip_addr.s_addr = inet_addr(ip);
 
 		if(conf->isBlacklistedIPv4(&ip_addr))
-		  ban(ip, true, "ban-" + pipes_fileno[i].second, ip_country);
+		  ban(ip, true, true, "ban-" + pipes_fileno[i].second, ip_country);
 	      } else {
 		/* IPv6 */
 		struct in6_addr ip_addr;
@@ -307,16 +311,16 @@ void NwInterface::packetPollLoop() {
 		inet_pton(AF_INET6, ip, &ip_addr);
 
 		if(conf->isBlacklistedIPv6(&ip_addr))
-		  ban(ip, true, "ban-" + pipes_fileno[i].second, ip_country);
+		  ban(ip, true, true, "ban-" + pipes_fileno[i].second, ip_country);
 	      }
 
 	      if(ip_country[0] != '\0') {
 		if(conf->getMarker(ip_country, ip_continent).get() != conf->getMarkerPass().get())
-		  ban(ip, true, "ban-" + pipes_fileno[i].second, ip_country);
+		  ban(ip, true, true, "ban-" + pipes_fileno[i].second, ip_country);
 	      }
 	    } else {
 	      /* In this case the IP has to be banned immediately */
-	      ban(ip, true, "ban-" + pipes_fileno[i].second, ip_country);
+	      ban(ip, true, true, "ban-" + pipes_fileno[i].second, ip_country);
 	    }
 	  }
 	}
@@ -494,7 +498,9 @@ void NwInterface::addCommonJSON(Json::Value *root) {
 
 /* **************************************************** */
 
-void NwInterface::logHostBan(char *host_ip, bool ban_ip, std::string reason,
+void NwInterface::logHostBan(char *host_ip,
+			     bool ban_ip, bool ban_traffic,
+			     std::string reason,
 			     std::string country) {
   Json::Value root;
   std::string json_txt;
@@ -520,6 +526,15 @@ void NwInterface::logHostBan(char *host_ip, bool ban_ip, std::string reason,
 
     conf->execDeferredCmd(cmd);
   }
+
+#ifdef HAVE_NTOP_CLOUD
+  if(cloud && ban_ip) {
+    ntop_cloud_report_host_blacklist(cloud, host_ip,
+				     ban_traffic ? bl_geofence_monitored_port : bl_geofence_watch,
+				     (char*)reason.c_str());
+
+  }
+#endif
 }
 
 /* **************************************************** */
@@ -684,7 +699,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
 	    dst_host, dport, dst_country, dst_continent, false,
 	    false /* drop */);
 
-    ban(src_host, true /* ban */, "ban-honeypot", src_country);
+    ban(src_host, true /* ban */, true, "ban-honeypot", src_country);
     return(conf->getMarkerDrop());
   }
 
@@ -750,7 +765,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
 	    false /* drop */);
 
     if((proto == IPPROTO_TCP) || (proto == IPPROTO_UDP)) /* Ignore non TCP/UDP */
-      ban(src_host, true /* ban */, msg, src_country);
+      ban(src_host, true /* ban */, true, msg, src_country);
   }
 
   return(m);
@@ -833,7 +848,7 @@ void NwInterface::harvestWatches() {
 #ifdef DEBUG
       trace->traceEvent(TRACE_NORMAL, "Harvesting");
 #endif
-      ban((char*)it->first.c_str(), false /* unban */, "unban", "");
+      ban((char*)it->first.c_str(), false /* unban */, false, "unban", "");
       delete it->second;
       watches_blacklist.erase(it++);    // or "it = m.erase(it)" since C++11
     } else
@@ -843,7 +858,8 @@ void NwInterface::harvestWatches() {
 
 /* **************************************************** */
 
-void NwInterface::ban(char *host, bool ban_ip, std::string reason, std::string country) {
+void NwInterface::ban(char *host, bool ban_ip,
+		      bool ban_traffic, std::string reason, std::string country) {
   char cmdbuf[128];
   bool is_ipv4 = (strchr(host, ':') == NULL) ? true /* IPv4 */ : false /* IPv6 */;
   std::unordered_map<std::string, WatchMatches*>::iterator it = watches_blacklist.find(std::string(host));
@@ -855,7 +871,7 @@ void NwInterface::ban(char *host, bool ban_ip, std::string reason, std::string c
       watches_blacklist[host] = new WatchMatches();
 
       if(fw) fw->ban(host, is_ipv4);
-      logHostBan(host, ban_ip, reason, country);
+      logHostBan(host, ban_ip, ban_traffic, reason, country);
     } else {
       WatchMatches *m = it->second;
 
@@ -865,7 +881,7 @@ void NwInterface::ban(char *host, bool ban_ip, std::string reason, std::string c
     /* Unban */
 
     if(fw) fw->unban(host, is_ipv4);
-    logHostBan(host, ban_ip, reason, country);
+    logHostBan(host, ban_ip, ban_traffic, reason, country);
   }
 }
 
@@ -875,7 +891,7 @@ void NwInterface::ban_ipv4(u_int32_t ip4 /* network byte order */, bool ban_ip,
 			   std::string reason, std::string country) {
   char ipbuf[32], *host = Utils::intoaV4(ntohl(ip4), ipbuf, sizeof(ipbuf));
 
-  ban(host, ban_ip, reason, country);
+  ban(host, ban_ip, true, reason, country);
 }
 
 /* **************************************************** */
@@ -884,7 +900,7 @@ void NwInterface::ban_ipv6(struct ndpi_in6_addr ip6, bool ban_ip,
 			   std::string reason, std::string country) {
   char ipbuf[64], *host = Utils::intoaV6(ip6, 128, ipbuf, sizeof(ipbuf));
 
-  ban(host, ban_ip, reason, country);
+  ban(host, ban_ip, true, reason, country);
 }
 
 /* **************************************************** */

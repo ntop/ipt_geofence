@@ -28,6 +28,26 @@ const char *version = IPT_RELEASE;
 u_int32_t last_modification_time = 0;
 NwInterface *iface;
 
+#ifdef HAVE_NTOP_CLOUD
+cloud_handler *cloud = NULL;
+
+static int get_uuid(char *buf, u_int buf_len) {
+  const char *cmd = "/bin/ls /dev/disk/by-uuid | sort -u|head -1";
+  FILE *fp;
+  
+  fp = popen(cmd, "r");
+  if (fp == NULL)
+    return(-1);
+
+  memset(buf, 0, buf_len);
+
+  pclose(fp);
+
+  return(0);
+}
+
+#endif
+
 // #define DEBUG
 
 /* ************************************************* */
@@ -55,7 +75,7 @@ void sigproc(int sig) {
 
 static void help() {
   printf("Welcome to ipt_geofence v.%s\n", version);
-  printf("Copyright 2021-23 ntop\n");
+  printf("Copyright 2021-24 ntop\n");
 
   printf("\nUsage:\n");
   printf("ipt_geofence [-h][-v][-s] -c <config file> -m <city>\n");
@@ -187,6 +207,35 @@ int main(int argc, char *argv[]) {
   alarm(60);
 #endif
 
+#ifdef HAVE_NTOP_CLOUD
+  char uuid[64];
+  
+  if(get_uuid(uuid, sizeof(uuid)) == 0) {
+    if((cloud = init_ntop_cloud_from_conf(NULL /* Use system cloud.conf */,
+					  uuid,
+					  (char*)"ipt_geofence")) == NULL) {
+      trace->traceEvent(TRACE_ERROR, "Unable to connect to the ntop cloud");
+    } else {
+      trace->traceEvent(TRACE_NORMAL, "Successfully connected to ntop cloud");
+      
+      /* Advertise the application is up */
+      if(!ntop_cloud_register_msg(cloud,				  
+				  (char*)"ipt_geofence",
+				  (char*)PACKAGE_VERSION,
+				  (char*)PACKAGE_MACHINE,
+				  (char*)PACKAGE_OS,
+				  (char*)"community",
+				  uuid
+				  )) {
+	trace->traceEvent(TRACE_ERROR, "Unable to register to the cloud");
+      } else {
+	trace->traceEvent(TRACE_NORMAL, "Successfully registered with the cloud");
+	trace->traceEvent(TRACE_NORMAL, "Unique id %s", cloud->my_topic);
+      }
+    }
+  }
+#endif
+  
   try {
     iface = new NwInterface(conf->getQueueId(), conf, &geoip, confPath);
 

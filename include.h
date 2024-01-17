@@ -76,6 +76,12 @@
 #include <zmq.h>
 #endif
 
+#ifdef HAVE_NTOP_CLOUD
+extern "C" {
+#include "ntop_cloud.h"
+};
+#endif
+
 /* ***** C++ ***** */
 #include <unordered_map>
 #include <fstream>

@@ -12,6 +12,17 @@ GIT_HASH=`git log --pretty=format:"%H (%ad)"|head -1`
 MACHINE=`uname -m`
 SYSTEM=`uname -s`
 
+AC_DEFINE_UNQUOTED(PACKAGE_MACHINE, "$MACHINE", [Machine definition])
+
+
+if [ test -f /usr/bin/lsb_release ]; then
+   OSNAME=`/usr/bin/lsb_release -d|cut -d ':' -f 2| sed -e 's/^[[[:space:]]]*//'`
+else
+   OS="Unknown"
+fi
+
+AC_DEFINE_UNQUOTED(PACKAGE_OS, "$OSNAME", [Opeating system])
+   
 CFLAGS="${CFLAGS} -I/usr/local/include -I/opt/homebrew/include"
 LDFLAGS="${LDFLAGS} -L/usr/local/lib -L/opt/homebrew/lib"
 
@@ -47,6 +58,24 @@ if test $SYSTEM != "FreeBSD" && test $SYSTEM != "Darwin"; then
 else
   LIBS="$LIBS -lpcap"
   CXX="$CXX -fno-color-diagnostics"
+fi
+
+NTOPCLOUD_HOME="../ntopcloud"
+if test -d "${NTOPCLOUD_HOME}"; then
+  SSL_INC="`pkg-config --cflags libssl` -I/usr/include/openssl"
+  SSL_LIB="`pkg-config --libs libssl` -lssl -lcrypto"
+
+  CFLAGS="${CFLAGS} -I${NTOPCLOUD_HOME} ${SSL_INC}"
+  CXXFLAGS="${CXXFLAGS} -I${NTOPCLOUD_HOME} ${SSL_INC}"
+  LIBS="${LIBS} ${NTOPCLOUD_HOME}/libcloud.a ${SSL_LIB}"
+
+  if test -d /usr/include/json-c; then
+    LIBS="${LIBS} -ljson-c"
+  else
+   echo "FATAL ERROR: Please apt install libjson-c-dev"
+ fi
+
+ AC_DEFINE(HAVE_NTOP_CLOUD, 1, [ntop cloud detected])
 fi
 
 dnl> GeoIP
@@ -118,6 +147,7 @@ fi
 
 AC_SUBST(VERSION)
 AC_SUBST(RELEASE)
+AC_SUBST(SYSTEM)
 AC_SUBST(IPT_RELEASE)
 AC_SUBST(GIT_BRANCH)
 AC_SUBST(GIT_HASH)
