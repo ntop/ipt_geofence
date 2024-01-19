@@ -46,7 +46,7 @@ NwInterface::NwInterface(u_int nf_device_id,
   ifaceRunning = false;
 
   fw = NULL;
-  
+
 #ifdef __linux__
   fw = new LinuxFirewall();
 #else
@@ -54,7 +54,7 @@ NwInterface::NwInterface(u_int nf_device_id,
   fw = new FreeBSDFirewall();
 #endif
 #endif
-  
+
 #ifdef __linux__
   queueId = nf_device_id, nfHandle = nfq_open();
 
@@ -113,7 +113,7 @@ NwInterface::~NwInterface() {
   if(pcap_handle != NULL)
     pcap_close(pcap_handle);
 #endif
-  
+
   for(u_int i=0, s = pipes.size(); i < s; i++)
     pclose(pipes[i]);
 
@@ -140,7 +140,7 @@ NwInterface::~NwInterface() {
 
   logStartStop(false /* stop */);
   if(zmq) delete zmq;
-  if(fw)  delete fw;        
+  if(fw)  delete fw;
 }
 
 /* **************************************************** */
@@ -247,7 +247,7 @@ void NwInterface::packetPollLoop() {
 	max_fd = pcap_handle_fileno;
     }
 #endif
-    
+
     wait_time.tv_sec = 1, wait_time.tv_usec = 0;
     id = num = select(max_fd+1, &mask, 0, 0, &wait_time);
 
@@ -363,9 +363,31 @@ void NwInterface::packetPollLoop() {
 
       trace->traceEvent(TRACE_NORMAL, "New configuration has been updated");
     }
-  }
+
+#ifdef HAVE_NTOP_CLOUD
+    if(cloud != NULL) {
+      char *msg, *out_topic;
+      u_int16_t out_topic_len;
+      u_int32_t msg_len;
+      struct timeval timeout = { 0, 0 };
+
+      if(ntop_cloud_poll(cloud, &timeout,
+			 &out_topic, &out_topic_len,
+			 &msg, &msg_len)) {
+	/* Message received */
+	trace->traceEvent(TRACE_NORMAL,
+			  "[topic %.*s][msg %.*s]",
+			  out_topic_len, out_topic,
+			  msg_len, msg);
+
+	/* TODO process message */
+      }
+    }
+#endif    
+  } /* while */
 
   trace->traceEvent(TRACE_NORMAL, "Leaving packet poll loop");
+
   ifaceRunning = false;
 }
 
@@ -529,6 +551,8 @@ void NwInterface::logHostBan(char *host_ip,
 
 #ifdef HAVE_NTOP_CLOUD
   if(cloud && ban_ip) {
+    trace->traceEvent(TRACE_NORMAL, "Banning host %s", host_ip);
+    
     ntop_cloud_report_host_blacklist(cloud, host_ip,
 				     ban_traffic ? bl_geofence_monitored_port : bl_geofence_watch,
 				     (char*)reason.c_str());
@@ -589,7 +613,7 @@ void NwInterface::logFlow(const char *proto_name,
   if(pass_verdict)
     trace->traceEvent(TRACE_INFO, "%s", json_txt.c_str());
   else {
-    trace->traceEvent(TRACE_NORMAL, "%s", json_txt.c_str());
+    trace->traceEvent(TRACE_INFO, "%s", json_txt.c_str());
 
     if(zmq)
       zmq->sendMessage(ZMQ_TOPIC_NAME, json_txt.c_str());
