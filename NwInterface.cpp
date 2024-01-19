@@ -555,8 +555,12 @@ void NwInterface::logHostBan(char *host_ip,
     
     ntop_cloud_report_host_blacklist(cloud, host_ip,
 				     ban_traffic ? bl_geofence_monitored_port : bl_geofence_watch,
-				     (char*)reason.c_str());
-
+				     (char*)reason.c_str(),
+				     (char*)(ban_ip ? "ban" : "unban"),
+				     (char*)country.c_str(),
+				     (char*)conf->getHostIP(),
+				     (char*)conf->getHostName(),
+				     (char*)(std::string(PACKAGE_NAME) + std::string(" ") + std::string(IPT_RELEASE)).c_str());
   }
 #endif
 }
