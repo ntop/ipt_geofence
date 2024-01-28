@@ -32,10 +32,6 @@ int netfilter_callback(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg,
 		       struct nfq_data *nfa, void *data);
 #endif
 
-#ifdef HAVE_NTOP_CLOUD
-extern cloud_handler *cloud;
-#endif
-
 /* **************************************************** */
 
 NwInterface::NwInterface(u_int nf_device_id,
@@ -362,28 +358,7 @@ void NwInterface::packetPollLoop() {
       shadowConf = NULL;
 
       trace->traceEvent(TRACE_NORMAL, "New configuration has been updated");
-    }
-
-#ifdef HAVE_NTOP_CLOUD
-    if(cloud != NULL) {
-      char *msg, *out_topic;
-      u_int16_t out_topic_len;
-      u_int32_t msg_len;
-      struct timeval timeout = { 0, 0 };
-
-      if(ntop_cloud_poll(cloud, &timeout,
-			 &out_topic, &out_topic_len,
-			 &msg, &msg_len)) {
-	/* Message received */
-	trace->traceEvent(TRACE_NORMAL,
-			  "[topic %.*s][msg %.*s]",
-			  out_topic_len, out_topic,
-			  msg_len, msg);
-
-	/* TODO process message */
-      }
-    }
-#endif    
+    }    
   } /* while */
 
   trace->traceEvent(TRACE_NORMAL, "Leaving packet poll loop");
@@ -550,17 +525,15 @@ void NwInterface::logHostBan(char *host_ip,
   }
 
 #ifdef HAVE_NTOP_CLOUD
-  if(cloud && ban_ip) {
-    trace->traceEvent(TRACE_NORMAL, "Banning host %s", host_ip);
-    
-    ntop_cloud_report_host_blacklist(cloud, host_ip,
-				     ban_traffic ? bl_geofence_monitored_port : bl_geofence_watch,
-				     (char*)reason.c_str(),
-				     (char*)(ban_ip ? "ban" : "unban"),
-				     (char*)country.c_str(),
-				     (char*)conf->getHostIP(),
-				     (char*)conf->getHostName(),
-				     (char*)(std::string(PACKAGE_NAME) + std::string(" ") + std::string(IPT_RELEASE)).c_str());
+  if(cloud && ban_ip) {    
+    cloud->ban(host_ip,
+	       ban_traffic ? bl_geofence_monitored_port : bl_geofence_watch,
+	       (char*)reason.c_str(),
+	       (char*)(ban_ip ? "ban" : "unban"),
+	       (char*)country.c_str(),
+	       (char*)conf->getHostIP(),
+	       (char*)conf->getHostName(),
+	       (char*)(std::string(PACKAGE_NAME) + std::string(" ") + std::string(IPT_RELEASE)).c_str());
   }
 #endif
 }

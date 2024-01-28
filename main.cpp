@@ -29,31 +29,7 @@ u_int32_t last_modification_time = 0;
 NwInterface *iface;
 
 #ifdef HAVE_NTOP_CLOUD
-cloud_handler *cloud = NULL;
-
-static int get_uuid(char *buf, u_int buf_len) {
-  const char *cmd = "/bin/ls /dev/disk/by-uuid | sort -u|head -1";
-  FILE *fp;
-  int l;
-  char *ret;
-  
-  fp = popen(cmd, "r");
-  if (fp == NULL)
-    return(-1);
-
-  memset(buf, 0, buf_len);
-  ret = fgets(buf, buf_len, fp);
-
-  if(ret != NULL) {
-    if((l = strlen(buf)) > 0)
-      buf[l-1] = '\0';
-  }
-  
-  pclose(fp);
-
-  return(0);
-}
-
+NtopCloud *cloud = NULL;
 #endif
 
 // #define DEBUG
@@ -216,34 +192,10 @@ int main(int argc, char *argv[]) {
 #endif
 
 #ifdef HAVE_NTOP_CLOUD
-  char uuid[64];
-  
-  if(get_uuid(uuid, sizeof(uuid)) == 0) {
-    if((cloud = init_ntop_cloud_from_conf(NULL /* Use system cloud.conf */,
-					  uuid,
-					  (char*)"ipt_geofence")) == NULL) {
-      trace->traceEvent(TRACE_ERROR, "Unable to connect to the ntop cloud");
-    } else {
-      trace->traceEvent(TRACE_NORMAL, "Successfully connected to ntop cloud [%s]",
-			cloud->my_topic);
-      
-      /* Advertise the application is up */
-      if(!ntop_cloud_register_msg(cloud,				  
-				  (char*)"ipt_geofence",
-				  (char*)PACKAGE_VERSION,
-				  (char*)PACKAGE_MACHINE,
-				  (char*)PACKAGE_OS,
-				  (char*)"community",
-				  uuid
-				  )) {
-	trace->traceEvent(TRACE_ERROR, "Unable to register to the cloud");
-      } else {
-	trace->traceEvent(TRACE_NORMAL, "Successfully registered with the cloud");
-	trace->traceEvent(TRACE_NORMAL, "Unique id %s", cloud->my_topic);
-      }
-    }
-  } else {
-    trace->traceEvent(TRACE_ERROR, "Unable to connect to ntop cloud [%s]", uuid);
+  try {
+    cloud = new NtopCloud();
+  } catch (...) {
+    cloud = NULL;
   }
 #endif
   
@@ -257,6 +209,10 @@ int main(int argc, char *argv[]) {
 		      "errors and try again");
   }
 
+#ifdef NTOP_CLOUD
+  if(cloud) delete cloud;
+#endif
+  
   delete iface;
   delete conf;
 
