@@ -23,6 +23,7 @@
 
 #ifdef HAVE_NTOP_CLOUD
 
+
 /* ******************************* */
 
 static void infiniteloop(NtopCloud &obj) {
@@ -43,7 +44,7 @@ NtopCloud::NtopCloud() {
       trace->traceEvent(TRACE_ERROR, "Unable to connect to the ntop cloud");
     } else {
       trace->traceEvent(TRACE_NORMAL, "Successfully connected to ntop cloud [%s]",
-			cloud->my_topic);
+			ntop_cloud_get_topic_name(cloud));
 
       /* Advertise the application is up */
       if(!ntop_cloud_register_msg(cloud,
@@ -55,7 +56,7 @@ NtopCloud::NtopCloud() {
 	trace->traceEvent(TRACE_ERROR, "Unable to register to the cloud");
       } else {
 	trace->traceEvent(TRACE_NORMAL, "Successfully registered with the cloud");
-	trace->traceEvent(TRACE_NORMAL, "Unique id %s", cloud->my_topic);
+	trace->traceEvent(TRACE_NORMAL, "Unique id %s", ntop_cloud_get_topic_name(cloud));
       }
     }
 
@@ -102,7 +103,7 @@ void NtopCloud::poll() {
   char *msg, *out_topic;
   u_int16_t out_topic_len;
   u_int32_t msg_len;
-  struct timeval timeout = { 1, 0 };
+  struct timeval timeout = { 1 /* sec */, 0 };
 
   if(ntop_cloud_poll(cloud, &timeout,
 		     &out_topic, &out_topic_len,
@@ -113,13 +114,40 @@ void NtopCloud::poll() {
 		      out_topic_len, out_topic,
 		      msg_len, msg);
 
-    /* TODO process message */
+    if(ntop_cloud_handle_message(cloud, out_topic, out_topic_len,
+				 msg, msg_len, NULL, NULL) == false)
+      trace->traceEvent(TRACE_WARNING, "Unable to handle received message");
+  }
+
+  if(!messages.empty()) {
+    bool ret;
+    BanMsg b_msg;
+
+    m.lock();
+    b_msg = messages.front();
+    messages.erase(messages.begin());
+    m.unlock();
+
+    trace->traceEvent(TRACE_NORMAL, "Banning host %s", b_msg.host_ip.c_str());
+
+    ret = ntop_cloud_report_host_blacklist(cloud,
+					   (char*)b_msg.host_ip.c_str(),
+					   b_msg.reason,
+					   (char*)b_msg.details.c_str(),
+					   (char*)b_msg.action.c_str(),
+					   (char*)b_msg.additional_info.c_str(),
+					   (char*)b_msg.reporter_ip.c_str(),
+					   (char*)b_msg.reporter_host.c_str(),
+					   (char*)b_msg.reporter_version.c_str());
+
+    if(!ret)
+      trace->traceEvent(TRACE_NORMAL, "Banning message sent %s", ret ? "OK" : "ERROR");
   }
 }
 
 /* ******************************* */
 
-bool NtopCloud::ban(char *host_ip,
+void NtopCloud::ban(char *host_ip,
 		    host_blacklist_reason reason,
 		    char *details,
 		    char *action,
@@ -127,17 +155,22 @@ bool NtopCloud::ban(char *host_ip,
 		    char *reporter_ip,
 		    char *reporter_host,
 		    char *reporter_version) {
-  bool ret;
+  BanMsg b_msg;
 
-  ret = ntop_cloud_report_host_blacklist(cloud, host_ip,
-					 reason, details,
-					 action, additional_info,
-					 reporter_ip, reporter_host,
-					 reporter_version);
-  
-  trace->traceEvent(TRACE_NORMAL, "Banning host %s", host_ip);
+  b_msg.host_ip = std::string(host_ip);
+  b_msg.reason = reason;
+  b_msg.details = std::string(details);
+  b_msg.action = std::string(action);
+  b_msg.additional_info = std::string(additional_info);
+  b_msg.reporter_ip = std::string(reporter_ip);
+  b_msg.reporter_host = std::string(reporter_host);
+  b_msg.reporter_version = std::string(reporter_version);
 
-  return(ret);
+  m.lock();
+  messages.push_back(b_msg);
+  m.unlock();
+
+  trace->traceEvent(TRACE_INFO, "Queued banned host %s", host_ip);
 }
 
 /* ******************************* */

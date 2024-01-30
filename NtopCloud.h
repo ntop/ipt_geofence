@@ -26,10 +26,26 @@
 
 /* ******************************* */
 
+class BanMsg {
+public:
+  std::string host_ip;
+  host_blacklist_reason reason;
+  std::string details;
+  std::string action;
+  std::string additional_info;
+  std::string reporter_ip;
+  std::string reporter_host;
+  std::string reporter_version;
+};
+
+/* ******************************* */
+
 class NtopCloud {
  private:
   cloud_handler *cloud;
   std::thread   infinite_thread;
+  std::vector<BanMsg> messages;
+  std::mutex m;
   
   int get_uuid(char *buf, u_int buf_len);
 
@@ -38,7 +54,7 @@ class NtopCloud {
   ~NtopCloud();
 
   void poll();
-  bool ban(char *host_ip, host_blacklist_reason reason,
+  void ban(char *host_ip, host_blacklist_reason reason,
 	   char *details, char *action,
 	   char *additional_info, char *reporter_ip,
 	   char *reporter_host, char *reporter_version);

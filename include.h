@@ -91,6 +91,7 @@ extern "C" {
 #include <thread>
 #include <list>
 #include <set>
+#include <vector>
 #include <mutex>
 #include <queue>
 
