@@ -42,6 +42,7 @@ NtopCloud::NtopCloud() {
 					  uuid,
 					  (char*)"ipt_geofence")) == NULL) {
       trace->traceEvent(TRACE_ERROR, "Unable to connect to the ntop cloud");
+      throw("Unable to connect to ntop cloud");
     } else {
       trace->traceEvent(TRACE_NORMAL, "Successfully connected to ntop cloud [%s]",
 			ntop_cloud_get_topic_name(cloud));
@@ -54,6 +55,7 @@ NtopCloud::NtopCloud() {
 				  (char*)PACKAGE_OS,
 				  (char*)"community", uuid)) {
 	trace->traceEvent(TRACE_ERROR, "Unable to register to the cloud");
+	throw("Unable to connect to ntop cloud");
       } else {
 	trace->traceEvent(TRACE_NORMAL, "Successfully registered with the cloud");
 	trace->traceEvent(TRACE_NORMAL, "Unique id %s", ntop_cloud_get_topic_name(cloud));
