@@ -7,9 +7,15 @@ GIT_COMMITS=`git rev-list --count HEAD`
 MACHINE=`uname -m`
 SHORT_MACHINE=`uname -m | cut -b1-3`
 
-DEBIAN_VERSION=`cat /etc/debian_version | grep "^8" | wc -l`
+DEBIAN_VERSION=`cat /etc/debian_version | cut -d '.' -f 1`
 
-EXTRA_DEP="libnetfilter-queue1, libmaxminddb0, libjsoncpp25, libcurl4, conntrack"
+if test $DEBIAN_VERSION = "10"; then
+ JSONDEP="libjsoncpp1"
+else
+ JSONDEP="libjsoncpp25"
+fi
+
+EXTRA_DEP="libnetfilter-queue1, libmaxminddb0, ${JSONDEP}, libcurl4, conntrack"
 BUILDPACKAGE_EXTRA=
 
 AC_CHECK_LIB([zmq], [zmq_socket_monitor])
