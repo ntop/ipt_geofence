@@ -1798,8 +1798,9 @@ MACHINE=`uname -m`
 SHORT_MACHINE=`uname -m | cut -b1-3`
 
 DEBIAN_VERSION=`cat /etc/debian_version | cut -d '.' -f 1`
+UBUNTU_VERSION=`lsb_release -r| cut -d ':' -f 2 | sed 's/\t//g'`
 
-if test $DEBIAN_VERSION = "10"; then
+if test $DEBIAN_VERSION = "10" || test $UBUNTU_VERSION == "20.04"; then
  JSONDEP="libjsoncpp1"
 else
  JSONDEP="libjsoncpp25"
