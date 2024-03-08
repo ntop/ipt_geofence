@@ -639,7 +639,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
 	      src_host, sport, src_country, src_continent, true,
 	      dst_host, dport, dst_country, dst_continent, false,
 	      false /* drop */);
-
+	ban(src_host, true /* ban */, "ban-blacklist", src_country);
       return(conf->getMarkerDrop());
     }
 
@@ -650,7 +650,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
 	      src_host, sport, src_country, src_continent, false,
 	      dst_host, dport, dst_country, dst_continent, true,
 	      false /* drop */);
-
+	ban(dst_host, true /* ban */, "ban-blacklist", dst_country);
       return(conf->getMarkerDrop());
     }
   } else if(ipv6) {
@@ -663,7 +663,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
               src_host, sport, src_country, src_continent, true,
               dst_host, dport, dst_country, dst_continent, false,
               false /* drop */);
-
+	ban(src_host, true /* ban */, "ban-blacklist", src_country);
       return(conf->getMarkerDrop());
     }
 
@@ -674,7 +674,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
               src_host, sport, src_country, src_continent, false,
               dst_host, dport, dst_country, dst_continent, true,
               false /* drop */);
-
+	ban(dst_host, true /* ban */, "ban-blacklist", dst_country);
       return(conf->getMarkerDrop());
     }
   }
