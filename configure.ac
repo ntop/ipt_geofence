@@ -63,7 +63,7 @@ fi
 NTOPCLOUD_HOME="../ntopcloud"
 if test -d "${NTOPCLOUD_HOME}"; then
   SSL_INC="`pkg-config --cflags libssl` -I/usr/include/openssl"
-  SSL_LIB="`pkg-config --libs libssl` -lssl -lcrypto"
+  SSL_LIB="`pkg-config --libs libssl` -lssl -lcrypto -lsodium"
 
   CFLAGS="${CFLAGS} -I${NTOPCLOUD_HOME} ${SSL_INC}"
   CXXFLAGS="${CXXFLAGS} -I${NTOPCLOUD_HOME} ${SSL_INC}"

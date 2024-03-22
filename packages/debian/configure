@@ -1809,6 +1809,11 @@ fi
 EXTRA_DEP="libnetfilter-queue1, libmaxminddb0, ${JSONDEP}, libcurl4, conntrack"
 BUILDPACKAGE_EXTRA=
 
+NTOPCLOUD_LIB="${HOME}/ntopcloud/libcloud.a"
+if test -d "${NTOPCLOUD_LIB}"; then
+  EXTRA_DEP="${EXTRA_DEP}, libsodium23"
+fi
+
 ac_ext=c
 ac_cpp='$CPP $CPPFLAGS'
 ac_compile='$CC -c $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'

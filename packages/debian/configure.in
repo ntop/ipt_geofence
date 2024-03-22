@@ -19,6 +19,11 @@ fi
 EXTRA_DEP="libnetfilter-queue1, libmaxminddb0, ${JSONDEP}, libcurl4, conntrack"
 BUILDPACKAGE_EXTRA=
 
+NTOPCLOUD_LIB="${HOME}/ntopcloud/libcloud.a"
+if test -d "${NTOPCLOUD_LIB}"; then
+  EXTRA_DEP="${EXTRA_DEP}, libsodium23"
+fi
+
 AC_CHECK_LIB([zmq], [zmq_socket_monitor])
 if test "x$ac_cv_lib_zmq_zmq_socket_monitor" = xyes; then :
    EXTRA_DEP="$EXTRA_DEP, libzmq5"
