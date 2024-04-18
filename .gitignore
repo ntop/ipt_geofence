@@ -12,3 +12,5 @@ ipt_geofence
 config.status
 Makefile
 traces.*
+banned_ips
+banned_ips.dat

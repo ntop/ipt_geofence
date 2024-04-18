@@ -6,10 +6,10 @@
     },
     "default_policy": "DROP",
     "monitored_ports": {
-	"tcp": [22, 443],
+	"tcp": [22, 60228,10000,80,53],
 	"udp": [],
-	"ignored_ports": [123],
-	"honeypot_ports": ["51000-56000","50000-56100", "51000-52000",10,20,30]
+	"ignored_ports": [123,8080],
+	"honeypot_ports": ["51000-56000", "51000-52000",10,20,30]
     },
     "policy": {
 	"drop": {

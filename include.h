@@ -110,6 +110,7 @@ extern "C" {
 
 #include "Trace.h"
 #include "Utils.h"
+#include "BannedIpLogger.h"
 #include "Blacklists.h"
 #include "Marker.h"
 #include "Configuration.h"

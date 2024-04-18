@@ -20,7 +20,6 @@
  */
 
 #include "include.h"
-
 #define TOO_MANY_INVALID_ATTEMPTS    3
 #define NUM_PURGE_LOOP             300
 
@@ -40,7 +39,6 @@ NwInterface::NwInterface(u_int nf_device_id,
   conf = _c, geoip = _g, confPath = c_path;
   reloaderThread = NULL;
   ifaceRunning = false;
-
   fw = NULL;
 
 #ifdef __linux__
@@ -179,7 +177,12 @@ void NwInterface::packetPollLoop() {
 
   /* Spawn reload config thread in background */
   reloaderThread = new std::thread(&NwInterface::reloadConfLoop, this);
-
+  logger = new BannedIpLogger();
+  logger->load(watches_blacklist);
+  //for testing
+  for(std::unordered_map<std::string, WatchMatches*>::iterator it = watches_blacklist.begin();it != watches_blacklist.end(); it++) {
+    std::cout << "Read: " << it -> first << "\n";
+  }
   /* Start watches */
   for(std::unordered_map<std::string, std::pair<std::string, bool>>::iterator it = watches->begin(); it != watches->end(); it++) {
     std::pair<std::string, bool> item = it->second;
@@ -364,6 +367,7 @@ void NwInterface::packetPollLoop() {
   trace->traceEvent(TRACE_NORMAL, "Leaving packet poll loop");
 
   ifaceRunning = false;
+  logger -> save(watches_blacklist);
 }
 
 /* **************************************************** */
@@ -510,7 +514,8 @@ void NwInterface::logHostBan(char *host_ip,
   root["action"] = ban_ip ? "ban" : "unban";
 
   json_txt = writer.write(root);
-
+  //testing
+  std::cout << json_txt << "\n";
   trace->traceEvent(TRACE_INFO, "%s", json_txt.c_str());
 
   if(zmq)
@@ -868,6 +873,8 @@ void NwInterface::ban(char *host, bool ban_ip,
   if(ban_ip) {
     /* Ban */
 
+
+    // ip not found, let's add him
     if(it == watches_blacklist.end()) {
       watches_blacklist[host] = new WatchMatches();
 

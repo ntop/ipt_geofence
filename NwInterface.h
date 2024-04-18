@@ -44,6 +44,7 @@ class NwInterface {
   std::unordered_map<std::string, WatchMatches*> watches_blacklist;
   std::string confPath;
   ZMQ *zmq;
+  BannedIpLogger *logger;
 #ifndef __linux__
   pcap_t *pcap_handle;
   int pcap_handle_fileno;
