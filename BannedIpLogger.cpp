@@ -33,7 +33,7 @@ bool is_empty(std::ifstream& pFile)
   return pFile.peek() == std::ifstream::traits_type::eof();
 }
 
-int BannedIpLogger::load(std::unordered_map<std::string, WatchMatches*> ips) {
+int BannedIpLogger::load(std::unordered_map<std::string, WatchMatches*> *ips) {
   std::cout << "Started loading banned_ips.dat\n";
   std::ifstream rf("banned_ips.dat", std::ios::out | std::ios::binary);
   if(!rf) {
@@ -73,27 +73,8 @@ int BannedIpLogger::load(std::unordered_map<std::string, WatchMatches*> ips) {
   }
   //insert data after the loop has finished
   if(!ips_found.empty())
-    ips.insert(ips_found.begin(),ips_found.end());
+    ips -> insert(ips_found.begin(),ips_found.end());
   rf.close();
-    //std::string line;
-    //std::string test = "ciaoo";
-    //char *result = new char [256];
-    /*while (std::getline(infile, line))
-    {
-        std::istringstream iss(line);
-        std::cout<< iss << " string printed\n";
-        //int a, b;
-        //if (!(iss >> a >> b)) { break; } // error
-
-        // process pair (a,b)
-    }*/
-    /*rf.read(result, sizeof(256));
-    std::cout<< result << " string printed\n";
-    rf.close();
-    if(!rf.good()) {
-        std::cout << "Error occurred at reading time!" ;
-        return 1;
-    }*/
   return 0;
 }
 
@@ -116,24 +97,11 @@ int BannedIpLogger::save(std::unordered_map<std::string, WatchMatches*> ips) {
     wf.write((char*) &size, sizeof(size_t) );
     wf.write( (char*) string_serialized.c_str(), size );
   }
-  //wf.write('\n',1);
   wf.close();
   if(!wf.good()) {
     std::cout << "Error occurred at writing time!";
     return 1;
   }
-  /*std::ofstream wf("banned_ips.dat", std::ios::out | std::ios::binary);
-  if(!wf) {
-  std::cout << "Cannot open file!";
-  return 1;
-  }
-  std::string test = "ciaoo";
-  wf.write(test.c_str(),sizeof (test.c_str()));
-  wf.close();
-  if(!wf.good()) {
-  std::cout << "Error occurred at writing time!";
-  return 1;
-  }*/
   return 0;
 }
 /*
@@ -141,55 +109,3 @@ void serialize(Serializer& out, Map const& map) {
     out << map.size();
     for (auto const& p: map) { out << p.first << p.second; }
 }*/
-
-class Figure
-{
-private:
-    std::string name;
-    std::string type;
-public:
-    Figure(){}
-    Figure(std::string name,std::string type):name(name),type(type){}
-
-    void write(std::ostream& f)
-    {
-        size_t size;
-
-        // we need to store the data from the string along with the size
-        // because to restore it we need to temporarily read it somewhere
-        // before storing it in the std::string (istream::read() doesn't
-        // read directly to std::string)
-
-        size = name.size();
-        f.write( (char*)&size, sizeof(size_t) );
-        f.write( (char*)name.c_str(), size );
-
-        size = type.size();
-        f.write( (char*)&size, sizeof(size_t) );
-        f.write( (char*)type.c_str(), size );
-    }
-    void read(std::istream& f)
-    {
-        size_t size;
-        char *data;
-
-        // when we read the string data we need somewhere to store it
-        // because we std::string isn't a primitive type.  So we read
-        // the size, allocate an array, read the data into the array,
-        // load the std::string, and delete the array
-
-        f.read( (char*)&size, sizeof(size) );
-        data = new char[size+1];
-        f.read( data, size );
-        data[size]='\0';
-        name = data;
-        delete data;
-
-        f.read( (char*)&size, sizeof(size) );
-        data = new char[size+1];
-        f.read( data, size );
-        data[size]='\0';
-        type = data;
-        delete data;
-    }
-};

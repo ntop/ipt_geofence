@@ -178,7 +178,7 @@ void NwInterface::packetPollLoop() {
   /* Spawn reload config thread in background */
   reloaderThread = new std::thread(&NwInterface::reloadConfLoop, this);
   logger = new BannedIpLogger();
-  logger->load(watches_blacklist);
+  logger->load(&watches_blacklist);
   //for testing
   for(std::unordered_map<std::string, WatchMatches*>::iterator it = watches_blacklist.begin();it != watches_blacklist.end(); it++) {
     std::cout << "Read: " << it -> first << "\n";

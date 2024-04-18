@@ -14,7 +14,7 @@
 class BannedIpLogger {
 
  public:
-    int load(std::unordered_map<std::string, WatchMatches*> ips);
+    int load(std::unordered_map<std::string, WatchMatches*> *ips);
     int save(std::unordered_map<std::string, WatchMatches*> ips);
 
 };
