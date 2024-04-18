@@ -6,15 +6,15 @@
     },
     "default_policy": "DROP",
     "monitored_ports": {
-	"tcp": [22, 80, 443],
+	"tcp": [22, 443],
 	"udp": [],
 	"ignored_ports": [123],
 	"honeypot_ports": ["51000-56000","50000-56100", "51000-52000",10,20,30]
     },
     "policy": {
 	"drop": {
-	    "countries_whitelist": ["IT", "DE", "CH", "NL"],
-	    "continents_whitelist": ["NA"]
+	    "countries_whitelist": ["DE", "CH", "NL"],
+	    "continents_whitelist": []
 	},
 	"pass": {
 	    "countries_blacklist": ["RU", "BY"],

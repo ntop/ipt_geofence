@@ -31,14 +31,15 @@ echo 1 > /proc/sys/net/ipv6/conf/all/forwarding
 IPTABLES="iptables"
 # We will execute this code using "ip6tables" instead of "iptables" the second time
 for i in {1,2}; do
-    $IPTABLES -F
-    $IPTABLES -t nat -F
-    $IPTABLES -t mangle -F
+    #$IPTABLES -F
+    #$IPTABLES -t nat -F
+    #$IPTABLES -t mangle -F
 
     # Create the blacklist chain where we will store IP to ban
     # Flush all if already there
     $IPTABLES -F IPT_GEOFENCE_BLACKLIST
     $IPTABLES -X IPT_GEOFENCE_BLACKLIST
+    $IPTABLES -N IPT_GEOFENCE_BLACKLIST
     # Return to the original chain
     $IPTABLES -A IPT_GEOFENCE_BLACKLIST -j RETURN
     # Jump to the blacklist chain

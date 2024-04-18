@@ -1,0 +1,14 @@
+*.o
+output.*
+*.mmdb
+config.h
+config.h.in
+config.log
+configure
+zmqReceiver
+.idea
+requests
+ipt_geofence
+config.status
+Makefile
+traces.*
