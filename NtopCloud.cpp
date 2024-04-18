@@ -50,7 +50,7 @@ NtopCloud::NtopCloud() {
       /* Advertise the application is up */
       if(!ntop_cloud_register_msg(cloud,
 				  (char*)"ipt_geofence",
-				  (char*)PACKAGE_VERSION,
+				  (char*)IPT_RELEASE,
 				  (char*)PACKAGE_MACHINE,
 				  (char*)PACKAGE_OS,
 				  (char*)"community", uuid)) {
@@ -111,7 +111,7 @@ void NtopCloud::poll() {
 		     &out_topic, &out_topic_len,
 		     &msg, &msg_len)) {
     /* Message received */
-    trace->traceEvent(TRACE_NORMAL,
+    trace->traceEvent(TRACE_INFO,
 		      "[topic %.*s][msg %.*s]",
 		      out_topic_len, out_topic,
 		      msg_len, msg);
@@ -130,7 +130,7 @@ void NtopCloud::poll() {
     messages.erase(messages.begin());
     m.unlock();
 
-    trace->traceEvent(TRACE_NORMAL, "Banning host %s", b_msg.host_ip.c_str());
+    trace->traceEvent(TRACE_INFO, "Banning host %s", b_msg.host_ip.c_str());
 
     ret = ntop_cloud_report_host_blacklist(cloud,
 					   (char*)b_msg.host_ip.c_str(),

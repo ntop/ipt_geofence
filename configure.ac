@@ -46,6 +46,8 @@ else
   exit 1
 fi
 
+AC_CHECK_LIB(resolv, inet_aton)
+
 if test $SYSTEM != "FreeBSD" && test $SYSTEM != "Darwin"; then
   AC_CHECK_HEADERS([libnetfilter_queue/libnetfilter_queue.h], AC_DEFINE_UNQUOTED(HAVE_NETFILTER, 1, [nfq is present]))
 
@@ -67,7 +69,7 @@ if test -d "${NTOPCLOUD_HOME}"; then
 
   CFLAGS="${CFLAGS} -I${NTOPCLOUD_HOME} ${SSL_INC}"
   CXXFLAGS="${CXXFLAGS} -I${NTOPCLOUD_HOME} ${SSL_INC}"
-  LIBS="${LIBS} ${NTOPCLOUD_HOME}/libcloud.a ${SSL_LIB}"
+  LIBS="${NTOPCLOUD_HOME}/libcloud.a ${LIBS} ${SSL_LIB}"
 
   if test -d /usr/include/json-c; then
     LIBS="${LIBS} -ljson-c"
