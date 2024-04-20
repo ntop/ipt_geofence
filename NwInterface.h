@@ -43,6 +43,7 @@ class NwInterface {
   double banTimeout = 900.0; // 15 minutes
   std::unordered_map<std::string, WatchMatches*> watches_blacklist;
   std::string confPath;
+  std::string dumpPath;
   ZMQ *zmq;
   BannedIpLogger *logger;
 #ifndef __linux__
@@ -85,7 +86,7 @@ class NwInterface {
   int sendTelegramMessage(std::string message);
   
  public:
-  NwInterface(u_int nf_device_id, Configuration *_c, GeoIP *_g, std::string c_path);
+  NwInterface(u_int nf_device_id, Configuration *_c, GeoIP *_g, std::string c_path, std::string _dump_path);
   ~NwInterface();
 
 #ifdef __linux__

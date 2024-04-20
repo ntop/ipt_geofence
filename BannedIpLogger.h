@@ -6,15 +6,13 @@
 #define _BANNEDIPLOGGER_H
 #include "WatchMatches.h"
 #include <unordered_map>
-//#include <vector>
-//#include <fstream>
-//#include <iostream>
-//#include <algorithm>
-//#include <functional>
+
 class BannedIpLogger {
 
  public:
-    int load(std::unordered_map<std::string, WatchMatches*> *ips);
+    std::string dumpPath;
+    BannedIpLogger(std::string _dumpPath) { dumpPath = _dumpPath; }
+    std::unordered_map<std::string, WatchMatches*> load();
     int save(std::unordered_map<std::string, WatchMatches*> ips);
 
 };

@@ -35,8 +35,11 @@ int netfilter_callback(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg,
 
 NwInterface::NwInterface(u_int nf_device_id,
 			 Configuration *_c,
-			 GeoIP *_g, std::string c_path) {
-  conf = _c, geoip = _g, confPath = c_path;
+			 GeoIP *_g,
+       std::string c_path,
+       std::string _dump_path
+             ) {
+  conf = _c, geoip = _g, confPath = c_path; dumpPath = _dump_path;
   reloaderThread = NULL;
   ifaceRunning = false;
   fw = NULL;
@@ -177,11 +180,12 @@ void NwInterface::packetPollLoop() {
 
   /* Spawn reload config thread in background */
   reloaderThread = new std::thread(&NwInterface::reloadConfLoop, this);
-  logger = new BannedIpLogger();
-  logger->load(&watches_blacklist);
+  logger = new BannedIpLogger(dumpPath);
+  std::unordered_map<std::string, WatchMatches*> fetched = logger->load();
   //for testing
-  for(std::unordered_map<std::string, WatchMatches*>::iterator it = watches_blacklist.begin();it != watches_blacklist.end(); it++) {
+  for(std::unordered_map<std::string, WatchMatches*>::iterator it = fetched.begin();it != fetched.end(); it++) {
     std::cout << "Read: " << it -> first << "\n";
+    ban((char *) it->first.c_str(), true, true, "ip found in persistent file", "");
   }
   /* Start watches */
   for(std::unordered_map<std::string, std::pair<std::string, bool>>::iterator it = watches->begin(); it != watches->end(); it++) {
@@ -836,7 +840,6 @@ void NwInterface::reloadConfLoop() {
 /* **************************************************** */
 
 void NwInterface::harvestWatches() {
-  u_int32_t when = time(NULL) - MAX_IDLENESS;
 
 #ifdef DEBUG
   trace->traceEvent(TRACE_NORMAL, "NwInterface::harvestWatches()");
@@ -849,8 +852,7 @@ void NwInterface::harvestWatches() {
     trace->traceEvent(TRACE_NORMAL, "last_match=%u / now=%u [to go: %d]",
 		      match->get_last_match(), when, (match->get_last_match() - when));
 #endif
-
-    if(match->ready_to_harvest(when)) {
+    if(match->ready_to_harvest()) {
 #ifdef DEBUG
       trace->traceEvent(TRACE_NORMAL, "Harvesting");
 #endif
