@@ -14,14 +14,11 @@
 typedef std::unordered_map<std::string, WatchMatches*> ip_map;
 
 
-//TODO read ips from json file
-//TODO add define for function values
 //TODO move function inside this file
 //TODO remove ip from file after condition is met, ??
 //TODO change class name
-//TODO change console logs format
 
-std::vector<std::string> split(std::string s, std::string delimiter) {
+std::vector<std::string> BannedIpLogger::split(std::string s, std::string delimiter) {
   size_t pos_start = 0, pos_end, delim_len = delimiter.length();
   std::string token;
   std::vector<std::string> res;
@@ -35,16 +32,108 @@ std::vector<std::string> split(std::string s, std::string delimiter) {
   res.push_back (s.substr (pos_start));
   return res;
 }
-bool is_empty(std::ifstream& pFile)
+bool BannedIpLogger::is_empty(std::ifstream& pFile)
 {
   return pFile.peek() == std::ifstream::traits_type::eof();
 }
 
 ip_map BannedIpLogger::load() {
-  std::unordered_map<std::string, WatchMatches*> fetched_ip_list;
-  if(dumpPath.empty()) return fetched_ip_list;
+  if(dumpPath.empty()) return std::unordered_map<std::string, WatchMatches*>();
   trace->traceEvent(TRACE_NORMAL, "%s", "Started loading ips from persistent file");
-  std::ifstream rf("banned_ips.dat", std::ios::out | std::ios::binary);
+#if IS_HUMAN_READABLE
+  return read_as_json();
+#else
+  return read_file();
+#endif
+
+}
+
+int BannedIpLogger::save(ip_map ips) {
+  if(dumpPath.empty()) return 1;
+  trace->traceEvent(TRACE_NORMAL, "%s", "Writing in persistent storage banned ips");
+#if IS_HUMAN_READABLE
+  return save_as_json(ips);
+#else
+   return save_file(ips);
+#endif
+}
+ip_map BannedIpLogger::read_as_json() {
+  std::unordered_map<std::string, WatchMatches*> fetched_ip_list;
+  Json::Value root;
+  std::ifstream ifs;
+  JSONCPP_STRING errs;
+  Json::CharReaderBuilder builder;
+
+  ifs.open(dumpPath);
+  if(ifs.fail()) {
+    trace->traceEvent(TRACE_WARNING, "%s", "Error, reading persistent file failed!");
+    return fetched_ip_list;
+  }
+
+  builder["collectComments"] = true;
+
+  if(!parseFromStream(builder, ifs, &root, &errs)) {
+    std::cout << errs << std::endl;
+    return fetched_ip_list;
+  }
+  for (Json::Value::ArrayIndex i = 0; i != root["list"].size(); i++){
+    if (root["list"][i].isObject())
+      if(root["list"][i]["ip"].isString() && root["list"][i]["matches"].isUInt() && root["list"][i]["lastSeen"].isUInt()) {
+        //simple check for ipv4 and ipv6, not exhaustive.
+        if(split(root["list"][i]["ip"].asString(),".").size() != 4 && split(root["list"][i]["ip"].asString(),":").size() != 7) return fetched_ip_list;
+        fetched_ip_list[root["list"][i]["ip"].asString()] = new WatchMatches(root["list"][i]["matches"].asUInt(),
+                                                                             root["list"][i]["lastSeen"].asUInt());
+      }
+  }
+  ifs.close();
+  return fetched_ip_list;
+}
+bool BannedIpLogger::save_as_json(std::unordered_map<std::string, WatchMatches *> ips){
+  Json::Value root;
+  Json::Value array(Json::arrayValue);
+  Json::StyledStreamWriter writer;
+  std::ofstream out(dumpPath);
+  for(std::unordered_map<std::string, WatchMatches*>::iterator it = ips.begin();it != ips.end(); it++) {
+    Json::Value obj(Json::objectValue);
+    obj["ip"] = it -> first;
+    obj["matches"] = it -> second -> get_num_matches();
+    obj["lastSeen"] = it -> second -> get_last_match();
+    array.append(obj);
+  }
+  root["list"] = array;
+
+  writer.write(out,root);
+  out.close();
+  return true;
+}
+
+bool BannedIpLogger::save_file(ip_map ips) {
+  //serialize host ip, times of it has appeared and last seen time
+  std::string string_serialized;
+  std::ofstream wf(dumpPath, std::ios::out | std::ios::binary);
+  if(!wf) {
+    trace->traceEvent(TRACE_WARNING, "%s", "Cannot open file!");
+    return false;
+  }
+  for(std::unordered_map<std::string, WatchMatches*>::iterator it = ips.begin();it != ips.end(); it++) {
+    WatchMatches* watches = it->second;
+    watches->get_num_matches();
+    string_serialized = it->first + "$$" + std::to_string(watches->get_num_matches()) + "$$" + std::to_string(watches->get_last_match());
+    size_t size = string_serialized.size();
+    wf.write((char*) &size, sizeof(size_t) );
+    wf.write( (char*) string_serialized.c_str(), size );
+  }
+  wf.close();
+  if(!wf.good()) {
+    trace->traceEvent(TRACE_WARNING, "%s", "Error occurred at writing time!");
+    return false;
+  }
+  return true;
+}
+
+ip_map BannedIpLogger::read_file() {
+  std::unordered_map<std::string, WatchMatches*> fetched_ip_list;
+  std::ifstream rf(dumpPath, std::ios::out | std::ios::binary);
   if(!rf) {
     trace->traceEvent(TRACE_WARNING, "%s", "Cannot open file!");
     return fetched_ip_list;
@@ -59,7 +148,9 @@ ip_map BannedIpLogger::load() {
   rf.seekg (0, rf.end);
   int length = rf.tellg();
   rf.seekg (0, rf.beg);
-  while (rf.gcount() < length){
+  int read = 0;
+  while (read < length){
+    read += rf.gcount();
     rf.read( (char*)&size, sizeof(size) );
     if(!rf) break;
     data = new char[size+1];
@@ -74,35 +165,8 @@ ip_map BannedIpLogger::load() {
     //TODO check if it's necessary to handle invalid_argument and out_of_range exceptions
     int times = static_cast<uint32_t>(std::stoul(splitted[1]));
     int last_match = static_cast<uint32_t>(std::stoul(splitted[2]));
-      fetched_ip_list[splitted[0]] = new WatchMatches(times, last_match );
+    fetched_ip_list[splitted[0]] = new WatchMatches(times, last_match );
   }
   rf.close();
   return fetched_ip_list;
-}
-
-int BannedIpLogger::save(ip_map ips) {
-  if(dumpPath.empty()) return 1;
-  trace->traceEvent(TRACE_NORMAL, "%s", "Writing in persistent storage banned ips");
-  //serialize host ip, times of it has appeared and last seen time
-  std::string string_serialized;
-  std::ofstream wf(dumpPath, std::ios::out | std::ios::binary);
-  if(!wf) {
-    trace->traceEvent(TRACE_WARNING, "%s", "Cannot open file!");
-    return 1;
-  }
-  for(std::unordered_map<std::string, WatchMatches*>::iterator it = ips.begin();it != ips.end(); it++) {
-    WatchMatches* watches = it->second;
-    watches->get_num_matches();
-    string_serialized = it->first + "$$" + std::to_string(watches->get_num_matches()) + "$$" + std::to_string(watches->get_last_match());
-    std::cout << string_serialized;
-    size_t size = string_serialized.size();
-    wf.write((char*) &size, sizeof(size_t) );
-    wf.write( (char*) string_serialized.c_str(), size );
-  }
-  wf.close();
-  if(!wf.good()) {
-    trace->traceEvent(TRACE_WARNING, "%s", "Error occurred at writing time!");
-    return 1;
-  }
-  return 0;
 }
