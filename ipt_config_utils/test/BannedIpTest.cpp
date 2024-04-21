@@ -12,6 +12,7 @@ void test1();
 void test2();
 void test3();
 void test4();
+void test5();
 
 
 void print_test_passed(std::string message){
@@ -21,6 +22,16 @@ void print_test_passed(std::string message){
 
 int main (int argc, char *argv[]){
 
+  /**
+   * To run this test:
+   * - go to the base folder of the project
+   * - run "make test"
+   * - run "sudo ./ipt_test"
+   *
+   * If you want to check for memory leaks:
+   * then run "sudo valgrind -s ./ipt_test".
+   * Make sure to have valgrind installed on your device.
+   */
 
   /**
    * Test 0: empty path
@@ -50,6 +61,18 @@ int main (int argc, char *argv[]){
    */
    test4();
 
+
+   /**
+    * Most exhaustive test.
+    * How to execute:
+    * Run this program, then run ipt_geofence with the following command:
+    * sudo ./ipt_geofence -c sample_config.json -m dbip-country.mmdb -d test5.json
+    *
+    * Finally, check the test5.json file. The number of ip addresses remaining in the file depends on how long ipt_geofence runs.
+    *
+    * Test 5: Run NwInterface with 4 default ips that should be banned
+    */
+    test5();
 }
 
 
@@ -140,6 +163,42 @@ void test4(){
 
   print_test_passed("Test#4 Passed");
 }
-void test5(){
 
+void execCmd(char *cmdbuf) {
+  try {
+    Utils::execCmd(cmdbuf);
+  } catch (...) { trace->traceEvent(TRACE_ERROR, "Error while executing '%s'", cmdbuf); }
+}
+void test5(){
+  std::string outputFile = "test5.json";
+  BannedIpLogger *ip = new BannedIpLogger(outputFile);
+
+  const int howMany = 4;
+  std::unordered_map<std::string, WatchMatches*> matches_list;
+  for(int key = 0; key < howMany; key++){
+    std::string host = "192.168."+std::to_string(key/255)+"."+std::to_string(key%256);
+    matches_list[host] = new WatchMatches(key ,time(NULL));
+  }
+  ip ->save(matches_list);
+
+  //TODO Automate this test
+  /*std::string command = "sudo ./ipt_geofence -c sample_config.json -m dbip-country.mmdb -d test5.json";
+  execCmd((char *) command.c_str());
+
+
+  std::string kill = "sudo pkill -9 -f ipt_geofence";
+  execCmd((char *) kill.c_str());*/
+
+  int index = 0;
+  std::unordered_map<std::string, WatchMatches*> result = ip -> load();
+  for(std::unordered_map<std::string, WatchMatches*>::iterator it = result.begin();it != result.end(); it++) {
+    if(matches_list[it->first] -> ready_to_harvest()){
+      index++;
+      assert(matches_list[it->first] ->ready_to_harvest() == true);
+    }
+    else assert(matches_list[it->first] ->ready_to_harvest() == false);
+  }
+  // check if the size of the remaining watches.
+  assert(result.size() == howMany - index);
+  print_test_passed("Test#5 Passed");
 }

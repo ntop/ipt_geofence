@@ -882,7 +882,7 @@ void NwInterface::ban(char *host, bool ban_ip,
     } else {
       WatchMatches *m = it->second;
 
-      m->inc_matches(); /* TODO increment unban time */
+      m->inc_matches();
     }
   } else {
     /* Unban */
@@ -934,7 +934,12 @@ void NwInterface::initIpDumper() {
   logger = new BannedIpLogger(dumpPath);
   std::unordered_map<std::string, WatchMatches*> fetched = logger->load();
   for(std::unordered_map<std::string, WatchMatches*>::iterator it = fetched.begin();it != fetched.end(); it++) {
-    ban((char *) it->first.c_str(), true, true, "ip found in persistent file", "");
+    char *host =  (char *) it->first.c_str();
+    bool is_ipv4 = (strchr(host, ':') == NULL) ? true /* IPv4 */ : false /* IPv6 */;
+    watches_blacklist[it->first] = new WatchMatches(it->second->get_num_matches(), it->second->get_last_match());
+    if(fw) fw->ban(host, is_ipv4);
+    logHostBan(host, true, true, "ip found in persistent file", "");
+
   }
   logger -> release(fetched);
 }

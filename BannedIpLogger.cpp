@@ -4,7 +4,7 @@
 
 #include "include.h"
 
-#define IS_HUMAN_READABLE false
+#define IS_HUMAN_READABLE true
 /**
  * This option can be useful if combined with IS_HUMAN_READABLE = True.
  * This way, this class can operate also as a stacktrace of banned ips but without banning them.
@@ -54,7 +54,7 @@ ip_map BannedIpLogger::load() {
 
 int BannedIpLogger::save(ip_map ips) {
 #if IS_HUMAN_READABLE && SAVE_ANYWAYS
-  if(dumpPath.empty()) dumpPath = "ip_list_dumped.json"
+  if(dumpPath.empty()) dumpPath = "ip_list_dumped.json";
 #endif
   if(dumpPath.empty()) return 1;
   trace->traceEvent(TRACE_NORMAL, "%s", "Writing in persistent storage banned ips");
