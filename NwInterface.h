@@ -84,6 +84,8 @@ class NwInterface {
   void addCommonJSON(Json::Value *root);
   void logStartStop(bool start);
   int sendTelegramMessage(std::string message);
+  void initIpDumper();
+  void stopIpDumper();
   
  public:
   NwInterface(u_int nf_device_id, Configuration *_c, GeoIP *_g, std::string c_path, std::string _dump_path);

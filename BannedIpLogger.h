@@ -23,6 +23,7 @@ public:
   std::unordered_map<std::string, WatchMatches*> load();
   int save(std::unordered_map<std::string, WatchMatches*> ips);
 
+  void release(std::unordered_map<std::string, WatchMatches*> ips);
 
 };
 

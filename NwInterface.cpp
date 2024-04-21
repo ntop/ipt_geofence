@@ -180,13 +180,10 @@ void NwInterface::packetPollLoop() {
 
   /* Spawn reload config thread in background */
   reloaderThread = new std::thread(&NwInterface::reloadConfLoop, this);
-  logger = new BannedIpLogger(dumpPath);
-  std::unordered_map<std::string, WatchMatches*> fetched = logger->load();
-  //for testing
-  for(std::unordered_map<std::string, WatchMatches*>::iterator it = fetched.begin();it != fetched.end(); it++) {
-    std::cout << "Read: " << it -> first << "\n";
-    ban((char *) it->first.c_str(), true, true, "ip found in persistent file", "");
-  }
+
+  /* Load history of banned IP addresses */
+  initIpDumper();
+
   /* Start watches */
   for(std::unordered_map<std::string, std::pair<std::string, bool>>::iterator it = watches->begin(); it != watches->end(); it++) {
     std::pair<std::string, bool> item = it->second;
@@ -371,7 +368,7 @@ void NwInterface::packetPollLoop() {
   trace->traceEvent(TRACE_NORMAL, "Leaving packet poll loop");
 
   ifaceRunning = false;
-  logger -> save(watches_blacklist);
+  stopIpDumper();
 }
 
 /* **************************************************** */
@@ -930,4 +927,18 @@ void NwInterface::flush_ban() {
 
 int NwInterface::sendTelegramMessage(std::string message) {
   return(conf->sendTelegramMessage(message));
+}
+
+void NwInterface::initIpDumper() {
+  logger = new BannedIpLogger(dumpPath);
+  std::unordered_map<std::string, WatchMatches*> fetched = logger->load();
+  for(ip_map::iterator it = fetched.begin();it != fetched.end(); it++) {
+    ban_function((char *) it->first.c_str(), true, true, "ip found in persistent file", "");
+  }
+  logger -> release(fetched);
+}
+
+void NwInterface::stopIpDumper() {
+  logger -> save(watches_blacklist);
+  delete logger;
 }

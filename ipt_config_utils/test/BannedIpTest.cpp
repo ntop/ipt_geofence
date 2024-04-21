@@ -21,6 +21,7 @@ int main (int argc, char *argv[]){
   BannedIpLogger *no_path = new BannedIpLogger("");
   std::unordered_map<std::string, WatchMatches*> path_result = no_path -> load();
   assert(path_result.size() == 0);
+  delete no_path;
   print_test_passed("Test#0 Passed");
 
   /**
@@ -28,6 +29,7 @@ int main (int argc, char *argv[]){
    */
   BannedIpLogger *no_file = new BannedIpLogger("XXXXXXX");
   std::unordered_map<std::string, WatchMatches*> no_result = no_file -> load();
+  delete no_file;
   assert(no_result.size() == 0);
   print_test_passed("Test#1 Passed");
   /**
@@ -35,10 +37,15 @@ int main (int argc, char *argv[]){
    */
   BannedIpLogger *malformed = new BannedIpLogger("malformed.json");
   std::unordered_map<std::string, WatchMatches*> malformed_list;
-  malformed_list["$$$$"] = new WatchMatches((u_int32_t) 1,(u_int32_t)171361377);
+  malformed_list["$$$$"] = new WatchMatches(1,171361377);
+  for (auto itr = malformed_list.begin(); itr != malformed_list.end();)
+  {
+    delete itr->second;
+    itr = malformed_list.erase(itr);
+  }
   malformed ->save(malformed_list);
   std::unordered_map<std::string, WatchMatches*> malformed_result = malformed -> load();
-
+  delete malformed;
   assert(malformed_result.size() == 0);
   print_test_passed("Test#2 Passed");
   /**
@@ -55,7 +62,10 @@ int main (int argc, char *argv[]){
   ip ->save(matches_list);
 
   std::unordered_map<std::string, WatchMatches*> result = ip -> load();
+
   assert(result.size() == howMany);
+
+
   //Check if every entry has been loaded correctly
   int count = 0;
   for(std::unordered_map<std::string, WatchMatches*>::iterator it = result.begin(); it != result.end(); it++){
@@ -66,6 +76,19 @@ int main (int argc, char *argv[]){
       assert(match->second -> get_num_matches() == it->second->get_num_matches());
     }
   }
+
+  for (auto itr = result.begin(); itr != result.end(); )
+  {
+    delete itr->second;
+    itr = result.erase(itr);
+  }
+  for (auto itr = matches_list.begin(); itr != matches_list.end();)
+  {
+    delete itr->second;
+    itr = matches_list.erase(itr);
+  }
+  delete ip;
+  delete trace;
   assert(count == howMany);
   print_test_passed("Test#3 Passed");
 }

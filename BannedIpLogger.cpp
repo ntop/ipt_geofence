@@ -4,7 +4,7 @@
 
 #include "include.h"
 
-#define IS_HUMAN_READABLE true
+#define IS_HUMAN_READABLE false
 /**
  * This option can be useful if combined with IS_HUMAN_READABLE = True.
  * This way, this class can operate also as a stacktrace of banned ips.
@@ -67,6 +67,7 @@ ip_map BannedIpLogger::read_as_json() {
   ifs.open(dumpPath);
   if(ifs.fail()) {
     trace->traceEvent(TRACE_WARNING, "%s", "Error, reading persistent file failed!");
+    ifs.close();
     return fetched_ip_list;
   }
 
@@ -74,6 +75,7 @@ ip_map BannedIpLogger::read_as_json() {
 
   if(!parseFromStream(builder, ifs, &root, &errs)) {
     std::cout << errs << std::endl;
+    ifs.close();
     return fetched_ip_list;
   }
   for (Json::Value::ArrayIndex i = 0; i != root["list"].size(); i++){
@@ -158,6 +160,7 @@ ip_map BannedIpLogger::read_file() {
     if(!rf) break;
     data[size]='\0';
     std::vector<std::string> splitted =  split(data,"$$");
+    delete[] data;
     if(splitted.size() != 3) {
       trace->traceEvent(TRACE_WARNING, "%s", "Error while reading WatchMatches, malformed line in file");
       return fetched_ip_list;
@@ -169,4 +172,12 @@ ip_map BannedIpLogger::read_file() {
   }
   rf.close();
   return fetched_ip_list;
+}
+
+void BannedIpLogger::release(std::unordered_map<std::string, WatchMatches *> ips) {
+  for (auto itr = ips.begin(); itr != ips.end();)
+  {
+    delete itr->second;
+    itr = ips.erase(itr);
+  }
 }
