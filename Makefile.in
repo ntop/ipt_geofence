@@ -10,7 +10,7 @@ TARGET=ipt_geofence
 LIBS=@LDFLAGS@ @LIBS@
 
 
-OBJECTS = Blacklists.o Configuration.o  GeoIP.o  NwInterface.o NtopCloud.o  Trace.o  Utils.o ZMQ.o
+OBJECTS = Blacklists.o Configuration.o  GeoIP.o  NwInterface.o NtopCloud.o  Trace.o  Utils.o ZMQ.o BannedIpLogger.o
 HEADERS = $(wildcard *.h)
 
 all: $(TARGET) zmqReceiver
@@ -23,6 +23,9 @@ zmqReceiver: zmqReceiver.cpp Utils.o Trace.o Makefile
 
 %.o: %.cpp $(HEADERS) Makefile
 	$(CXX) $(CPPFLAGS) -c $< -o $@
+
+test:
+	$(CXX) $(CPPFLAGS) $(OBJECTS) ipt_config_utils/test/BannedIpTest.cpp -o ipt_test $(LIBS)
 
 clean:
 	/bin/rm -rf *~ *~ *.o $(TARGET)

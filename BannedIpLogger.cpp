@@ -14,9 +14,6 @@
 typedef std::unordered_map<std::string, WatchMatches*> ip_map;
 
 
-//TODO move function inside this file
-//TODO remove ip from file after condition is met, ??
-//TODO change class name
 
 std::vector<std::string> BannedIpLogger::split(std::string s, std::string delimiter) {
   size_t pos_start = 0, pos_end, delim_len = delimiter.length();
