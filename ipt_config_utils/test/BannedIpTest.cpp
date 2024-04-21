@@ -7,6 +7,13 @@
 
 Trace *trace = new Trace();
 
+void test();
+void test1();
+void test2();
+void test3();
+void test4();
+
+
 void print_test_passed(std::string message){
   printf("\x1B[32m%s\033[0m\n",message.c_str());
 
@@ -18,24 +25,51 @@ int main (int argc, char *argv[]){
   /**
    * Test 0: empty path
    */
+  test();
+
+  /**
+   * Test 1: No file found
+   */
+  test1();
+
+
+  /**
+   * Test 2: Malformed file
+   */
+  test2();
+
+
+  /**
+   * Test 3: Save and load 10.000 entries
+   */
+  test3();
+
+
+  /**
+   * Test 4: Check if num_matches increments correctly and its time to harvest
+   */
+   test4();
+
+}
+
+
+void test(){
   BannedIpLogger *no_path = new BannedIpLogger("");
   std::unordered_map<std::string, WatchMatches*> path_result = no_path -> load();
   assert(path_result.size() == 0);
   delete no_path;
   print_test_passed("Test#0 Passed");
-
-  /**
-   * Test 1: No file found
-   */
+}
+void test1(){
   BannedIpLogger *no_file = new BannedIpLogger("XXXXXXX");
   std::unordered_map<std::string, WatchMatches*> no_result = no_file -> load();
   delete no_file;
   assert(no_result.size() == 0);
   print_test_passed("Test#1 Passed");
-  /**
-   * Test 2: Malformed file
-   */
-  BannedIpLogger *malformed = new BannedIpLogger("malformed.json");
+}
+
+void test2(){
+  BannedIpLogger *malformed = new BannedIpLogger("test2.json");
   std::unordered_map<std::string, WatchMatches*> malformed_list;
   malformed_list["$$$$"] = new WatchMatches(1,171361377);
   for (auto itr = malformed_list.begin(); itr != malformed_list.end();)
@@ -48,10 +82,12 @@ int main (int argc, char *argv[]){
   delete malformed;
   assert(malformed_result.size() == 0);
   print_test_passed("Test#2 Passed");
-  /**
-   * Test 3: Save and load 10.000 entries
-   */
-  BannedIpLogger *ip = new BannedIpLogger("test_file.json");
+}
+void test3(){
+  std::string outputFile = "test3.json";
+  //Test when IS_HUMAN_READABLE = False
+  //outputFile = "test3.bin";
+  BannedIpLogger *ip = new BannedIpLogger(outputFile);
 
   const int howMany = 10000;
   std::unordered_map<std::string, WatchMatches*> matches_list;
@@ -64,7 +100,6 @@ int main (int argc, char *argv[]){
   std::unordered_map<std::string, WatchMatches*> result = ip -> load();
 
   assert(result.size() == howMany);
-
 
   //Check if every entry has been loaded correctly
   int count = 0;
@@ -91,4 +126,20 @@ int main (int argc, char *argv[]){
   delete trace;
   assert(count == howMany);
   print_test_passed("Test#3 Passed");
+}
+void test4(){
+  WatchMatches *watchMatches =  new WatchMatches(1,time(NULL));
+
+  for(int key = 1; key <= 12; key++){
+    assert(watchMatches -> ready_to_harvest() == false);
+    // The value should be the same bug maybe sometime there would be a small delay in computation. However, the difference should be less than 1 second.
+    assert(std::abs(time(NULL) - watchMatches ->  f(key) * 100 - watchMatches->calculate_ban_time()) <= 1);
+    watchMatches->inc_matches();
+  }
+  delete watchMatches;
+
+  print_test_passed("Test#4 Passed");
+}
+void test5(){
+
 }

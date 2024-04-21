@@ -7,9 +7,10 @@
 #define IS_HUMAN_READABLE false
 /**
  * This option can be useful if combined with IS_HUMAN_READABLE = True.
- * This way, this class can operate also as a stacktrace of banned ips.
+ * This way, this class can operate also as a stacktrace of banned ips but without banning them.
  */
 #define SAVE_ANYWAYS true
+
 
 typedef std::unordered_map<std::string, WatchMatches*> ip_map;
 
@@ -29,23 +30,32 @@ std::vector<std::string> BannedIpLogger::split(std::string s, std::string delimi
   res.push_back (s.substr (pos_start));
   return res;
 }
+
+/* **************************************************** */
+
 bool BannedIpLogger::is_empty(std::ifstream& pFile)
 {
   return pFile.peek() == std::ifstream::traits_type::eof();
 }
 
+/* **************************************************** */
+
 ip_map BannedIpLogger::load() {
-  if(dumpPath.empty()) return std::unordered_map<std::string, WatchMatches*>();
+  if(dumpPath.empty()) return ip_map();
   trace->traceEvent(TRACE_NORMAL, "%s", "Started loading ips from persistent file");
 #if IS_HUMAN_READABLE
   return read_as_json();
 #else
   return read_file();
 #endif
-
 }
 
+/* **************************************************** */
+
 int BannedIpLogger::save(ip_map ips) {
+#if IS_HUMAN_READABLE && SAVE_ANYWAYS
+  if(dumpPath.empty()) dumpPath = "ip_list_dumped.json"
+#endif
   if(dumpPath.empty()) return 1;
   trace->traceEvent(TRACE_NORMAL, "%s", "Writing in persistent storage banned ips");
 #if IS_HUMAN_READABLE
@@ -54,6 +64,9 @@ int BannedIpLogger::save(ip_map ips) {
    return save_file(ips);
 #endif
 }
+
+/* **************************************************** */
+
 ip_map BannedIpLogger::read_as_json() {
   std::unordered_map<std::string, WatchMatches*> fetched_ip_list;
   Json::Value root;
@@ -87,12 +100,15 @@ ip_map BannedIpLogger::read_as_json() {
   ifs.close();
   return fetched_ip_list;
 }
-bool BannedIpLogger::save_as_json(std::unordered_map<std::string, WatchMatches *> ips){
+
+/* **************************************************** */
+
+bool BannedIpLogger::save_as_json(ip_map ips){
   Json::Value root;
   Json::Value array(Json::arrayValue);
   Json::StyledStreamWriter writer;
   std::ofstream out(dumpPath);
-  for(std::unordered_map<std::string, WatchMatches*>::iterator it = ips.begin();it != ips.end(); it++) {
+  for(ip_map::iterator it = ips.begin();it != ips.end(); it++) {
     Json::Value obj(Json::objectValue);
     obj["ip"] = it -> first;
     obj["matches"] = it -> second -> get_num_matches();
@@ -103,8 +119,12 @@ bool BannedIpLogger::save_as_json(std::unordered_map<std::string, WatchMatches *
 
   writer.write(out,root);
   out.close();
+  if(!out.good())
+    return false;
   return true;
 }
+
+/* **************************************************** */
 
 bool BannedIpLogger::save_file(ip_map ips) {
   //serialize host ip, times of it has appeared and last seen time
@@ -114,7 +134,7 @@ bool BannedIpLogger::save_file(ip_map ips) {
     trace->traceEvent(TRACE_WARNING, "%s", "Cannot open file!");
     return false;
   }
-  for(std::unordered_map<std::string, WatchMatches*>::iterator it = ips.begin();it != ips.end(); it++) {
+  for(ip_map::iterator it = ips.begin();it != ips.end(); it++) {
     WatchMatches* watches = it->second;
     watches->get_num_matches();
     string_serialized = it->first + "$$" + std::to_string(watches->get_num_matches()) + "$$" + std::to_string(watches->get_last_match());
@@ -130,6 +150,8 @@ bool BannedIpLogger::save_file(ip_map ips) {
   return true;
 }
 
+/* **************************************************** */
+
 ip_map BannedIpLogger::read_file() {
   std::unordered_map<std::string, WatchMatches*> fetched_ip_list;
   std::ifstream rf(dumpPath, std::ios::out | std::ios::binary);
@@ -144,12 +166,7 @@ ip_map BannedIpLogger::read_file() {
   if(is_empty(rf)) {
     return fetched_ip_list;
   }
-  rf.seekg (0, rf.end);
-  int length = rf.tellg();
-  rf.seekg (0, rf.beg);
-  int read = 0;
-  while (read < length){
-    read += rf.gcount();
+  while (1){
     rf.read( (char*)&size, sizeof(size) );
     if(!rf) break;
     data = new char[size+1];
@@ -162,7 +179,6 @@ ip_map BannedIpLogger::read_file() {
       trace->traceEvent(TRACE_WARNING, "%s", "Error while reading WatchMatches, malformed line in file");
       return fetched_ip_list;
     }
-    //TODO check if it's necessary to handle invalid_argument and out_of_range exceptions
     int times = static_cast<uint32_t>(std::stoul(splitted[1]));
     int last_match = static_cast<uint32_t>(std::stoul(splitted[2]));
     fetched_ip_list[splitted[0]] = new WatchMatches(times, last_match );
@@ -171,7 +187,9 @@ ip_map BannedIpLogger::read_file() {
   return fetched_ip_list;
 }
 
-void BannedIpLogger::release(std::unordered_map<std::string, WatchMatches *> ips) {
+/* **************************************************** */
+
+void BannedIpLogger::release(ip_map ips) {
   for (auto itr = ips.begin(); itr != ips.end();)
   {
     delete itr->second;

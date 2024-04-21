@@ -906,7 +906,6 @@ void NwInterface::ban_ipv4(u_int32_t ip4 /* network byte order */, bool ban_ip,
 void NwInterface::ban_ipv6(struct ndpi_in6_addr ip6, bool ban_ip,
 			   std::string reason, std::string country) {
   char ipbuf[64], *host = Utils::intoaV6(ip6, 128, ipbuf, sizeof(ipbuf));
-
   ban(host, ban_ip, true, reason, country);
 }
 
@@ -929,14 +928,18 @@ int NwInterface::sendTelegramMessage(std::string message) {
   return(conf->sendTelegramMessage(message));
 }
 
+/* **************************************************** */
+
 void NwInterface::initIpDumper() {
   logger = new BannedIpLogger(dumpPath);
   std::unordered_map<std::string, WatchMatches*> fetched = logger->load();
-  for(ip_map::iterator it = fetched.begin();it != fetched.end(); it++) {
-    ban_function((char *) it->first.c_str(), true, true, "ip found in persistent file", "");
+  for(std::unordered_map<std::string, WatchMatches*>::iterator it = fetched.begin();it != fetched.end(); it++) {
+    ban((char *) it->first.c_str(), true, true, "ip found in persistent file", "");
   }
   logger -> release(fetched);
 }
+
+/* **************************************************** */
 
 void NwInterface::stopIpDumper() {
   logger -> save(watches_blacklist);
