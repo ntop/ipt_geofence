@@ -1,48 +1,48 @@
 {
-    "queue_id": 0,
-    "markers": {
-	"pass": 1000,
-	"drop": 2000
+  "queue_id": 0,
+  "markers": {
+    "pass": 1000,
+    "drop": 2000
+  },
+  "default_policy": "DROP",
+  "monitored_ports": {
+    "tcp": [22, 60228,10000,80,53],
+    "udp": [],
+    "ignored_ports": [123,8080],
+    "honeypot_ports": ["51000-56000", "51000-52000",10,20,30]
+  },
+  "policy": {
+    "drop": {
+      "countries_whitelist": ["DE", "CH", "NL"],
+      "continents_whitelist": []
     },
-    "default_policy": "DROP",
-    "monitored_ports": {
-	"tcp": [22, 60228,10000,80,53],
-	"udp": [],
-	"ignored_ports": [123,8080],
-	"honeypot_ports": ["51000-56000", "51000-52000",10,20,30]
-    },
-    "policy": {
-	"drop": {
-	    "countries_whitelist": ["DE", "CH", "NL"],
-	    "continents_whitelist": []
-	},
-	"pass": {
-	    "countries_blacklist": ["RU", "BY"],
-	    "continents_blacklist": []
-	}
-    },
-    "blacklists": [
-	"https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/dshield_7d.netset",
-	"https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/alienvault_reputation.ipset",
-	"https://feodotracker.abuse.ch/downloads/ipblocklist_recommended.txt",
-	"https://rules.emergingthreats.net/fwrules/emerging-Block-IPs.txt",
-	"https://feodotracker.abuse.ch/downloads/ipblocklist.txt",
-	"https://sslbl.abuse.ch/blacklist/sslipblacklist.txt"
-    ],
-    "watches": [
-	{ "name" : "mail", "cmd": "/usr/share/ipt_geofence/scripts/mail.py" },
-	{ "name" : "auth", "cmd": "/usr/share/ipt_geofence/scripts/auth.py" }
-    ],
-    "telegram": {
-	"bot_token": "",
-        "chat_id": ""
-    },
-    "cmd": {
-	"ban": "",
-	"unban": ""
-    },
-    "zmq": {
-	"url": "",
-        "encryption_key": ""
+    "pass": {
+      "countries_blacklist": ["RU", "BY"],
+      "continents_blacklist": []
     }
+  },
+  "blacklists": [
+    "https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/dshield_7d.netset",
+    "https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/alienvault_reputation.ipset",
+    "https://feodotracker.abuse.ch/downloads/ipblocklist_recommended.txt",
+    "https://rules.emergingthreats.net/fwrules/emerging-Block-IPs.txt",
+    "https://feodotracker.abuse.ch/downloads/ipblocklist.txt",
+    "https://sslbl.abuse.ch/blacklist/sslipblacklist.txt"
+  ],
+  "watches": [
+    { "name" : "mail", "cmd": "/usr/share/ipt_geofence/scripts/mail.py" },
+    { "name" : "auth", "cmd": "/usr/share/ipt_geofence/scripts/auth.py" }
+  ],
+  "telegram": {
+    "bot_token": "",
+    "chat_id": ""
+  },
+  "cmd": {
+    "ban": "",
+    "unban": ""
+  },
+  "zmq": {
+    "url": "",
+    "encryption_key": ""
+  }
 }

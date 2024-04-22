@@ -35,7 +35,7 @@ private:
   const int function_base = 6;
   const float function_b = 0.3;
   const int function_offset = -2;
-  const int max_matches = 12;
+  const int max_matches = 22;
 public:
   WatchMatches() { last_match = time(NULL), num_matches = 1; }
   WatchMatches(u_int32_t _num_matches, u_int32_t _last_matches) { last_match = _last_matches, num_matches = _num_matches; }
