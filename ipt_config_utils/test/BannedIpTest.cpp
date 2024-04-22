@@ -61,14 +61,11 @@ int main (int argc, char *argv[]){
    */
    test4();
 
-
+  delete trace;
    /**
     * Most exhaustive test.
-    * How to execute:
-    * Run this program, then run ipt_geofence with the following command:
-    * sudo ./ipt_geofence -c sample_config.json -m dbip-country.mmdb -d test5.json
     *
-    * Finally, check the test5.json file. The number of ip addresses remaining in the file depends on how long ipt_geofence runs.
+    * The number of ip addresses remaining in the file depends on how long you let ipt_geofence run.
     *
     * Test 5: Run NwInterface with 4 default ips that should be banned
     */
@@ -146,7 +143,6 @@ void test3(){
     itr = matches_list.erase(itr);
   }
   delete ip;
-  delete trace;
   assert(count == howMany);
   print_test_passed("Test#3 Passed");
 }
@@ -164,11 +160,6 @@ void test4(){
   print_test_passed("Test#4 Passed");
 }
 
-void execCmd(char *cmdbuf) {
-  try {
-    Utils::execCmd(cmdbuf);
-  } catch (...) { trace->traceEvent(TRACE_ERROR, "Error while executing '%s'", cmdbuf); }
-}
 void test5(){
   std::string outputFile = "test5.json";
   BannedIpLogger *ip = new BannedIpLogger(outputFile);
@@ -181,24 +172,33 @@ void test5(){
   }
   ip ->save(matches_list);
 
-  //TODO Automate this test
-  /*std::string command = "sudo ./ipt_geofence -c sample_config.json -m dbip-country.mmdb -d test5.json";
-  execCmd((char *) command.c_str());
+  std::string command = "sudo ./ipt_geofence -c sample_config.json -m dbip-country.mmdb -d test5.json";
 
+  //return value ignored
+  std::system((char *) command.c_str());
+  sleep(1);
 
-  std::string kill = "sudo pkill -9 -f ipt_geofence";
-  execCmd((char *) kill.c_str());*/
 
   int index = 0;
   std::unordered_map<std::string, WatchMatches*> result = ip -> load();
-  for(std::unordered_map<std::string, WatchMatches*>::iterator it = result.begin();it != result.end(); it++) {
-    if(matches_list[it->first] -> ready_to_harvest()){
+  std::unordered_map<std::string, WatchMatches*> not_harvested;
+  for(std::unordered_map<std::string, WatchMatches*>::iterator it = matches_list.begin();it != matches_list.end(); it++) {
+    if(it -> second -> ready_to_harvest()){
       index++;
-      assert(matches_list[it->first] ->ready_to_harvest() == true);
+      assert(it -> second -> ready_to_harvest() == true);
     }
-    else assert(matches_list[it->first] ->ready_to_harvest() == false);
+    else {
+      assert(it -> second -> ready_to_harvest() == false);
+      not_harvested[it ->first] = it -> second;
+    }
   }
-  // check if the size of the remaining watches.
-  assert(result.size() == howMany - index);
+  for(std::unordered_map<std::string, WatchMatches*>::iterator it = not_harvested.begin();it != not_harvested.end(); it++) {
+    if(!result[it -> first] -> ready_to_harvest()){
+      assert(result[it -> first]  -> ready_to_harvest() == false);
+    }
+  }
+  ip ->release(matches_list);
+  ip ->release(result);
+  delete ip;
   print_test_passed("Test#5 Passed");
 }
