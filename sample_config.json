@@ -6,15 +6,15 @@
   },
   "default_policy": "DROP",
   "monitored_ports": {
-    "tcp": [22, 60228,10000,80,53],
+    "tcp": [22, 80, 443],
     "udp": [],
-    "ignored_ports": [123,8080],
-    "honeypot_ports": ["51000-56000", "51000-52000",10,20,30]
+    "ignored_ports": [123],
+    "honeypot_ports": ["51000-56000","50000-56100", "51000-52000",10,20,30]
   },
   "policy": {
     "drop": {
-      "countries_whitelist": ["DE", "CH", "NL"],
-      "continents_whitelist": []
+      "countries_whitelist": ["IT", "DE", "CH", "NL"],
+      "continents_whitelist": ["NA"]
     },
     "pass": {
       "countries_blacklist": ["RU", "BY"],

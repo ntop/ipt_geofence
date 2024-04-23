@@ -7,6 +7,13 @@
 #include "WatchMatches.h"
 #include <unordered_map>
 
+#define IS_HUMAN_READABLE false
+/**
+ * This option can be useful if combined with IS_HUMAN_READABLE = True.
+ * This way, this class can operate also as a logger of banned ip addresses but without banning them.
+ */
+#define LOG_ONLY false
+
 class BannedIpLogger {
 private:
   std::unordered_map<std::string, WatchMatches*> read_as_json();
@@ -18,8 +25,7 @@ private:
   //checks if the file is empty
   bool is_empty(std::ifstream& pFile);
 public:
-  std::string dumpPath = "";
-  BannedIpLogger(std::string _dumpPath) { dumpPath = _dumpPath; }
+  std::string dumpPath = IS_HUMAN_READABLE ? "/var/tmp/banned_ip_addresses.json" : "/var/tmp/banned_ip_addresses.bin";
   std::unordered_map<std::string, WatchMatches*> load();
   int save(std::unordered_map<std::string, WatchMatches*> ips);
 

@@ -12,7 +12,6 @@ void test1();
 void test2();
 void test3();
 void test4();
-void test5();
 
 
 void print_test_passed(std::string message){
@@ -34,34 +33,29 @@ int main (int argc, char *argv[]){
    */
 
   /**
-   * Test 0: empty path
+   * Test 0: File does not exist
    */
   test();
-
-  /**
-   * Test 1: No file found
-   */
-  test1();
 
 
   /**
    * Test 2: Malformed file
    */
-  test2();
+  test1();
 
 
   /**
    * Test 3: Save and load 10.000 entries
    */
-  test3();
+  test2();
 
 
   /**
    * Test 4: Check if num_matches increments correctly and its time to harvest
    */
-   test4();
+   test3();
 
-  delete trace;
+   delete trace;
    /**
     * Most exhaustive test.
     *
@@ -69,27 +63,22 @@ int main (int argc, char *argv[]){
     *
     * Test 5: Run NwInterface with 4 default ips that should be banned
     */
-    test5();
+    test4();
 }
 
 
 void test(){
-  BannedIpLogger *no_path = new BannedIpLogger("");
+  std::string command = "rm /var/tmp/banned_ip_addresses.*";
+  std::system((char *) command.c_str());
+  BannedIpLogger *no_path = new BannedIpLogger();
   std::unordered_map<std::string, WatchMatches*> path_result = no_path -> load();
   assert(path_result.size() == 0);
   delete no_path;
   print_test_passed("Test#0 Passed");
 }
-void test1(){
-  BannedIpLogger *no_file = new BannedIpLogger("XXXXXXX");
-  std::unordered_map<std::string, WatchMatches*> no_result = no_file -> load();
-  delete no_file;
-  assert(no_result.size() == 0);
-  print_test_passed("Test#1 Passed");
-}
 
-void test2(){
-  BannedIpLogger *malformed = new BannedIpLogger("test2.json");
+void test1(){
+  BannedIpLogger *malformed = new BannedIpLogger();
   std::unordered_map<std::string, WatchMatches*> malformed_list;
   malformed_list["$$$$"] = new WatchMatches(1,171361377);
   for (auto itr = malformed_list.begin(); itr != malformed_list.end();)
@@ -101,13 +90,11 @@ void test2(){
   std::unordered_map<std::string, WatchMatches*> malformed_result = malformed -> load();
   delete malformed;
   assert(malformed_result.size() == 0);
-  print_test_passed("Test#2 Passed");
+  print_test_passed("Test#1 Passed");
 }
-void test3(){
-  std::string outputFile = "test3.json";
-  //Test when IS_HUMAN_READABLE = False
-  //outputFile = "test3.bin";
-  BannedIpLogger *ip = new BannedIpLogger(outputFile);
+void test2(){
+
+  BannedIpLogger *ip = new BannedIpLogger();
 
   const int howMany = 10000;
   std::unordered_map<std::string, WatchMatches*> matches_list;
@@ -144,9 +131,9 @@ void test3(){
   }
   delete ip;
   assert(count == howMany);
-  print_test_passed("Test#3 Passed");
+  print_test_passed("Test#2 Passed");
 }
-void test4(){
+void test3(){
   WatchMatches *watchMatches =  new WatchMatches(1,time(NULL));
 
   for(int key = 1; key <= 12; key++){
@@ -157,12 +144,11 @@ void test4(){
   }
   delete watchMatches;
 
-  print_test_passed("Test#4 Passed");
+  print_test_passed("Test#3 Passed");
 }
 
-void test5(){
-  std::string outputFile = "test5.json";
-  BannedIpLogger *ip = new BannedIpLogger(outputFile);
+void test4(){
+  BannedIpLogger *ip = new BannedIpLogger();
 
   const int howMany = 4;
   std::unordered_map<std::string, WatchMatches*> matches_list;
@@ -172,7 +158,7 @@ void test5(){
   }
   ip ->save(matches_list);
 
-  std::string command = "sudo ./ipt_geofence -c sample_config.json -m dbip-country.mmdb -d test5.json";
+  std::string command = "sudo ./ipt_geofence -c sample_config.json -m dbip-country.mmdb";
 
   //return value ignored
   std::system((char *) command.c_str());
@@ -200,5 +186,5 @@ void test5(){
   ip ->release(matches_list);
   ip ->release(result);
   delete ip;
-  print_test_passed("Test#5 Passed");
+  print_test_passed("Test#4 Passed");
 }

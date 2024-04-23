@@ -72,7 +72,6 @@ static void help() {
   printf("-c <config>       | Specify the configuration file\n");
   printf("-m <city>         | Local mmdb_city MMDB file\n");
   printf("-T <message>      | [Debug] Send ZMQ test message and exits.\n");
-  printf("-d <dump>         | Specify the file name to save the list of banned IPs to persistent storage.\n");
 #if defined __FreeBSD__
   printf("-i <ifname>       | Interface name\n");
 #endif
@@ -95,7 +94,6 @@ static void help() {
 int main(int argc, char *argv[]) {
   u_char c;
   std::string confPath = "";
-  std::string dumpPath = "";
   const struct option long_options[] = {
     { "config",      required_argument,    NULL, 'c' },
     { "mmdb_city",   required_argument,    NULL, 'm' },
@@ -106,7 +104,6 @@ int main(int argc, char *argv[]) {
     { "syslog",      no_argument,          NULL, 's' },
     { "zmq-test",    required_argument,    NULL, 'T' },
     { "verbose",     no_argument,          NULL, 'v' },
-    { "dump",        optional_argument,    NULL, 'd'},
     /* End of options */
     { NULL,          no_argument,          NULL,  0 }
   };
@@ -117,7 +114,7 @@ int main(int argc, char *argv[]) {
   trace = new Trace();
   conf = new Configuration();
 
-  while((c = getopt_long(argc, argv, "c:u:l:m:svVT:d:h"
+  while((c = getopt_long(argc, argv, "c:u:l:m:svVT:h"
 #if defined __FreeBSD__ || defined __APPLE__
 			 "i:"
 #endif
@@ -148,10 +145,6 @@ int main(int argc, char *argv[]) {
 
     case 'v':
       trace->set_trace_level(6);
-      break;
-
-    case 'd':
-      dumpPath = optarg;
       break;
 
     default:
@@ -207,7 +200,7 @@ int main(int argc, char *argv[]) {
 #endif
   
   try {
-    iface = new NwInterface(conf->getQueueId(), conf, &geoip, confPath, dumpPath);
+    iface = new NwInterface(conf->getQueueId(), conf, &geoip, confPath);
 
     iface->packetPollLoop();
   } catch(int err) {

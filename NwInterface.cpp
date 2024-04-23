@@ -36,10 +36,9 @@ int netfilter_callback(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg,
 NwInterface::NwInterface(u_int nf_device_id,
 			 Configuration *_c,
 			 GeoIP *_g,
-       std::string c_path,
-       std::string _dump_path
+       std::string c_path
              ) {
-  conf = _c, geoip = _g, confPath = c_path; dumpPath = _dump_path;
+  conf = _c, geoip = _g, confPath = c_path;
   reloaderThread = NULL;
   ifaceRunning = false;
   fw = NULL;
@@ -931,7 +930,8 @@ int NwInterface::sendTelegramMessage(std::string message) {
 /* **************************************************** */
 
 void NwInterface::initIpDumper() {
-  logger = new BannedIpLogger(dumpPath);
+  logger = new BannedIpLogger();
+#if !LOG_ONLY
   std::unordered_map<std::string, WatchMatches*> fetched = logger->load();
   for(std::unordered_map<std::string, WatchMatches*>::iterator it = fetched.begin();it != fetched.end(); it++) {
     char *host =  (char *) it->first.c_str();
@@ -942,7 +942,9 @@ void NwInterface::initIpDumper() {
 
   }
   logger -> release(fetched);
+#endif
 }
+
 
 /* **************************************************** */
 
