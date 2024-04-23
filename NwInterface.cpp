@@ -514,8 +514,6 @@ void NwInterface::logHostBan(char *host_ip,
   root["action"] = ban_ip ? "ban" : "unban";
 
   json_txt = writer.write(root);
-  //testing
-  std::cout << json_txt << "\n";
   trace->traceEvent(TRACE_INFO, "%s", json_txt.c_str());
 
   if(zmq)
