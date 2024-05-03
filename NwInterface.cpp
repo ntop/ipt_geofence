@@ -20,7 +20,6 @@
  */
 
 #include "include.h"
-
 #define TOO_MANY_INVALID_ATTEMPTS    3
 #define NUM_PURGE_LOOP             300
 
@@ -36,7 +35,9 @@ int netfilter_callback(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg,
 
 NwInterface::NwInterface(u_int nf_device_id,
 			 Configuration *_c,
-			 GeoIP *_g, std::string c_path) {
+			 GeoIP *_g,
+       std::string c_path
+             ) {
   conf = _c, geoip = _g, confPath = c_path;
   reloaderThread = NULL;
   ifaceRunning = false;
@@ -831,7 +832,6 @@ void NwInterface::reloadConfLoop() {
 /* **************************************************** */
 
 void NwInterface::harvestWatches() {
-  u_int32_t when = time(NULL) - MAX_IDLENESS;
 
 #ifdef DEBUG
   trace->traceEvent(TRACE_NORMAL, "NwInterface::harvestWatches()");
@@ -844,8 +844,7 @@ void NwInterface::harvestWatches() {
     trace->traceEvent(TRACE_NORMAL, "last_match=%u / now=%u [to go: %d]",
 		      match->get_last_match(), when, (match->get_last_match() - when));
 #endif
-
-    if(match->ready_to_harvest(when)) {
+    if(match->ready_to_harvest()) {
 #ifdef DEBUG
       trace->traceEvent(TRACE_NORMAL, "Harvesting");
 #endif
@@ -868,15 +867,17 @@ void NwInterface::ban(char *host, bool ban_ip,
   if(ban_ip) {
     /* Ban */
 
-    if(it == watches_blacklist.end()) {
-      watches_blacklist[host] = new WatchMatches();
 
+    if(it == watches_blacklist.end()) {
+      WatchMatches *match = new WatchMatches();
+      watches_blacklist[host] = match;
+      match->set_num_matches(conf->addBannedAddress(host, NULL));
       if(fw) fw->ban(host, is_ipv4);
       logHostBan(host, ban_ip, ban_traffic, reason, country);
     } else {
       WatchMatches *m = it->second;
-
-      m->inc_matches(); /* TODO increment unban time */
+      m->inc_matches();
+      conf->addBannedAddress(host, m);
     }
   } else {
     /* Unban */

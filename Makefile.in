@@ -10,7 +10,7 @@ TARGET=ipt_geofence
 LIBS=@LDFLAGS@ @LIBS@
 
 
-OBJECTS = Blacklists.o Configuration.o  GeoIP.o  NwInterface.o NtopCloud.o  Trace.o  Utils.o ZMQ.o
+OBJECTS = Blacklists.o Configuration.o  GeoIP.o  NwInterface.o NtopCloud.o  Trace.o  Utils.o ZMQ.o BannedIpLogger.o
 HEADERS = $(wildcard *.h)
 
 all: $(TARGET) zmqReceiver

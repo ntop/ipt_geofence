@@ -64,6 +64,7 @@ void Blacklists::addAddress(int family, void *addr, int bits) {
 /* ****************************************** */
 
 bool Blacklists::isBlacklistedIPv4(struct in_addr *addr) {
+  if(ip_logger.findIpv4(addr)) return true;
   ndpi_prefix_t prefix;
 
   ndpi_fill_prefix_v4(&prefix, addr, 32, ptree_v4->maxbits);
@@ -77,6 +78,7 @@ bool Blacklists::isBlacklistedIPv4(struct in_addr *addr) {
 /* ****************************************** */
 
 bool Blacklists::isBlacklistedIPv6(struct in6_addr *addr6) {
+  if(ip_logger.findIpv6(addr6)) return true;
   ndpi_prefix_t prefix;
 
   ndpi_fill_prefix_v6(&prefix, addr6, 128, ptree_v6->maxbits);

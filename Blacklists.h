@@ -27,7 +27,7 @@
 class Blacklists {
  private:
   ndpi_patricia_tree_t *ptree_v4, *ptree_v6;
-  
+  BannedIpLogger ip_logger;
   void addAddress(int family, void *addr, int bits);
   bool findAddress(int family, struct in_addr *addr, int bits);
 
@@ -40,6 +40,8 @@ class Blacklists {
   void removeAddress(char *net);
   bool loadIPsetFromFile(const char *path);
   bool loadIPsetFromURL(const char *url);
+
+  inline int addBannedAddress(char *addr, WatchMatches *matches) { return ip_logger.addAddress(std::string(addr), matches); }
 
   bool isBlacklistedIPv4(struct in_addr *pin);
   bool isBlacklistedIPv6(struct in6_addr *addr6);
