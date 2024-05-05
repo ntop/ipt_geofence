@@ -358,7 +358,7 @@ void NwInterface::packetPollLoop() {
       shadowConf = NULL;
 
       trace->traceEvent(TRACE_NORMAL, "New configuration has been updated");
-    }    
+    }
   } /* while */
 
   trace->traceEvent(TRACE_NORMAL, "Leaving packet poll loop");
@@ -525,7 +525,7 @@ void NwInterface::logHostBan(char *host_ip,
   }
 
 #ifdef HAVE_NTOP_CLOUD
-  if(cloud && ban_ip) {    
+  if(cloud && ban_ip) {
     cloud->ban(host_ip,
 	       ban_traffic ? bl_geofence_monitored_port : bl_geofence_watch,
 	       (char*)reason.c_str(),
@@ -633,7 +633,10 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
 
     in.s_addr = saddr;
 
-    /* For all ports/protocols, check if sender/recipient are blacklisted and if so, block this flow */
+    /* For all ports/protocols, check if sender/recipient are white/black-listed and if so, pass/block this flow */
+    
+    if(conf->isWhitelistedIPv4(&in))  return(conf->getMarkerPass()); /* Whitelisted IP */
+
     if(conf->isBlacklistedIPv4(&in)) {
       logFlow(proto_name,
 	      src_host, sport, src_country, src_continent, true,
@@ -645,6 +648,8 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
 
     in.s_addr = daddr;
 
+    if(conf->isWhitelistedIPv4(&in))  return(conf->getMarkerPass()); /* Whitelisted IP */
+    
     if(conf->isBlacklistedIPv4(&in)) {
       logFlow(proto_name,
 	      src_host, sport, src_country, src_continent, false,

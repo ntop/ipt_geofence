@@ -63,7 +63,7 @@ void Lists::addAddress(int family, void *addr, int bits) {
 
 /* ****************************************** */
 
-bool Lists::isBlacklistedIPv4(struct in_addr *addr) {
+bool Lists::isListedIPv4(struct in_addr *addr) {
   ndpi_prefix_t prefix;
 
   ndpi_fill_prefix_v4(&prefix, addr, 32, ptree_v4->maxbits);
@@ -76,7 +76,7 @@ bool Lists::isBlacklistedIPv4(struct in_addr *addr) {
 
 /* ****************************************** */
 
-bool Lists::isBlacklistedIPv6(struct in6_addr *addr6) {
+bool Lists::isListedIPv6(struct in6_addr *addr6) {
   ndpi_prefix_t prefix;
 
   ndpi_fill_prefix_v6(&prefix, addr6, 128, ptree_v6->maxbits);
@@ -96,14 +96,14 @@ bool Lists::findAddress(char *addr) {
     struct in6_addr addr6;
 
     if(inet_pton(AF_INET6, addr, &addr6))
-      return(isBlacklistedIPv6(&addr6));
+      return(isListedIPv6(&addr6));
     else
       return(false); /* Conversion failed */
   } else {
     struct in_addr pin;
 
     inet_aton(addr, &pin);
-    return(isBlacklistedIPv4(&pin));
+    return(isListedIPv4(&pin));
   }
 }
 
@@ -171,9 +171,11 @@ bool Lists::loadIPsetFromFile(const char *path) {
   std::ifstream infile(path);
   std::string line;
 
-  if(!infile.is_open())
+  if(!infile.is_open()) {
+    trace->traceEvent(TRACE_WARNING, "Unable to open file %s", path);
     return(false);
-
+  }
+  
   while(getline(infile, line)){   
     if((line[0] == '#') || (line[0] == '\0'))
       continue;

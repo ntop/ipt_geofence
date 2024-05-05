@@ -29,6 +29,9 @@
 	"https://feodotracker.abuse.ch/downloads/ipblocklist.txt",
 	"https://sslbl.abuse.ch/blacklist/sslipblacklist.txt"
     ],
+    "whitelists": [
+	"./whitelist.txt"
+    ],
     "watches": [
 	{ "name" : "mail", "cmd": "/usr/share/ipt_geofence/scripts/mail.py" },
 	{ "name" : "auth", "cmd": "/usr/share/ipt_geofence/scripts/auth.py" }

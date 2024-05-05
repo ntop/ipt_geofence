@@ -39,7 +39,7 @@ class Configuration {
   Marker marker_pass;
   Marker marker_drop;
   Marker default_policy;
-  Lists blacklists;
+  Lists blacklists, whitelists;
   std::string host_ip, host_name;
   std::string cmd_ban, cmd_unban;
   std::string telegram_bot_token, telegram_chat_id;
@@ -84,9 +84,13 @@ class Configuration {
   inline bool isMonitoredTCPPort(u_int16_t port) { return(all_tcp_ports || (tcp_ports.find(port) != tcp_ports.end())); }
   inline bool isMonitoredUDPPort(u_int16_t port) { return(all_udp_ports || (udp_ports.find(port) != udp_ports.end())); }
   bool isProtectedPort(u_int16_t port);
-  inline bool isBlacklistedIPv4(struct in_addr *addr)               { return(blacklists.isBlacklistedIPv4(addr)) ;}
-  inline bool isBlacklistedIPv6(struct in6_addr *addr6)             { return(blacklists.isBlacklistedIPv6(addr6));}
-  inline void loadIPsetFromURL(const char* url)                     { blacklists.loadIPsetFromURL(url); }
+
+  inline bool isBlacklistedIPv4(struct in_addr *addr)               { return(blacklists.isListedIPv4(addr));  }
+  inline bool isBlacklistedIPv6(struct in6_addr *addr6)             { return(blacklists.isListedIPv6(addr6)); }
+
+  inline bool isWhitelistedIPv4(struct in_addr *addr)               { return(whitelists.isListedIPv4(addr));  }
+  inline bool isWhitelistedIPv6(struct in6_addr *addr6)             { return(whitelists.isListedIPv6(addr6)); }
+
   inline std::unordered_map<std::string, std::pair<std::string, bool> >* get_watches()
                                                                     { return(&watches);                 }
   inline const char *getHostIP()                                    { return(host_ip.c_str());          }

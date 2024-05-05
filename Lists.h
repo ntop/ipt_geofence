@@ -41,9 +41,8 @@ class Lists {
   bool loadIPsetFromFile(const char *path);
   bool loadIPsetFromURL(const char *url);
 
-  bool isBlacklistedIPv4(struct in_addr *pin);
-  bool isBlacklistedIPv6(struct in6_addr *addr6);
-  std::vector<std::string> urls;
+  bool isListedIPv4(struct in_addr *pin);
+  bool isListedIPv6(struct in6_addr *addr6);
 };
 
 

@@ -79,12 +79,16 @@ bool Configuration::readConfigFile(const char *path) {
     return(false);
   }
 
+  /* **************************** */
+  
   if(root["queue_id"].empty()) {
     trace->traceEvent(TRACE_ERROR, "Missing %s from %s", "queue_id", path);
     return(false);
   } else
     nfq_queue_id = root["queue_id"].asUInt();
 
+  /* **************************** */
+  
   if(!root["markers"].empty()) {
     if(root["markers"]["pass"].empty()) {
       trace->traceEvent(TRACE_INFO, "Missing %s from %s: using default %u", "pass", path, DEFAULT_PASS_MARKER);
@@ -110,8 +114,11 @@ bool Configuration::readConfigFile(const char *path) {
       return(false);
     }
   }
+  
   trace->traceEvent(TRACE_INFO, "Markers are set to: pass %d, drop %d", marker_pass, marker_drop);
 
+  /* **************************** */
+  
   if(root["default_policy"].empty()) {
     trace->traceEvent(TRACE_ERROR, "Missing %s from %s", "default_policy", path);
     return(false);
@@ -123,6 +130,8 @@ bool Configuration::readConfigFile(const char *path) {
 
   all_tcp_ports = all_udp_ports = true;
 
+  /* **************************** */
+  
   if(!root["monitored_ports"].empty()) {
     if(!root["monitored_ports"]["tcp"].empty()) {
       all_tcp_ports = false;
@@ -187,6 +196,8 @@ bool Configuration::readConfigFile(const char *path) {
     }
   }
 
+  /* **************************** */
+  
   if(all_tcp_ports) trace->traceEvent(TRACE_INFO, "All TCP ports will be monitored");
   if(all_udp_ports) trace->traceEvent(TRACE_INFO, "All UDP ports will be monitored");
 
@@ -196,6 +207,7 @@ bool Configuration::readConfigFile(const char *path) {
     Json::Value json_policy_obj = root["policy"][json_policy_str];
     std::string json_list_str = json_policy_str == "drop" ? "_whitelist" : "_blacklist";
     int counter = 2;
+
     do {
       std::string json_value_str = counter == 2 ? "countries" : "continents";
       if(json_policy_obj[json_value_str+json_list_str].empty()) {
@@ -211,6 +223,8 @@ bool Configuration::readConfigFile(const char *path) {
     } while(--counter);
   }
 
+  /* **************************** */
+  
   if(!root["watches"].empty()) {
     size_t num_watches = root["watches"].size();
 
@@ -231,18 +245,33 @@ bool Configuration::readConfigFile(const char *path) {
     }
   }
 
+  /* **************************** */
+  
+  if(!root["whitelists"].empty()) {
+    size_t n_paths = root["whitelists"].size();
+
+    for(Json::Value::ArrayIndex i = 0; i != n_paths; i++) {
+      std::string path (root["whitelists"][i].asString());
+
+      trace->traceEvent(TRACE_NORMAL, "Loading %s...", path.c_str());
+      whitelists.loadIPsetFromFile(path.c_str());
+    }
+  }
+
+  /* **************************** */
+  
   if(!root["blacklists"].empty()) {
     size_t n_urls = root["blacklists"].size();
 
-    blacklists.urls.resize(n_urls);
-
     for(Json::Value::ArrayIndex i = 0; i != n_urls; i++) {
       std::string url (root["blacklists"][i].asString());
-      blacklists.urls[i] = url;
+
       blacklists.loadIPsetFromURL(url.c_str());
     }
   }
 
+  /* **************************** */
+  
   if(!root["telegram"].empty()) {
     if(!root["telegram"]["bot_token"].empty())
       telegram_bot_token = root["telegram"]["bot_token"].asString();
@@ -251,6 +280,8 @@ bool Configuration::readConfigFile(const char *path) {
       telegram_chat_id = root["telegram"]["chat_id"].asString();
   }
 
+  /* **************************** */
+  
   if(!root["cmd"].empty()) {
     if(!root["cmd"]["ban"].empty())
       cmd_ban = root["cmd"]["ban"].asString();
@@ -259,6 +290,8 @@ bool Configuration::readConfigFile(const char *path) {
       cmd_unban = root["cmd"]["unban"].asString();
   }
 
+  /* **************************** */
+  
   if(!root["zmq"].empty()) {
     if(!root["zmq"]["url"].empty())
       zmq_url = root["zmq"]["url"].asString();
