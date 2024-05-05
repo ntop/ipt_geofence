@@ -1,6 +1,6 @@
 /*
  *
- * (C) 2021-23 - ntop.org
+ * (C) 2021-24 - ntop.org
  *
  *
  * This program is free software; you can redistribute it and/or modify
@@ -110,7 +110,7 @@ extern "C" {
 
 #include "Trace.h"
 #include "Utils.h"
-#include "Blacklists.h"
+#include "Lists.h"
 #include "Marker.h"
 #include "Configuration.h"
 #include "ZMQ.h"

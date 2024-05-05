@@ -1,6 +1,6 @@
 /*
  *
- * (C) 2021-23 - ntop.org
+ * (C) 2021-24 - ntop.org
  *
  *
  * This program is free software; you can redistribute it and/or modify
@@ -234,11 +234,11 @@ bool Configuration::readConfigFile(const char *path) {
   if(!root["blacklists"].empty()) {
     size_t n_urls = root["blacklists"].size();
 
-    blacklists.urls_Blacklist.resize(n_urls);
+    blacklists.urls.resize(n_urls);
 
     for(Json::Value::ArrayIndex i = 0; i != n_urls; i++) {
       std::string url (root["blacklists"][i].asString());
-      blacklists.urls_Blacklist[i] = url;
+      blacklists.urls[i] = url;
       blacklists.loadIPsetFromURL(url.c_str());
     }
   }

@@ -39,7 +39,7 @@ class Configuration {
   Marker marker_pass;
   Marker marker_drop;
   Marker default_policy;
-  Blacklists blacklists;
+  Lists blacklists;
   std::string host_ip, host_name;
   std::string cmd_ban, cmd_unban;
   std::string telegram_bot_token, telegram_chat_id;

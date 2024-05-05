@@ -19,12 +19,12 @@
  *
  */
 
-#ifndef _BLACKLISTS_H_
-#define _BLACKLISTS_H_
+#ifndef _LISTS_H_
+#define _LISTS_H_
 
 /* ******************************* */
 
-class Blacklists {
+class Lists {
  private:
   ndpi_patricia_tree_t *ptree_v4, *ptree_v6;
   
@@ -32,8 +32,8 @@ class Blacklists {
   bool findAddress(int family, struct in_addr *addr, int bits);
 
  public:
-  Blacklists();
-  ~Blacklists();
+  Lists();
+  ~Lists();
 
   bool findAddress(char *addr);
   void addAddress(char *net);
@@ -43,8 +43,8 @@ class Blacklists {
 
   bool isBlacklistedIPv4(struct in_addr *pin);
   bool isBlacklistedIPv6(struct in6_addr *addr6);
-  std::vector<std::string> urls_Blacklist;
+  std::vector<std::string> urls;
 };
 
 
-#endif /* _BLACKLISTS_H_ */
+#endif /* _LISTS_H_ */

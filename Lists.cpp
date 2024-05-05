@@ -23,7 +23,7 @@
 
 /* ****************************************** */
 
-Blacklists::Blacklists() {
+Lists::Lists() {
   ptree_v4 = ndpi_patricia_new(32);
   ptree_v6 = ndpi_patricia_new(128);
 }
@@ -36,7 +36,7 @@ static void free_ptree_data(void *data) {
 
 /* ****************************************** */
 
-Blacklists::~Blacklists() {
+Lists::~Lists() {
   if(ptree_v4)
     ndpi_patricia_destroy(ptree_v4, free_ptree_data);
 
@@ -47,7 +47,7 @@ Blacklists::~Blacklists() {
 
 /* ****************************************** */
 
-void Blacklists::addAddress(int family, void *addr, int bits) {
+void Lists::addAddress(int family, void *addr, int bits) {
   ndpi_prefix_t prefix;
   ndpi_patricia_node_t *node;
   ndpi_patricia_tree_t *tree;
@@ -63,7 +63,7 @@ void Blacklists::addAddress(int family, void *addr, int bits) {
 
 /* ****************************************** */
 
-bool Blacklists::isBlacklistedIPv4(struct in_addr *addr) {
+bool Lists::isBlacklistedIPv4(struct in_addr *addr) {
   ndpi_prefix_t prefix;
 
   ndpi_fill_prefix_v4(&prefix, addr, 32, ptree_v4->maxbits);
@@ -76,7 +76,7 @@ bool Blacklists::isBlacklistedIPv4(struct in_addr *addr) {
 
 /* ****************************************** */
 
-bool Blacklists::isBlacklistedIPv6(struct in6_addr *addr6) {
+bool Lists::isBlacklistedIPv6(struct in6_addr *addr6) {
   ndpi_prefix_t prefix;
 
   ndpi_fill_prefix_v6(&prefix, addr6, 128, ptree_v6->maxbits);
@@ -89,7 +89,7 @@ bool Blacklists::isBlacklistedIPv6(struct in6_addr *addr6) {
 
 /* ****************************************** */
 
-bool Blacklists::findAddress(char *addr) {
+bool Lists::findAddress(char *addr) {
   ndpi_prefix_t prefix;
 
   if(strchr(addr, ':') != NULL) {
@@ -109,7 +109,7 @@ bool Blacklists::findAddress(char *addr) {
 
 /* ****************************************** */
 
-void Blacklists::addAddress(char *net) {
+void Lists::addAddress(char *net) {
   char *_bits = strchr(net, '/');
   u_int bits = 0;
 
@@ -135,7 +135,7 @@ void Blacklists::addAddress(char *net) {
 
 /* ****************************************** */
 
-void Blacklists::removeAddress(char *net) {
+void Lists::removeAddress(char *net) {
   char *_bits = strchr(net, '/');
   u_int bits = 0;
   ndpi_prefix_t prefix;
@@ -167,7 +167,7 @@ void Blacklists::removeAddress(char *net) {
 
 /* ****************************************** */
 
-bool Blacklists::loadIPsetFromFile(const char *path) {
+bool Lists::loadIPsetFromFile(const char *path) {
   std::ifstream infile(path);
   std::string line;
 
@@ -205,7 +205,7 @@ bool Blacklists::loadIPsetFromFile(const char *path) {
 
 /* ****************************************** */
 
-bool Blacklists::loadIPsetFromURL(const char *url) {
+bool Lists::loadIPsetFromURL(const char *url) {
   CURL *curl = curl_easy_init();
   FILE *fd;
   CURLcode res;
