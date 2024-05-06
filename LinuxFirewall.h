@@ -42,8 +42,8 @@ class LinuxFirewall : public Firewall {
 	     is_ipv4 ? "" : "6", ip);
     execCmd(cmdbuf);
   }
-#endif
 };
+#endif
 
 #endif /* _LINUX_FIREWALL_H_ */
 
