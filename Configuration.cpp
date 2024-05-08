@@ -52,6 +52,7 @@ Configuration::~Configuration() {
   telegramThread->join();
   cmdThread->join();
   delete telegramThread;
+  delete cmdThread;
 }
 
 /* *************************2****************************** */

@@ -21,19 +21,34 @@
 #ifndef _WATCH_MATCHES_H_
 #define _WATCH_MATCHES_H_
 
-#define MAX_IDLENESS   300 /* 5 minutes */
+
 
 class WatchMatches {
 private:
   u_int32_t last_match, num_matches;
-
+  /**
+   * Change this parameters if you want to customize the function used for calculating the banning time.
+   */
+  const int function_a = 3;
+  const int function_base = 6;
+  const float function_b = 0.3;
+  const int function_offset = -2;
+  const int max_matches = 22;
 public:
   WatchMatches() { last_match = time(NULL), num_matches = 1; }
-
+  WatchMatches(u_int32_t _num_matches, u_int32_t _last_matches) { last_match = _last_matches, num_matches = _num_matches; }
+  int f(float x) {
+      if (x >= max_matches) return 315360; //ban for one year at this point
+      return (int) (function_a * std::pow(function_base, function_b * (float) x) + function_offset);
+  }
+  bool isBanned = false;
   inline u_int32_t get_last_match()   { return(last_match);                     }
   inline u_int32_t get_num_matches()  { return(num_matches);                    }
+  inline void set_last_match(u_int32_t value)   { last_match = value;           }
+  inline void set_num_matches(u_int32_t value)   { num_matches = value;         }
   inline void      inc_matches()      { num_matches++, last_match = time(NULL); }
-  inline bool      ready_to_harvest(u_int32_t when) { return((last_match < when) ? true : false); }
+  inline u_int32_t calculate_ban_time() { return time(NULL) - f(get_num_matches()) * 100; }
+  inline bool      ready_to_harvest() { return((last_match < calculate_ban_time() ) ? true : false); }
 };
 
 #endif /* _WATCH_MATCHES_H_ */

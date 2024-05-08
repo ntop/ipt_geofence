@@ -21,6 +21,7 @@
 
 #include "include.h"
 
+#define DROP_AFTER 86400 /* Drop after one day */
 /* ****************************************** */
 
 Lists::Lists() {
@@ -64,6 +65,7 @@ void Lists::addAddress(int family, void *addr, int bits) {
 /* ****************************************** */
 
 bool Lists::isListedIPv4(struct in_addr *addr) {
+  if(findIpv4(addr)) return true;
   ndpi_prefix_t prefix;
 
   ndpi_fill_prefix_v4(&prefix, addr, 32, ptree_v4->maxbits);
@@ -77,6 +79,7 @@ bool Lists::isListedIPv4(struct in_addr *addr) {
 /* ****************************************** */
 
 bool Lists::isListedIPv6(struct in6_addr *addr6) {
+  if(findIpv6(addr6)) return true;
   ndpi_prefix_t prefix;
 
   ndpi_fill_prefix_v6(&prefix, addr6, 128, ptree_v6->maxbits);
@@ -248,4 +251,102 @@ bool Lists::loadIPsetFromURL(const char *url) {
 #endif
 
   return(rc);
+}
+
+/* **************************************************** */
+
+bool  Lists::load(std::unordered_map<std::string, WatchMatches*>& watches) {
+  watches_blacklist = watches;
+  std::ifstream infile(dump_path);
+  std::string line;
+  bool is_empty = infile.peek() == std::ifstream::traits_type::eof();
+  if(!infile.is_open() || is_empty) {
+    infile.close();
+    trace->traceEvent(TRACE_WARNING,  "Cannot open or empty file: %s", dump_path.c_str());
+    return (false);
+  }
+
+  while(getline(infile, line)){
+    if(line[0] == '\0')
+      continue;
+    if(line.find('\t') != std::string::npos) {
+      char *token, *dup = strdup(line.c_str());
+      int times, last_match;
+      char *host;
+      for(int key = 0; key < 3; key ++){
+        last_match = -1;
+        if((token = strtok(key==0 ? dup : NULL, "\t")) == NULL){
+          trace->traceEvent(TRACE_WARNING, "%s", "Error while reading WatchMatches, malformed line in file");
+          infile.close();
+          return false;
+        }
+        if(key == 0) host = token;
+        if(key == 1) times = static_cast<uint32_t>(std::stoul(token));
+        if(key == 2) last_match = static_cast<uint32_t>(std::stoul(token));
+        if(last_match == -1) continue;
+        watches_blacklist[std::string (host)] = new WatchMatches(times,last_match);
+      }
+      free(dup);
+    }
+  }
+
+  infile.close();
+  return(true);
+}
+
+/* **************************************************** */
+
+bool Lists::save() {
+  std::string string_serialized;
+  std::ofstream wf(dump_path, std::ios::out | std::ios::binary);
+  if(!wf) {
+    wf.close();
+    trace->traceEvent(TRACE_WARNING, "Cannot open file: %s", dump_path.c_str());
+    return false;
+  }
+  for(std::unordered_map<std::string, WatchMatches *>::iterator it = watches_blacklist.begin();it != watches_blacklist.end(); it++) {
+    string_serialized = it->first + "\t" + std::to_string(it->second->get_num_matches()) + "\t" + std::to_string(it->second->get_last_match()) + "\n";
+    size_t size = string_serialized.size();
+    wf.write( (char*) string_serialized.c_str(), size );
+  }
+  wf.close();
+  if(!wf.good()) {
+    trace->traceEvent(TRACE_WARNING, "Error occurred when writing %s",dump_path.c_str());
+    return false;
+  }
+  return true;
+}
+
+/* **************************************************** */
+
+bool Lists::findIpv4(struct in_addr *addr) {
+  char saddr[INET_ADDRSTRLEN];
+  struct in_addr copy;
+  copy.s_addr = htonl(addr->s_addr);
+  char *ip = (char *) inet_ntop(AF_INET, &copy, saddr, INET_ADDRSTRLEN);
+  if(ip == NULL) return false;
+  std::unordered_map<std::string, WatchMatches *>::iterator it = watches_blacklist.find(std::string(ip));
+  return it != watches_blacklist.end();
+}
+
+/* **************************************************** */
+
+bool Lists::findIpv6(struct in6_addr *addr) {
+  char saddr[INET6_ADDRSTRLEN];
+  char *ip = (char *) inet_ntop(AF_INET6, addr, saddr, INET6_ADDRSTRLEN);
+  if(ip == NULL) return false;
+  std::unordered_map<std::string, WatchMatches *>::iterator it = watches_blacklist.find(std::string(ip));
+  return it != watches_blacklist.end();
+}
+
+/* **************************************************** */
+
+void Lists::cleanAddresses() {
+  for (auto itr = watches_blacklist.begin(); itr != watches_blacklist.end();) {
+    if (itr->second->get_last_match() <= time(NULL) - DROP_AFTER && !itr->second->isBanned) {
+      delete itr->second;
+      itr = watches_blacklist.erase(itr);
+    }
+    else itr++;
+  }
 }
