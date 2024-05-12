@@ -174,7 +174,7 @@ void NwInterface::packetPollLoop() {
   int fd;
   std::vector<bool>  geo_ip_pipes;
   u_int num_loops = 0;
-
+  conf ->load(watches_blacklist);
   watches = conf->get_watches();
 
   /* Spawn reload config thread in background */
@@ -347,6 +347,7 @@ void NwInterface::packetPollLoop() {
 
     if((id == 0) || (num_loops > NUM_PURGE_LOOP)) {
       harvestWatches();
+      conf -> cleanAddresses();
       num_loops = 0;
     }
 
@@ -360,7 +361,7 @@ void NwInterface::packetPollLoop() {
       trace->traceEvent(TRACE_NORMAL, "New configuration has been updated");
     }
   } /* while */
-
+  conf ->save();
   trace->traceEvent(TRACE_NORMAL, "Leaving packet poll loop");
 
   ifaceRunning = false;
@@ -836,7 +837,6 @@ void NwInterface::reloadConfLoop() {
 /* **************************************************** */
 
 void NwInterface::harvestWatches() {
-  u_int32_t when = time(NULL) - MAX_IDLENESS;
 
 #ifdef DEBUG
   trace->traceEvent(TRACE_NORMAL, "NwInterface::harvestWatches()");
@@ -849,14 +849,12 @@ void NwInterface::harvestWatches() {
     trace->traceEvent(TRACE_NORMAL, "last_match=%u / now=%u [to go: %d]",
 		      match->get_last_match(), when, (match->get_last_match() - when));
 #endif
-
-    if(match->ready_to_harvest(when)) {
+    if(match->ready_to_harvest()) {
 #ifdef DEBUG
       trace->traceEvent(TRACE_NORMAL, "Harvesting");
 #endif
       ban((char*)it->first.c_str(), false /* unban */, false, "unban", "");
-      delete it->second;
-      watches_blacklist.erase(it++);    // or "it = m.erase(it)" since C++11
+      it->second->isBanned = false;
     } else
       ++it;
   }
@@ -874,14 +872,15 @@ void NwInterface::ban(char *host, bool ban_ip,
     /* Ban */
 
     if(it == watches_blacklist.end()) {
-      watches_blacklist[host] = new WatchMatches();
-
+      WatchMatches *match = new WatchMatches();
+      watches_blacklist[host] = match;
       if(fw) fw->ban(host, is_ipv4);
+      match->isBanned = true;
       logHostBan(host, ban_ip, ban_traffic, reason, country);
     } else {
       WatchMatches *m = it->second;
-
-      m->inc_matches(); /* TODO increment unban time */
+      m->inc_matches();
+      m->isBanned = true;
     }
   } else {
     /* Unban */

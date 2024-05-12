@@ -85,6 +85,10 @@ class Configuration {
   inline bool isMonitoredUDPPort(u_int16_t port) { return(all_udp_ports || (udp_ports.find(port) != udp_ports.end())); }
   bool isProtectedPort(u_int16_t port);
 
+  inline void save()                                                                     { blacklists.save(); }
+  inline void load(std::unordered_map<std::string, WatchMatches*>& watches_blacklist)  { blacklists.load(watches_blacklist); }
+  inline void cleanAddresses()                                                                    { blacklists.cleanAddresses(); }
+
   inline bool isBlacklistedIPv4(struct in_addr *addr)               { return(blacklists.isListedIPv4(addr));  }
   inline bool isBlacklistedIPv6(struct in6_addr *addr6)             { return(blacklists.isListedIPv6(addr6)); }
 

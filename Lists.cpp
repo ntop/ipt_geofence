@@ -21,6 +21,7 @@
 
 #include "include.h"
 
+#define DISCARD_AFTER 86400 /* Drop after one day */
 /* ****************************************** */
 
 Lists::Lists() {
@@ -64,6 +65,7 @@ void Lists::addAddress(int family, void *addr, int bits) {
 /* ****************************************** */
 
 bool Lists::isListedIPv4(struct in_addr *addr) {
+  if(findIp(addr, true)) return true;
   ndpi_prefix_t prefix;
 
   ndpi_fill_prefix_v4(&prefix, addr, 32, ptree_v4->maxbits);
@@ -77,6 +79,7 @@ bool Lists::isListedIPv4(struct in_addr *addr) {
 /* ****************************************** */
 
 bool Lists::isListedIPv6(struct in6_addr *addr6) {
+  if(findIp(addr6, false)) return true;
   ndpi_prefix_t prefix;
 
   ndpi_fill_prefix_v6(&prefix, addr6, 128, ptree_v6->maxbits);
@@ -248,4 +251,90 @@ bool Lists::loadIPsetFromURL(const char *url) {
 #endif
 
   return(rc);
+}
+
+/* **************************************************** */
+
+bool  Lists::load(std::unordered_map<std::string, WatchMatches*>& watches) {
+  if(dump_path.empty()) return false;
+  watches_blacklist = watches;
+  std::ifstream infile(dump_path);
+  std::string line;
+  if(!infile.good()){
+    infile.close();
+    trace->traceEvent(TRACE_WARNING,  "Unable to open file: %s", dump_path.c_str());
+    return (false);
+  }
+  while(getline(infile, line)){
+    if(line.empty()) continue; /* Skip empty lines */
+    std::stringstream ss(line);
+    std::string host, times, last_match;
+    try {
+      ss >> host >> times >> last_match;
+      uint32_t lm  = static_cast<uint32_t>(std::stoul(last_match));
+      if (lm <= time(NULL) - DISCARD_AFTER) continue; // Skip entry
+      watches_blacklist[host] = new WatchMatches(static_cast<uint32_t>(std::stoul(times)),lm);
+    }
+    catch (...){ // Failure, Invalid argument or out of range exceptions can be raised
+      trace->traceEvent(TRACE_WARNING, "%s", "Error when trying to parse value from file");
+      infile.close();
+      return false;
+    }
+   }
+  infile.close();
+  return(true);
+}
+
+/* **************************************************** */
+
+bool Lists::save() {
+  if(dump_path.empty()) return false;
+  std::string string_serialized;
+  std::ofstream wf(dump_path, std::ios::out | std::ios::binary);
+  if(!wf) {
+    wf.close();
+    trace->traceEvent(TRACE_WARNING, "Cannot open file: %s", dump_path.c_str());
+    return false;
+  }
+  for(std::unordered_map<std::string, WatchMatches *>::iterator it = watches_blacklist.begin();it != watches_blacklist.end(); it++) {
+    string_serialized = it->first + "\t" + std::to_string(it->second->get_num_matches()) + "\t" + std::to_string(it->second->get_last_match()) + "\n";
+    if(!(wf << string_serialized)){
+      trace->traceEvent(TRACE_WARNING, "Error occurred when writing %s",dump_path.c_str());
+      wf.close();
+      return false;
+    }
+  }
+  wf.close();
+  if(!wf.good()) {
+    trace->traceEvent(TRACE_WARNING, "Error occurred when writing %s",dump_path.c_str());
+    return false;
+  }
+  return true;
+}
+
+/* **************************************************** */
+
+bool Lists::findIp(void *addr, bool is_ipv4) {
+  char saddr[is_ipv4 ? INET_ADDRSTRLEN : INET6_ADDRSTRLEN];
+  struct in_addr copy;
+  if(is_ipv4)
+    copy.s_addr = htonl(((struct in_addr *) addr)->s_addr);
+  char *ip = (char *) (is_ipv4
+          ? inet_ntop(AF_INET, &copy, saddr, INET_ADDRSTRLEN)
+          : inet_ntop(AF_INET6, addr, saddr, INET6_ADDRSTRLEN));
+  if(ip == NULL) return false;
+  std::unordered_map<std::string, WatchMatches *>::iterator it = watches_blacklist.find(std::string(ip));
+  return it != watches_blacklist.end();
+}
+
+/* **************************************************** */
+
+void Lists::cleanAddresses() {
+  for (auto itr = watches_blacklist.begin(); itr != watches_blacklist.end();) {
+    if (itr->second->get_last_match() <= time(NULL) - DISCARD_AFTER && !itr->second->isBanned) {
+      delete itr->second;
+      itr = watches_blacklist.erase(itr);
+    }
+    else itr++;
+  }
 }

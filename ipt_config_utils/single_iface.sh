@@ -39,6 +39,7 @@ for i in {1,2}; do
     # Flush all if already there
     $IPTABLES -F IPT_GEOFENCE_BLACKLIST
     $IPTABLES -X IPT_GEOFENCE_BLACKLIST
+    $IPTABLES -N IPT_GEOFENCE_BLACKLIST
     # Return to the original chain
     $IPTABLES -A IPT_GEOFENCE_BLACKLIST -j RETURN
     # Jump to the blacklist chain

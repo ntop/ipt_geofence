@@ -22,24 +22,32 @@
 #ifndef _LISTS_H_
 #define _LISTS_H_
 
+#include <unordered_map>
+#include "WatchMatches.h"
 /* ******************************* */
 
 class Lists {
  private:
+  std::string dump_path;
   ndpi_patricia_tree_t *ptree_v4, *ptree_v6;
-  
   void addAddress(int family, void *addr, int bits);
   bool findAddress(int family, struct in_addr *addr, int bits);
+  bool findIp(void *addr, bool is_ipv4);
 
  public:
   Lists();
   ~Lists();
-
+  std::unordered_map<std::string, WatchMatches*> watches_blacklist;
   bool findAddress(char *addr);
   void addAddress(char *net);
   void removeAddress(char *net);
   bool loadIPsetFromFile(const char *path);
   bool loadIPsetFromURL(const char *url);
+
+  bool load(std::unordered_map<std::string, WatchMatches*>& watches);
+  bool save();
+  void cleanAddresses();
+  void setDumpPath(const char *path) { dump_path = std::string(path); }
 
   bool isListedIPv4(struct in_addr *pin);
   bool isListedIPv6(struct in6_addr *addr6);

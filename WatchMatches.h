@@ -21,19 +21,24 @@
 #ifndef _WATCH_MATCHES_H_
 #define _WATCH_MATCHES_H_
 
-#define MAX_IDLENESS   300 /* 5 minutes */
+
 
 class WatchMatches {
 private:
   u_int32_t last_match, num_matches;
-
+  int max_matches = 22;
 public:
   WatchMatches() { last_match = time(NULL), num_matches = 1; }
-
+  WatchMatches(u_int32_t _num_matches, u_int32_t _last_matches) { last_match = _last_matches, num_matches = _num_matches; }
+  int f(float x) {
+      if (x >= max_matches) return 315360; //ban for one year at this point
+      return (int) (std::pow(3, x * 1 /* Change this value if you want to make the function more or less steep */));
+  }
+  bool isBanned = false;
   inline u_int32_t get_last_match()   { return(last_match);                     }
   inline u_int32_t get_num_matches()  { return(num_matches);                    }
   inline void      inc_matches()      { num_matches++, last_match = time(NULL); }
-  inline bool      ready_to_harvest(u_int32_t when) { return((last_match < when) ? true : false); }
+  inline bool      ready_to_harvest() { return((last_match < time(NULL) - f(get_num_matches()) * 100 ) ? true : false); }
 };
 
 #endif /* _WATCH_MATCHES_H_ */
