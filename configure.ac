@@ -117,7 +117,7 @@ else
   INCS="$INCS -I $HOME/nDPI/src/include"
 fi
 
-LIBS="$LIBS -lpthread"
+LIBS="$LIBS -lpthread -lm"
 
 EXTN=
 if test $MACHINE = "x86_64"; then

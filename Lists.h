@@ -22,6 +22,11 @@
 #ifndef _LISTS_H_
 #define _LISTS_H_
 
+/* With this number of entries the memory used by the unordered_map will be about 1gb.
+ * If you want to increase the limit, remember that it tends to 10940000 * x --> 1gb * x
+ */
+#define MAX_ENTRIES 10940000
+
 #include <unordered_map>
 #include "WatchMatches.h"
 /* ******************************* */

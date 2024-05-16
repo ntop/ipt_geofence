@@ -65,7 +65,7 @@ void Lists::addAddress(int family, void *addr, int bits) {
 /* ****************************************** */
 
 bool Lists::isListedIPv4(struct in_addr *addr) {
-  if(findIp(addr, true)) return true;
+  if(findIp(addr, true /* is_ipv4 */)) return true;
   ndpi_prefix_t prefix;
 
   ndpi_fill_prefix_v4(&prefix, addr, 32, ptree_v4->maxbits);
@@ -79,7 +79,7 @@ bool Lists::isListedIPv4(struct in_addr *addr) {
 /* ****************************************** */
 
 bool Lists::isListedIPv6(struct in6_addr *addr6) {
-  if(findIp(addr6, false)) return true;
+  if(findIp(addr6, false /* is_ipv4 */)) return true;
   ndpi_prefix_t prefix;
 
   ndpi_fill_prefix_v6(&prefix, addr6, 128, ptree_v6->maxbits);

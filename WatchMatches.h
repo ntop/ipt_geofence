@@ -25,20 +25,31 @@
 
 class WatchMatches {
 private:
-  u_int32_t last_match, num_matches;
+  u_int32_t last_match;
+  u_int64_t num_matches;
   int max_matches = 22;
 public:
   WatchMatches() { last_match = time(NULL), num_matches = 1; }
+  /* This constructor is used when we load the entries from file. */
   WatchMatches(u_int32_t _num_matches, u_int32_t _last_matches) { last_match = _last_matches, num_matches = _num_matches; }
+  /*
+   * Default function: max_matches = 22,
+   * f(22) = 177148 * 100 ('* 100' it's required to convert in seconds) = ban for 205 days.
+   * We put 22 as max value because after 23 matches the ban is greater than 1 year.
+   * By changing max_matches you can change the max banning time.
+   * f(1) = 3 * 100 = ban for five minutes.
+   * You can change these parameters accordingly to your needs.
+   * */
   int f(float x) {
       if (x >= max_matches) return 315360; //ban for one year at this point
-      return (int) (std::pow(3, x * 1 /* Change this value if you want to make the function more or less steep */));
+      // /* Change this values if you want to make the function more or less steep */
+      return (int) (std::pow(3, x * 0.5)) + 1.5;
   }
   bool isBanned = false;
   inline u_int32_t get_last_match()   { return(last_match);                     }
-  inline u_int32_t get_num_matches()  { return(num_matches);                    }
+  inline u_int64_t get_num_matches()  { return(num_matches);                    }
   inline void      inc_matches()      { num_matches++, last_match = time(NULL); }
-  inline bool      ready_to_harvest() { return((last_match < time(NULL) - f(get_num_matches()) * 100 ) ? true : false); }
+  inline bool      ready_to_harvest(u_int32_t currentTime) { return((last_match < currentTime - f(get_num_matches()) * 100 ) ? true : false); }
 };
 
 #endif /* _WATCH_MATCHES_H_ */
