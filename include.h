@@ -94,7 +94,6 @@ extern "C" {
 #include <vector>
 #include <mutex>
 #include <queue>
-#include <cmath>
 
 /* ********************************************** */
 

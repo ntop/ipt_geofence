@@ -40,7 +40,7 @@ class NwInterface {
   GeoIP *geoip;
   std::thread *reloaderThread;
   double banTimeout = 900.0; // 15 minutes
-  std::unordered_map<std::string, WatchMatches*> watches_blacklist;
+  std::unordered_map<std::string /* numeric IP */, WatchMatches*> watches_blacklist;
   std::string confPath;
   ZMQ *zmq;
 #ifndef __linux__
@@ -51,7 +51,8 @@ class NwInterface {
   std::vector<FILE*> pipes;
   std::vector<std::pair<int, std::string>> pipes_fileno;
   
-  Marker makeVerdict(u_int8_t proto, u_int16_t vlanId,
+  Marker makeVerdict(bool is_ingress_packet,
+		     u_int8_t proto, u_int16_t vlanId,
 		     u_int16_t sport,
 		     u_int16_t dport,
          char *src, char *dst,
@@ -94,10 +95,13 @@ class NwInterface {
 #endif
   
   inline void stopPolling()                     { ifaceRunning = false;                };
-  Marker dissectPacket(const u_char *payload, u_int payload_len);
+  Marker dissectPacket(bool is_ingress_packet, const u_char *payload, u_int payload_len);
   inline bool isRunning()                       { return(ifaceRunning);                };
   void packetPollLoop();
   void flush_ban();
+
+  bool loadTemporarelyBannedHosts(const char* path);
+  bool saveTemporarelyBannedHosts(const char* path);
 };
 
 #endif /* _NETWORK_INTERFACE_H_ */

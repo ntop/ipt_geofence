@@ -148,10 +148,13 @@ int netfilter_callback(struct nfq_q_handle *qh,
 		       void *data) {
   const u_char *payload;
   struct nfqnl_msg_packet_hdr *ph = nfq_get_msg_packet_hdr(nfa);
+  /* The HW address is readeable only at certain hook points and it is the source address */
+  struct nfqnl_msg_packet_hw *hdr = nfq_get_packet_hw(nfa);
   NwInterface *iface = (NwInterface *)data;
   u_int payload_len;
   u_int32_t id = ph ? ntohl(ph->packet_id) : 0;
   u_int16_t marker;
+  u_int8_t null_mac[6] = {0};
 
   if(!ph) return(-1);
 
@@ -161,7 +164,7 @@ int netfilter_callback(struct nfq_q_handle *qh,
   payload_len = nfq_get_payload(nfa, (char **)&payload);
 #endif
 
-  marker = iface->dissectPacket(payload, payload_len).get();
+  marker = iface->dissectPacket(hdr ? true : false, payload, payload_len).get();
 
   return(nfq_set_verdict2(qh, id, NF_ACCEPT, marker, 0, NULL));
 }
@@ -174,7 +177,9 @@ void NwInterface::packetPollLoop() {
   int fd;
   std::vector<bool>  geo_ip_pipes;
   u_int num_loops = 0;
-  conf->load(watches_blacklist);
+
+  loadTemporarelyBannedHosts(conf->getDumpPath());
+
   watches = conf->get_watches();
 
   /* Spawn reload config thread in background */
@@ -333,7 +338,7 @@ void NwInterface::packetPollLoop() {
 
 	    if((l3_proto == ETHERTYPE_IP) || (l3_proto == ETHERTYPE_IPV6)) {
 	      /* IPv4 or IPv6 */
-	      u_int16_t marker = dissectPacket(&packet[sizeof(ndpi_ethhdr)],
+	      u_int16_t marker = dissectPacket(true, &packet[sizeof(ndpi_ethhdr)],
 					       hdr.caplen - sizeof(ndpi_ethhdr)).get();
 
 	      if(marker == conf->getMarkerDrop().get()) {
@@ -347,7 +352,6 @@ void NwInterface::packetPollLoop() {
 
     if((id == 0) || (num_loops > NUM_PURGE_LOOP)) {
       harvestWatches();
-      conf->cleanAddresses();
       num_loops = 0;
     }
 
@@ -361,7 +365,9 @@ void NwInterface::packetPollLoop() {
       trace->traceEvent(TRACE_NORMAL, "New configuration has been updated");
     }
   } /* while */
-  conf->save();
+
+  saveTemporarelyBannedHosts(conf->getDumpPath());
+
   trace->traceEvent(TRACE_NORMAL, "Leaving packet poll loop");
 
   ifaceRunning = false;
@@ -369,7 +375,8 @@ void NwInterface::packetPollLoop() {
 
 /* **************************************************** */
 
-Marker NwInterface::dissectPacket(const u_char *payload, u_int payload_len) {
+Marker NwInterface::dissectPacket(bool is_ingress_packet,
+				  const u_char *payload, u_int payload_len) {
   /* We can see only IP addresses */
   u_int16_t ip_offset = 0, vlan_id = 0 /* FIX */;
 
@@ -425,7 +432,8 @@ Marker NwInterface::dissectPacket(const u_char *payload, u_int payload_len) {
       src_port = dst_port = 0;
     }
 
-    return(makeVerdict(proto, vlan_id,
+    return(makeVerdict(is_ingress_packet,
+		       proto, vlan_id,
 		       src_port, dst_port,
 		       src, dst, ipv4, ipv6));
   }
@@ -602,7 +610,8 @@ void NwInterface::logFlow(const char *proto_name,
 
 /* **************************************************** */
 
-Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
+Marker NwInterface::makeVerdict(bool is_ingress_packet,
+				u_int8_t proto, u_int16_t vlanId,
 				u_int16_t sport /* network byte order */,
 				u_int16_t dport /* network byte order */,
 				char *src_host, char *dst_host,
@@ -613,8 +622,6 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
   struct in_addr in;
   char src_country[3]={}, dst_country[3]={}, src_continent[3]={}, dst_continent[3]={} ;
   const char *proto_name = getProtoName(proto);
-  u_int32_t saddr = ipv4 ? ntohl(inet_addr(src_host)) : 0;
-  u_int32_t daddr = ipv4 ? ntohl(inet_addr(dst_host)) : 0;
   Marker m, src_marker, dst_marker;
   u_int16_t _dport = dport;
   bool drop = false;
@@ -628,37 +635,47 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
 
   /* Check if sender/recipient are blacklisted */
   if(ipv4) {
+    u_int32_t saddr = inet_addr(src_host), daddr = inet_addr(dst_host);
+    
     /* Broadcast source (e.g. for DHCP) traffic shoud paas */
     if(isBroadMulticastIPv4(daddr))
       return(conf->getMarkerPass());
 
-    in.s_addr = saddr;
-
     /* For all ports/protocols, check if sender/recipient are white/black-listed and if so, pass/block this flow */
+    in.s_addr = saddr;
+    if(conf->isWhitelistedIPv4(&in)) {
+      return(conf->getMarkerPass()); /* Whitelisted IP (src) */
+    }
     
-    if(conf->isWhitelistedIPv4(&in))  return(conf->getMarkerPass()); /* Whitelisted IP */
-
     if(conf->isBlacklistedIPv4(&in)) {
       logFlow(proto_name,
 	      src_host, sport, src_country, src_continent, true,
 	      dst_host, dport, dst_country, dst_continent, false,
 	      false /* drop */);
 
+      // trace->traceEvent(TRACE_ERROR, "(1) %s <-> %s", src_host, dst_host);
+
+      ban(src_host, true /* ban */, true, "blacklisted-client", src_country);
       return(conf->getMarkerDrop());
     }
 
     in.s_addr = daddr;
-
-    if(conf->isWhitelistedIPv4(&in))  return(conf->getMarkerPass()); /* Whitelisted IP */
+    if(conf->isWhitelistedIPv4(&in)) {
+      return(conf->getMarkerPass()); /* Whitelisted IP (dst) */
+    }
     
     if(conf->isBlacklistedIPv4(&in)) {
       logFlow(proto_name,
 	      src_host, sport, src_country, src_continent, false,
 	      dst_host, dport, dst_country, dst_continent, true,
 	      false /* drop */);
+      // trace->traceEvent(TRACE_ERROR, "(2) %s <-> %s", src_host, dst_host);
 
+      ban(dst_host, true /* ban */, true, "blacklisted-server", dst_country);
       return(conf->getMarkerDrop());
     }
+
+    // trace->traceEvent(TRACE_ERROR, "(3) %s <-> %s", src_host, dst_host);
   } else if(ipv6) {
     struct in6_addr a;
 
@@ -670,6 +687,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
               dst_host, dport, dst_country, dst_continent, false,
               false /* drop */);
 
+      ban(src_host, true /* ban */, true, "blacklisted-client", src_country);
       return(conf->getMarkerDrop());
     }
 
@@ -681,6 +699,7 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
               dst_host, dport, dst_country, dst_continent, true,
               false /* drop */);
 
+      ban(dst_host, true /* ban */, true, "blacklisted-server", dst_country);
       return(conf->getMarkerDrop());
     }
   }
@@ -700,13 +719,17 @@ Marker NwInterface::makeVerdict(u_int8_t proto, u_int16_t vlanId,
   /* ******************************************************* */
 
   /* Check honeypot ports and (eventually) ban host */
-  if(conf->isProtectedPort(dport)) {
+  if(is_ingress_packet && conf->isProtectedPort(dport)) {
+    char str[128];
+
     logFlow(proto_name,
 	    src_host, sport, src_country, src_continent, false,
 	    dst_host, dport, dst_country, dst_continent, false,
 	    false /* drop */);
 
-    ban(src_host, true /* ban */, true, "ban-honeypot", src_country);
+    snprintf(str, sizeof(str), "ban-honeypot-%d", dport);
+
+    ban(src_host, true /* ban */, true, str, src_country);
     return(conf->getMarkerDrop());
   }
 
@@ -837,27 +860,28 @@ void NwInterface::reloadConfLoop() {
 /* **************************************************** */
 
 void NwInterface::harvestWatches() {
-  u_int32_t currentTime = time(NULL);
+  u_int32_t when = time(NULL) - MAX_IDLENESS;
+
 #ifdef DEBUG
   trace->traceEvent(TRACE_NORMAL, "NwInterface::harvestWatches()");
 #endif
 
-  for(std::unordered_map<std::string, WatchMatches*>::iterator it = watches_blacklist.begin(); it != watches_blacklist.end();) {
+  for(std::unordered_map<std::string, WatchMatches*>::iterator it = watches_blacklist.begin();
+      it != watches_blacklist.end();) {
     WatchMatches *match = it->second;
 
 #ifdef DEBUG
     trace->traceEvent(TRACE_NORMAL, "last_match=%u / now=%u [to go: %d]",
 		      match->get_last_match(), when, (match->get_last_match() - when));
 #endif
-    if(match->ready_to_harvest(currentTime)) {
+
+    if(match->ready_to_harvest(when)) {
 #ifdef DEBUG
       trace->traceEvent(TRACE_NORMAL, "Harvesting");
 #endif
       ban((char*)it->first.c_str(), false /* unban */, false, "unban", "");
-      /* Entries will be deleted after 24hr since the unban if they don't get banned again.
-       * The method cleanAddresses takes care of this task.
-       */
-      it->second->isBanned = false;
+      delete it->second;
+      watches_blacklist.erase(it++);    // or "it = m.erase(it)" since C++11
     } else
       ++it;
   }
@@ -871,20 +895,40 @@ void NwInterface::ban(char *host, bool ban_ip,
   bool is_ipv4 = (strchr(host, ':') == NULL) ? true /* IPv4 */ : false /* IPv6 */;
   std::unordered_map<std::string, WatchMatches*>::iterator it = watches_blacklist.find(std::string(host));
 
+  // trace->traceEvent(TRACE_NORMAL, "*** %s ***", host);
+  
   if(ban_ip) {
     /* Ban */
-    // Note: watches_blacklist inserts entries until MAX_ENTRIES is reached.
-    // After that, it will start inserting again only if space has been freed by the cleanAddresses method.
-    if(it == watches_blacklist.end() && watches_blacklist.size() < MAX_ENTRIES) {
-      WatchMatches *match = new WatchMatches();
-      watches_blacklist[host] = match;
-      if(fw) fw->ban(host, is_ipv4);
-      match->isBanned = true;
-      logHostBan(host, ban_ip, ban_traffic, reason, country);
-    } else if (it != watches_blacklist.end()){
-      WatchMatches *m = it->second;
-      m->inc_matches();
-      m->isBanned = true;
+
+    if(it == watches_blacklist.end()) {
+      /* New ban */
+      try {
+	u_int32_t until_time =  time(NULL) + DEFAULT_BAN_TIME;
+	WatchMatches *watch = new WatchMatches(1, until_time);
+
+	trace->traceEvent(TRACE_INFO, "First time (until: %u) banning %s [%s]",
+			  until_time, host, reason.c_str());
+	watches_blacklist[host] = watch;
+	if(fw) fw->ban(host, is_ipv4);
+	logHostBan(host, ban_ip, ban_traffic, reason, country);
+      } catch(std::bad_alloc& ex) {
+	trace->traceEvent(TRACE_WARNING, "Not enough memory");
+      }
+    } else {
+      WatchMatches *watch = it->second;
+      u_int32_t until_time;
+      u_int32_t num_matches;
+
+      /* Host already banned */
+      watch->inc_matches();
+      num_matches = watch->get_num_matches(); 
+      until_time = time(NULL) + (DEFAULT_BAN_TIME * num_matches * num_matches);
+
+      trace->traceEvent(TRACE_INFO, "Recurrent (times: %d/until: %u) time banning %s [%s]",
+			watch->get_num_matches(), until_time,
+			host, reason.c_str());
+      
+      watch->ban_until(until_time);
     }
   } else {
     /* Unban */
@@ -929,4 +973,78 @@ void NwInterface::flush_ban() {
 
 int NwInterface::sendTelegramMessage(std::string message) {
   return(conf->sendTelegramMessage(message));
+}
+
+/* ****************************************** */
+
+bool NwInterface::loadTemporarelyBannedHosts(const char* path) {
+  std::ifstream infile(path);
+  std::string line;
+  u_int32_t num_entries = 0;
+
+  if(!infile.is_open()) {
+    trace->traceEvent(TRACE_WARNING, "Unable to open file %s", path);
+    return(false);
+  }
+
+  while(getline(infile, line)) {
+    char item[256], *ip, *num_bans;
+
+    if((line[0] == '#') || (line[0] == '\0'))
+      continue;
+
+    // trace->traceEvent(TRACE_INFO, "Adding %s", line.c_str());
+    /* Format: IP\tnum_bans */
+
+    snprintf(item, sizeof(item), "%s", line.c_str());
+    ip = strtok(item, "\t");
+
+    if(ip)
+      num_bans = strtok(NULL, "\t");
+    else
+      num_bans = NULL;
+
+    if(num_bans == NULL) {
+      trace->traceEvent(TRACE_WARNING, "Skipping invalid line %s", line.c_str());
+      continue;
+    }
+
+    try {
+      WatchMatches *wm = new WatchMatches(atoi(num_bans), time(NULL) + DEFAULT_BAN_TIME);
+
+      watches_blacklist[ip] = wm;
+      num_entries++;
+    } catch(std::bad_alloc& ex) {
+      trace->traceEvent(TRACE_WARNING, "Not enough memory");
+    }
+  }
+
+  trace->traceEvent(TRACE_NORMAL, "Loaded %u banned IPs to %s", num_entries, path);
+
+  infile.close();
+
+  return(true);
+}
+
+/* ****************************************** */
+
+bool NwInterface::saveTemporarelyBannedHosts(const char* path){
+  std::ofstream outfile(path);
+  std::string line;
+  u_int32_t num_entries = 0;
+
+  if(!outfile.is_open()) {
+    trace->traceEvent(TRACE_WARNING, "Unable to open file %s", path);
+    return(false);
+  }
+
+  for(std::unordered_map<std::string, WatchMatches*>::iterator it = watches_blacklist.begin();
+      it != watches_blacklist.end(); it++)
+    outfile << it->first << "\t" << it->second->get_num_matches() << "\n", num_entries++;
+
+  outfile.close();
+
+  trace->traceEvent(TRACE_NORMAL, "Saved %u banned IPs to %s", num_entries, path);
+
+  return(true);
 }

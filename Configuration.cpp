@@ -51,6 +51,7 @@ Configuration::~Configuration() {
   running = false;
   telegramThread->join();
   cmdThread->join();
+
   delete telegramThread;
   delete cmdThread;
 }
@@ -274,13 +275,14 @@ bool Configuration::readConfigFile(const char *path) {
   /* **************************** */
 
   if(root["blacklist_dump_path"].empty()) {
-    trace->traceEvent(TRACE_ERROR, "Missing %s from %s", "blacklist_dump_path", path);
-    return(false);
-  } else {
-    const char *dump_path = root["blacklist_dump_path"].asCString();
-    blacklists.setDumpPath(dump_path);
-  }
-
+    const char *def = "/var/tmp/banned_addresses.txt";
+      
+    trace->traceEvent(TRACE_WARNING, "Missing %s: using default %s",
+		      "blacklist_dump_path", def);
+    setDumpPath(def);
+  } else
+    setDumpPath(root["blacklist_dump_path"].asCString());
+  
   /* **************************** */
   
   if(!root["telegram"].empty()) {

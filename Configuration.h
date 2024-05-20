@@ -34,6 +34,7 @@ class Configuration {
   std::unordered_map<u_int16_t, Marker> ctrs_conts;
   std::unordered_map<u_int16_t, bool>   tcp_ports, udp_ports, ignored_ports, hp_ports, hp_all_except_ports;
   std::unordered_map<std::string /* name */, std::pair<std::string /* cmd */, bool /* true=geo-ip, false=block IP */> > watches;
+  std::string dump_path;
   unsigned int nfq_queue_id;
   Marker marker_unknown;
   Marker marker_pass;
@@ -85,10 +86,6 @@ class Configuration {
   inline bool isMonitoredUDPPort(u_int16_t port) { return(all_udp_ports || (udp_ports.find(port) != udp_ports.end())); }
   bool isProtectedPort(u_int16_t port);
 
-  inline void save()                                                                     { blacklists.save(); }
-  inline void load(std::unordered_map<std::string, WatchMatches*>& watches_blacklist)  { blacklists.load(watches_blacklist); }
-  inline void cleanAddresses()                                                                    { blacklists.cleanAddresses(); }
-
   inline bool isBlacklistedIPv4(struct in_addr *addr)               { return(blacklists.isListedIPv4(addr));  }
   inline bool isBlacklistedIPv6(struct in6_addr *addr6)             { return(blacklists.isListedIPv6(addr6)); }
 
@@ -110,6 +107,8 @@ class Configuration {
 #endif
 
   inline std::string getCmd(bool ban_cmd)                           { return(ban_cmd ? cmd_ban : cmd_unban); }
+  void setDumpPath(const char *path)                                { dump_path = std::string(path);         }
+  const char* getDumpPath()                                         { return(dump_path.c_str());             }
 };
 
 

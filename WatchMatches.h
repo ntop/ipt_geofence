@@ -21,35 +21,31 @@
 #ifndef _WATCH_MATCHES_H_
 #define _WATCH_MATCHES_H_
 
-
+#define MAX_IDLENESS       300 /* 5 minutes */
+#define DEFAULT_BAN_TIME   300 /* 5 minutes */
 
 class WatchMatches {
 private:
-  u_int32_t last_match;
-  u_int64_t num_matches;
-  int max_matches = 22;
+  u_int32_t last_match, num_matches, banned_until;
+
 public:
-  WatchMatches() { last_match = time(NULL), num_matches = 1; }
-  /* This constructor is used when we load the entries from file. */
-  WatchMatches(u_int32_t _num_matches, u_int32_t _last_matches) { last_match = _last_matches, num_matches = _num_matches; }
-  /*
-   * Default function: max_matches = 22,
-   * f(22) = 177148 * 100 ('* 100' it's required to convert in seconds) = ban for 205 days.
-   * We put 22 as max value because after 23 matches the ban is greater than 1 year.
-   * By changing max_matches you can change the max banning time.
-   * f(1) = 3 * 100 = ban for five minutes.
-   * You can change these parameters accordingly to your needs.
-   * */
-  int f(float x) {
-      if (x >= max_matches) return 315360; //ban for one year at this point
-      // /* Change this values if you want to make the function more or less steep */
-      return (int) (std::pow(3, x * 0.5)) + 1.5;
+  WatchMatches(u_int32_t _num_matches, u_int32_t _banned_until) {
+    last_match = time(NULL);
+
+    if(_num_matches == 0)
+      _num_matches = 1;
+    else if(_num_matches >= 99)
+      _num_matches = 99;
+    
+    num_matches = _num_matches, banned_until = _banned_until;
   }
-  bool isBanned = false;
-  inline u_int32_t get_last_match()   { return(last_match);                     }
-  inline u_int64_t get_num_matches()  { return(num_matches);                    }
+
+  inline u_int32_t get_last_match()       { return(last_match);   }
+  inline u_int32_t get_num_matches()      { return(num_matches);  }
+  void             ban_until(u_int32_t t) { banned_until = t;     }
+  
   inline void      inc_matches()      { num_matches++, last_match = time(NULL); }
-  inline bool      ready_to_harvest(u_int32_t currentTime) { return((last_match < currentTime - f(get_num_matches()) * 100 ) ? true : false); }
+  inline bool      ready_to_harvest(u_int32_t when) { return((banned_until < when) ? true : false); }
 };
 
 #endif /* _WATCH_MATCHES_H_ */
