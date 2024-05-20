@@ -52,6 +52,7 @@ Configuration::~Configuration() {
   telegramThread->join();
   cmdThread->join();
   delete telegramThread;
+  delete cmdThread;
 }
 
 /* *************************2****************************** */
@@ -268,6 +269,16 @@ bool Configuration::readConfigFile(const char *path) {
 
       blacklists.loadIPsetFromURL(url.c_str());
     }
+  }
+
+  /* **************************** */
+
+  if(root["blacklist_dump_path"].empty()) {
+    trace->traceEvent(TRACE_ERROR, "Missing %s from %s", "blacklist_dump_path", path);
+    return(false);
+  } else {
+    const char *dump_path = root["blacklist_dump_path"].asCString();
+    blacklists.setDumpPath(dump_path);
   }
 
   /* **************************** */

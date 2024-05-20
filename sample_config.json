@@ -21,6 +21,7 @@
 	    "continents_blacklist": []
 	}
     },
+	"blacklist_dump_path" : "/var/tmp/banned_addresses.txt",
     "blacklists": [
 	"https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/dshield_7d.netset",
 	"https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/alienvault_reputation.ipset",
