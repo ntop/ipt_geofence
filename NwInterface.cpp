@@ -227,7 +227,8 @@ void NwInterface::packetPollLoop() {
     fd_set mask;
     struct timeval wait_time;
     int max_fd = fd, num, id;
-
+    char pktBuf[65536] __attribute__ ((aligned));
+    
     FD_ZERO(&mask);
     FD_SET(fd, &mask);
 
@@ -258,7 +259,6 @@ void NwInterface::packetPollLoop() {
 #ifdef __linux__
       if(FD_ISSET(fd, &mask)) {
 	/* Socket data */
-	char pktBuf[8192] __attribute__ ((aligned));
 	int len = recv(fd, pktBuf, sizeof(pktBuf), 0);
 
 	// trace->traceEvent(TRACE_INFO, "Pkt len %d", len);
