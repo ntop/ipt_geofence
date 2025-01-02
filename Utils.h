@@ -28,8 +28,9 @@ class Utils {
   static bool  fromHex(char *in, u_int in_len, char *out, u_int out_len);
   static char* intoaV4(unsigned int addr, char* buf, u_short bufLen);
   static char* intoaV6(struct ndpi_in6_addr ipv6, u_int8_t bitmask, char* buf, u_short bufLen);
-  static std::string execCmd(const char *cmd);
-  static int   sendTelegramMessage(std::string bot_token, std::string chat_id, std::string message);
+  static std::string execCmd(const char *cmd, Trace *t);
+  static int   sendTelegramMessage(std::string bot_token,
+				   std::string chat_id, std::string message, Trace *t);
   static void  zapNewline(std::string &s);
 };
 

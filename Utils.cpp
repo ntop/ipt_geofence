@@ -118,14 +118,18 @@ std::string Utils::ltrim(std::string &s) {
 
 /* ****************************************************** */
 
-std::string Utils::execCmd(const char *cmd) {
+std::string Utils::execCmd(const char *cmd, Trace *t) {
   std::string command(cmd);
   std::array<char, 128> buffer;
   std::string result;
-  FILE* pipe = popen(command.c_str(), "r");
+  FILE* pipe;
+
+  t->traceEvent(TRACE_INFO, "Executing %s", cmd);
+    
+  pipe = popen(command.c_str(), "r");
   
   if(!pipe)
-    printf("Unable to run command %s\n", cmd);
+    t->traceEvent(TRACE_WARNING, "Unable to run command %s", cmd);
   else {  
     while(fgets(buffer.data(), 128, pipe) != NULL)
       result += buffer.data();  
@@ -142,10 +146,10 @@ std::string Utils::execCmd(const char *cmd) {
 
 /* #define CURL_DEBUG */
 
-int Utils::sendTelegramMessage(std::string bot_token, std::string chat_id, std::string message) {
+int Utils::sendTelegramMessage(std::string bot_token, std::string chat_id,
+			       std::string message, Trace *t) {
   CURL *curl = curl_easy_init();
   long response_code = -1;
-  Trace trace;
   
   if(curl) {
     char *msg = curl_easy_escape(curl, message.c_str(), message.size());
@@ -160,11 +164,11 @@ int Utils::sendTelegramMessage(std::string bot_token, std::string chat_id, std::
     curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &response_code);
 
 #ifdef CURL_DEBUG
-    trace.traceEvent(TRACE_NORMAL, "Calling %s", url.c_str());
+    t->traceEvent(TRACE_NORMAL, "Calling %s", url.c_str());
 #endif
     res = curl_easy_perform(curl);
 #ifdef CURL_DEBUG
-    trace.traceEvent(TRACE_NORMAL, "res: %d\n", res);
+    t->traceEvent(TRACE_NORMAL, "res: %d\n", res);
 #endif
     
     if(res == CURLE_OK) {
@@ -173,10 +177,10 @@ int Utils::sendTelegramMessage(std::string bot_token, std::string chat_id, std::
       curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &response_code);
 
 #ifdef CURL_DEBUG
-      trace.traceEvent(TRACE_NORMAL, "response_code: %ld\n", response_code);
+      t->traceEvent(TRACE_NORMAL, "response_code: %ld\n", response_code);
 #endif
     } else
-      trace.traceEvent(TRACE_WARNING, "cURL error: %d - %s", res, url.c_str());
+      t->traceEvent(TRACE_WARNING, "cURL error: %d - %s", res, url.c_str());
 
     /* Free */
     free(msg);

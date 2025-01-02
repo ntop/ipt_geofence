@@ -961,8 +961,8 @@ void NwInterface::ban_ipv6(struct ndpi_in6_addr ip6, bool ban_ip,
 void NwInterface::flush_ban() {
   try {
 #ifdef __linux__
-    Utils::execCmd("/usr/sbin/iptables  -F IPT_GEOFENCE_BLACKLIST");
-    Utils::execCmd("/usr/sbin/ip6tables -F IPT_GEOFENCE_BLACKLIST");
+    Utils::execCmd("/usr/sbin/iptables  -F IPT_GEOFENCE_BLACKLIST", trace);
+    Utils::execCmd("/usr/sbin/ip6tables -F IPT_GEOFENCE_BLACKLIST", trace);
 #endif
   } catch (...) {
     trace->traceEvent(TRACE_ERROR, "Error while flushing blacklists");

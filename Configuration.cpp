@@ -28,11 +28,11 @@ Configuration::Configuration() {
   marker_unknown.set(0), marker_pass.set(1000); marker_drop.set(2000);
   default_policy = marker_pass; configured = false;
   all_tcp_ports = all_udp_ports = true;
-  host_name = Utils::execCmd("/bin/hostname");
+  host_name = Utils::execCmd("/bin/hostname", trace);
 #if defined __FreeBSD__ || defined __APPLE__
   host_ip = host_name; /* To be improved */
 #else
-  host_ip   = Utils::execCmd("/bin/hostname -I | cut -f 1 -d ' '"); /* Pick only the first IP address of the list */
+  host_ip   = Utils::execCmd("/bin/hostname -I | cut -f 1 -d ' '", trace); /* Pick only the first IP address of the list */
 #endif
 
   /* Remove trailing \n */
@@ -499,7 +499,7 @@ void Configuration::sendTelegramMessages() {
       telegram_queue.pop();
       telegram_queue_lock.unlock();
 
-      Utils::sendTelegramMessage(telegram_bot_token, telegram_chat_id, message);
+      Utils::sendTelegramMessage(telegram_bot_token, telegram_chat_id, message, trace);
     } else {
       if(!running)
 	break;
@@ -529,7 +529,7 @@ void Configuration::executeCommands() {
       cmd_queue.pop();
       cmd_queue_lock.unlock();
 
-      Utils::execCmd(cmd.c_str());
+      Utils::execCmd(cmd.c_str(), trace);
     } else {
       if(!running)
 	break;

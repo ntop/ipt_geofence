@@ -28,7 +28,7 @@ class Firewall {
 protected:
   void execCmd(char *cmdbuf) {
     try {
-      Utils::execCmd(cmdbuf);
+      Utils::execCmd(cmdbuf, trace);
     } catch (...) { trace->traceEvent(TRACE_ERROR, "Error while executing '%s'", cmdbuf); }
   }
   
