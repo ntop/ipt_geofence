@@ -38,7 +38,7 @@ Configuration::Configuration() {
   /* Remove trailing \n */
   Utils::zapNewline(host_name);
   Utils::zapNewline(host_ip);
-  
+
   running = true;
 
   telegramThread = new std::thread(&Configuration::sendTelegramMessages, this);
@@ -82,7 +82,7 @@ bool Configuration::readConfigFile(const char *path) {
   }
 
   /* **************************** */
-  
+
   if(root["queue_id"].empty()) {
     trace->traceEvent(TRACE_ERROR, "Missing %s from %s", "queue_id", path);
     return(false);
@@ -90,7 +90,7 @@ bool Configuration::readConfigFile(const char *path) {
     nfq_queue_id = root["queue_id"].asUInt();
 
   /* **************************** */
-  
+
   if(!root["markers"].empty()) {
     if(root["markers"]["pass"].empty()) {
       trace->traceEvent(TRACE_INFO, "Missing %s from %s: using default %u", "pass", path, DEFAULT_PASS_MARKER);
@@ -116,11 +116,11 @@ bool Configuration::readConfigFile(const char *path) {
       return(false);
     }
   }
-  
+
   trace->traceEvent(TRACE_INFO, "Markers are set to: pass %d, drop %d", marker_pass, marker_drop);
 
   /* **************************** */
-  
+
   if(root["default_policy"].empty()) {
     trace->traceEvent(TRACE_ERROR, "Missing %s from %s", "default_policy", path);
     return(false);
@@ -133,7 +133,7 @@ bool Configuration::readConfigFile(const char *path) {
   all_tcp_ports = all_udp_ports = true;
 
   /* **************************** */
-  
+
   if(!root["monitored_ports"].empty()) {
     if(!root["monitored_ports"]["tcp"].empty()) {
       all_tcp_ports = false;
@@ -199,7 +199,7 @@ bool Configuration::readConfigFile(const char *path) {
   }
 
   /* **************************** */
-  
+
   if(all_tcp_ports) trace->traceEvent(TRACE_INFO, "All TCP ports will be monitored");
   if(all_udp_ports) trace->traceEvent(TRACE_INFO, "All UDP ports will be monitored");
 
@@ -226,7 +226,7 @@ bool Configuration::readConfigFile(const char *path) {
   }
 
   /* **************************** */
-  
+
   if(!root["watches"].empty()) {
     size_t num_watches = root["watches"].size();
 
@@ -248,7 +248,7 @@ bool Configuration::readConfigFile(const char *path) {
   }
 
   /* **************************** */
-  
+
   if(!root["whitelists"].empty()) {
     size_t n_paths = root["whitelists"].size();
 
@@ -261,7 +261,7 @@ bool Configuration::readConfigFile(const char *path) {
   }
 
   /* **************************** */
-  
+
   if(!root["blacklists"].empty()) {
     size_t n_urls = root["blacklists"].size();
 
@@ -276,15 +276,15 @@ bool Configuration::readConfigFile(const char *path) {
 
   if(root["blacklist_dump_path"].empty()) {
     const char *def = "/var/tmp/banned_addresses.txt";
-      
+
     trace->traceEvent(TRACE_WARNING, "Missing %s: using default %s",
 		      "blacklist_dump_path", def);
     setDumpPath(def);
   } else
     setDumpPath(root["blacklist_dump_path"].asCString());
-  
+
   /* **************************** */
-  
+
   if(!root["telegram"].empty()) {
     if(!root["telegram"]["bot_token"].empty())
       telegram_bot_token = root["telegram"]["bot_token"].asString();
@@ -294,7 +294,7 @@ bool Configuration::readConfigFile(const char *path) {
   }
 
   /* **************************** */
-  
+
   if(!root["cmd"].empty()) {
     if(!root["cmd"]["ban"].empty())
       cmd_ban = root["cmd"]["ban"].asString();
@@ -304,7 +304,7 @@ bool Configuration::readConfigFile(const char *path) {
   }
 
   /* **************************** */
-  
+
   if(!root["zmq"].empty()) {
     if(!root["zmq"]["url"].empty())
       zmq_url = root["zmq"]["url"].asString();
@@ -490,6 +490,8 @@ int Configuration::sendTelegramMessage(std::string msg) {
 /* **************************************************** */
 
 void Configuration::sendTelegramMessages() {
+  pthread_setname_np(pthread_self(), __FUNCTION__);
+
   while(true) {
     if(telegram_queue.size() > 0) {
       std::string message;
@@ -520,6 +522,8 @@ void Configuration::execDeferredCmd(std::string cmd) {
 /* **************************************************** */
 
 void Configuration::executeCommands() {
+  pthread_setname_np(pthread_self(), __FUNCTION__);
+
   while(true) {
     if(cmd_queue.size() > 0) {
       std::string cmd;

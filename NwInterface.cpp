@@ -178,6 +178,8 @@ void NwInterface::packetPollLoop() {
   std::vector<bool>  geo_ip_pipes;
   u_int num_loops = 0;
 
+  pthread_setname_np(pthread_self(), __FUNCTION__);
+
   loadTemporarelyBannedHosts(conf->getDumpPath());
 
   watches = conf->get_watches();
@@ -228,7 +230,7 @@ void NwInterface::packetPollLoop() {
     struct timeval wait_time;
     int max_fd = fd, num, id;
     char pktBuf[65536] __attribute__ ((aligned));
-    
+
     FD_ZERO(&mask);
     FD_SET(fd, &mask);
 
@@ -256,6 +258,8 @@ void NwInterface::packetPollLoop() {
     num_loops++;
 
     if(num > 0) {
+      int to_remove = -1;
+
 #ifdef __linux__
       if(FD_ISSET(fd, &mask)) {
 	/* Socket data */
@@ -281,9 +285,12 @@ void NwInterface::packetPollLoop() {
       for(u_int i=0, s = pipes_fileno.size(); i < s; i++) {
 	if(FD_ISSET(pipes_fileno[i].first, &mask)) {
 	  char ip[64];
+	  bool data_read = false;
 
 	  while(fgets(ip, sizeof(ip), pipes[i]) != NULL) {
 	    char ip_country[3]={}, ip_continent[3]={};
+
+	    data_read = true;
 
 #ifdef DEBUG
 	    trace->traceEvent(TRACE_ERROR, "Watch %s received %s", pipes_fileno[i].second, ip);
@@ -323,9 +330,26 @@ void NwInterface::packetPollLoop() {
 	      /* In this case the IP has to be banned immediately */
 	      ban(ip, true, true, "ban-" + pipes_fileno[i].second, ip_country);
 	    }
+	  } /* while */
+
+	  if(!data_read) {
+	    /*
+	      The file descriptor has been closed
+	      (e.g. the application started with the pipe has died)
+	    */
+	    to_remove = i;
 	  }
 	}
       } /* for */
+
+      if(to_remove != -1) {
+	FILE *fd = pipes[to_remove];
+
+	trace->traceEvent(TRACE_WARNING, "Watcher %d terminated", to_remove);
+	pclose(pipes[to_remove]);
+	pipes.erase(pipes.begin() + to_remove);
+	pipes_fileno.erase(pipes_fileno.begin() + to_remove);
+      }
 
 #ifndef __linux__
 	if(FD_ISSET(pcap_handle_fileno, &mask)) {
@@ -636,7 +660,7 @@ Marker NwInterface::makeVerdict(bool is_ingress_packet,
   /* Check if sender/recipient are blacklisted */
   if(ipv4) {
     u_int32_t saddr = inet_addr(src_host), daddr = inet_addr(dst_host);
-    
+
     /* Broadcast source (e.g. for DHCP) traffic shoud paas */
     if(isBroadMulticastIPv4(daddr))
       return(conf->getMarkerPass());
@@ -646,7 +670,7 @@ Marker NwInterface::makeVerdict(bool is_ingress_packet,
     if(conf->isWhitelistedIPv4(&in)) {
       return(conf->getMarkerPass()); /* Whitelisted IP (src) */
     }
-    
+
     if(conf->isBlacklistedIPv4(&in)) {
       logFlow(proto_name,
 	      src_host, sport, src_country, src_continent, true,
@@ -663,7 +687,7 @@ Marker NwInterface::makeVerdict(bool is_ingress_packet,
     if(conf->isWhitelistedIPv4(&in)) {
       return(conf->getMarkerPass()); /* Whitelisted IP (dst) */
     }
-    
+
     if(conf->isBlacklistedIPv4(&in)) {
       logFlow(proto_name,
 	      src_host, sport, src_country, src_continent, false,
@@ -821,6 +845,8 @@ void NwInterface::reloadConfLoop() {
 
   shadowConf = NULL;
 
+  pthread_setname_np(pthread_self(), __FUNCTION__);
+
   trace->traceEvent(TRACE_NORMAL, "Starting reload configuration loop");
 
   while(isRunning()) {
@@ -896,7 +922,7 @@ void NwInterface::ban(char *host, bool ban_ip,
   std::unordered_map<std::string, WatchMatches*>::iterator it = watches_blacklist.find(std::string(host));
 
   // trace->traceEvent(TRACE_NORMAL, "*** %s ***", host);
-  
+
   if(ban_ip) {
     /* Ban */
 
@@ -921,13 +947,13 @@ void NwInterface::ban(char *host, bool ban_ip,
 
       /* Host already banned */
       watch->inc_matches();
-      num_matches = watch->get_num_matches(); 
+      num_matches = watch->get_num_matches();
       until_time = time(NULL) + (DEFAULT_BAN_TIME * num_matches * num_matches);
 
       trace->traceEvent(TRACE_INFO, "Recurrent (times: %d/until: %u) time banning %s [%s]",
 			watch->get_num_matches(), until_time,
 			host, reason.c_str());
-      
+
       watch->ban_until(until_time);
     }
   } else {
