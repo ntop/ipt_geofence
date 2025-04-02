@@ -39,8 +39,7 @@ NwInterface::NwInterface(u_int nf_device_id,
 			 GeoIP *_g, std::string c_path) {
   conf = _c, geoip = _g, confPath = c_path;
   reloaderThread = NULL;
-  ifaceRunning = false;
-
+  ifaceRunning.store(false);
   fw = NULL;
 
 #ifdef __linux__
@@ -185,7 +184,6 @@ void NwInterface::packetPollLoop() {
   watches = conf->get_watches();
 
   /* Spawn reload config thread in background */
-  reloaderThread = new std::thread(&NwInterface::reloadConfLoop, this);
 
   /* Start watches */
   for(std::unordered_map<std::string, std::pair<std::string, bool>>::iterator it = watches->begin(); it != watches->end(); it++) {
@@ -196,17 +194,20 @@ void NwInterface::packetPollLoop() {
       trace->traceEvent(TRACE_ERROR, "Unable to run watch %s", item.first.c_str());
     } else {
       fd = fileno(watcher);
+      
 
       pipes.push_back(watcher);
       fcntl(fd, F_SETFL, O_NONBLOCK);
-      pipes_fileno.push_back(std::make_pair(fd, it->first));
+      pipes_fileno.push_back(std::make_pair(fd, item.first)); //Save the actual command to run in pipes_fileno
 
       geo_ip_pipes.push_back(item.second); /* true = geo-ip, false = block-ip */
       trace->traceEvent(TRACE_NORMAL, "Added watch %s [%s]", item.first.c_str(), item.first.c_str());
     }
   }
 
-  ifaceRunning = true;
+  ifaceRunning.store(true);
+  reloaderThread = new std::thread(&NwInterface::reloadConfLoop, this);
+
   logStartStop(true /* start */);
 
 #ifdef __linux__
@@ -284,9 +285,9 @@ void NwInterface::packetPollLoop() {
       /* Watches */
       for(u_int i=0, s = pipes_fileno.size(); i < s; i++) {
 	if(FD_ISSET(pipes_fileno[i].first, &mask)) {
+    
 	  char ip[64];
 	  bool data_read = false;
-
 	  while(fgets(ip, sizeof(ip), pipes[i]) != NULL) {
 	    char ip_country[3]={}, ip_continent[3]={};
 
@@ -346,10 +347,42 @@ void NwInterface::packetPollLoop() {
 	FILE *fd = pipes[to_remove];
 
 	trace->traceEvent(TRACE_WARNING, "Watcher %d terminated", to_remove);
-	pclose(pipes[to_remove]);
+  /* Restart the dead watcher */
+  std::string to_restart = pipes_fileno[to_remove].second; /*Restart this command */
+
+  /* Remove the dead pipe from the array */
+  int status = WEXITSTATUS(pclose(pipes[to_remove]));
 	pipes.erase(pipes.begin() + to_remove);
 	pipes_fileno.erase(pipes_fileno.begin() + to_remove);
-      }
+  /*
+    If the watcher was actually live then restart it 
+    Exit status = 127 means command not found
+    This is the only case in which we do not restart the watcher, the check is needed to avoid a restart loop
+    when the command is not found
+    If the command is not found we do not need to restart it, as it will never be found
+  */
+   if(status != 127)
+  {
+    FILE *restarted = popen(to_restart.c_str(), "r");
+    int fd_torestart;
+    if(restarted == NULL) {
+      trace->traceEvent(TRACE_ERROR, "Unable to restart watch %s", to_restart.c_str());
+    } else {
+      fd_torestart = fileno(restarted);
+
+      pipes.push_back(restarted);
+      fcntl(fd_torestart, F_SETFL, O_NONBLOCK);
+      pipes_fileno.push_back(std::make_pair(fd_torestart, to_restart)); 
+  
+
+      geo_ip_pipes.push_back(geo_ip_pipes[to_remove]);
+      trace->traceEvent(TRACE_NORMAL, "Restarted watch %s [%s]", to_restart.c_str(), to_restart.c_str());
+    }
+
+
+  }
+  
+  }
 
 #ifndef __linux__
 	if(FD_ISSET(pcap_handle_fileno, &mask)) {
@@ -394,7 +427,7 @@ void NwInterface::packetPollLoop() {
 
   trace->traceEvent(TRACE_NORMAL, "Leaving packet poll loop");
 
-  ifaceRunning = false;
+  ifaceRunning.store(false);
 }
 
 /* **************************************************** */
