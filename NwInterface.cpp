@@ -39,8 +39,7 @@ NwInterface::NwInterface(u_int nf_device_id,
 			 GeoIP *_g, std::string c_path) {
   conf = _c, geoip = _g, confPath = c_path;
   reloaderThread = NULL;
-  ifaceRunning = false;
-
+  ifaceRunning.store(false);
   fw = NULL;
 
 #ifdef __linux__
@@ -185,7 +184,6 @@ void NwInterface::packetPollLoop() {
   watches = conf->get_watches();
 
   /* Spawn reload config thread in background */
-  reloaderThread = new std::thread(&NwInterface::reloadConfLoop, this);
 
   /* Start watches */
   for(std::unordered_map<std::string, std::pair<std::string, bool>>::iterator it = watches->begin(); it != watches->end(); it++) {
@@ -196,17 +194,20 @@ void NwInterface::packetPollLoop() {
       trace->traceEvent(TRACE_ERROR, "Unable to run watch %s", item.first.c_str());
     } else {
       fd = fileno(watcher);
+      
 
       pipes.push_back(watcher);
       fcntl(fd, F_SETFL, O_NONBLOCK);
-      pipes_fileno.push_back(std::make_pair(fd, it->first));
-
+      pipes_fileno.push_back(std::make_pair(fd, item.first)); //Save the actual command to run in pipes_fileno
+      pipes_restart_count.push_back(std::make_pair(fd,0)); //File_Descriptor - How many restart attempts on it
       geo_ip_pipes.push_back(item.second); /* true = geo-ip, false = block-ip */
       trace->traceEvent(TRACE_NORMAL, "Added watch %s [%s]", item.first.c_str(), item.first.c_str());
     }
   }
 
-  ifaceRunning = true;
+  ifaceRunning.store(true);
+  reloaderThread = new std::thread(&NwInterface::reloadConfLoop, this);
+
   logStartStop(true /* start */);
 
 #ifdef __linux__
@@ -284,12 +285,11 @@ void NwInterface::packetPollLoop() {
       /* Watches */
       for(u_int i=0, s = pipes_fileno.size(); i < s; i++) {
 	if(FD_ISSET(pipes_fileno[i].first, &mask)) {
+    
 	  char ip[64];
 	  bool data_read = false;
-
 	  while(fgets(ip, sizeof(ip), pipes[i]) != NULL) {
 	    char ip_country[3]={}, ip_continent[3]={};
-
 	    data_read = true;
 
 #ifdef DEBUG
@@ -331,7 +331,6 @@ void NwInterface::packetPollLoop() {
 	      ban(ip, true, true, "ban-" + pipes_fileno[i].second, ip_country);
 	    }
 	  } /* while */
-
 	  if(!data_read) {
 	    /*
 	      The file descriptor has been closed
@@ -341,15 +340,68 @@ void NwInterface::packetPollLoop() {
 	  }
 	}
       } /* for */
-
       if(to_remove != -1) {
 	FILE *fd = pipes[to_remove];
 
 	trace->traceEvent(TRACE_WARNING, "Watcher %d terminated", to_remove);
-	pclose(pipes[to_remove]);
+  /* Restart the dead watcher */
+  std::string to_restart = pipes_fileno[to_remove].second; /*Restart this command */
+
+  /* Remove the dead pipe from the vector */
+  int status = pclose(pipes[to_remove]);
 	pipes.erase(pipes.begin() + to_remove);
 	pipes_fileno.erase(pipes_fileno.begin() + to_remove);
-      }
+  /*
+    If the watcher was actually live then restart it 
+    Exit status = 127 means command not found
+    This is the only case in which we are sure we do not have to restart the watcher, the check is needed to avoid a restart loop
+    when the command is not found
+    If the command is not found we do not need to restart it, as it will never be found
+  */
+  
+  if(WEXITSTATUS(status) != 127) 
+  {
+    int count = pipes_restart_count[to_remove].second; 
+    /*
+      Watcher will be restarted if and only if the number of attempts is less than MAX_RESTART_ATTEMPTS
+      If the number of attempts is greater than MAX_RESTART_ATTEMPTS then we do not restart it in order to avoid a possible restart loop. 
+      The number of attempts is saved in the vector pipes_restart_count made of pairs with the first element being the file descriptor and the second element being the number of attempts
+      New count is pipes_restart_count[to_remove].second + 1 since we are going to restart the watcher whose position is ''to_remove'' so its current number of restart attempts
+      can be found in pipes_restart_count[to_remove].second
+      The old pipe is removed from the vector pipes_restart_count since it died
+      The new pipe is added to the vector pipes_restart_count with the new count
+     */
+    if(count < MAX_RESTART_ATTEMPTS)
+    {
+          /* Attempting to restart */
+          FILE *restarted = popen(to_restart.c_str(), "r");
+          int fd_torestart;
+          if(restarted == NULL) {
+            trace->traceEvent(TRACE_ERROR, "Unable to restart watch %s", to_restart.c_str());
+          } 
+          else 
+          {
+            fd_torestart = fileno(restarted);
+            pipes.push_back(restarted);
+            fcntl(fd_torestart, F_SETFL, O_NONBLOCK);
+            pipes_fileno.push_back(std::make_pair(fd_torestart, to_restart));
+            geo_ip_pipes.push_back(geo_ip_pipes[to_remove]);
+            pipes_restart_count.push_back(std::make_pair(fd_torestart,/*Count*/ count+1)); /*Increment the number of attempts */
+            pipes_restart_count.erase(pipes_restart_count.begin() + to_remove); /* Remove the old pipe from the vector */
+            trace->traceEvent(TRACE_NORMAL, "Restarted watch %s [%s]", to_restart.c_str(), to_restart.c_str());
+
+          }
+    }
+    else
+    {
+      trace->traceEvent(TRACE_ERROR, "Too many attempts, something went wrong, please check your configuration file.");
+    }
+
+
+
+  }
+  
+  }
 
 #ifndef __linux__
 	if(FD_ISSET(pcap_handle_fileno, &mask)) {
@@ -394,7 +446,7 @@ void NwInterface::packetPollLoop() {
 
   trace->traceEvent(TRACE_NORMAL, "Leaving packet poll loop");
 
-  ifaceRunning = false;
+  ifaceRunning.store(false);
 }
 
 /* **************************************************** */
