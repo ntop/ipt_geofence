@@ -35,7 +35,7 @@ class NwInterface {
 #endif
   Firewall *fw;
   pthread_t pollLoop;
-  bool ifaceRunning;
+  std::atomic<bool> ifaceRunning; /* Atomic Bool to ensure thread safety*/
   Configuration *conf, *shadowConf = NULL;
   GeoIP *geoip;
   std::thread *reloaderThread;
@@ -48,6 +48,7 @@ class NwInterface {
   int pcap_handle_fileno;
 #endif
   std::unordered_map<std::string, std::pair<std::string,bool> > *watches;
+  std::vector<std::pair<int,int>> pipes_restart_count;
   std::vector<FILE*> pipes;
   std::vector<std::pair<int, std::string>> pipes_fileno;
   
@@ -94,9 +95,9 @@ class NwInterface {
   inline struct nfq_q_handle* get_queueHandle() { return(queueHandle);                 };
 #endif
   
-  inline void stopPolling()                     { ifaceRunning = false;                };
+  inline void stopPolling()                     { ifaceRunning.store(false);                };
   Marker dissectPacket(bool is_ingress_packet, const u_char *payload, u_int payload_len);
-  inline bool isRunning()                       { return(ifaceRunning);                };
+  inline bool isRunning()                       { return(ifaceRunning.load());                };
   void packetPollLoop();
   void flush_ban();
 

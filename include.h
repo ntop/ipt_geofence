@@ -35,6 +35,8 @@
 #include <errno.h>
 #include <pthread.h>
 #include <signal.h>
+#include <atomic>
+#include <errno.h>
 #ifdef __linux__
 #include <linux/types.h>
 #endif
@@ -105,6 +107,7 @@ extern "C" {
 #define NF_MAX_QUEUE_LEN   (8192)
 
 #define ZMQ_TOPIC_NAME     "ban"
+#define MAX_RESTART_ATTEMPTS 10
 
 /* ********************************************** */
 
