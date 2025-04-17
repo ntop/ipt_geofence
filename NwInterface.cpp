@@ -184,8 +184,7 @@ void NwInterface::packetPollLoop() {
 
   watches = conf->get_watches();
 
-  /* Spawn reload config thread in background */
-  reloaderThread = new std::thread(&NwInterface::reloadConfLoop, this);
+  
 
   /* Start watches */
   for(std::unordered_map<std::string, std::pair<std::string, bool>>::iterator it = watches->begin(); it != watches->end(); it++) {
@@ -207,6 +206,8 @@ void NwInterface::packetPollLoop() {
   }
 
   ifaceRunning = true;
+  /* Spawn reload config thread in background, moved down here to avoid the mentioned issue */
+  reloaderThread = new std::thread(&NwInterface::reloadConfLoop, this);
   logStartStop(true /* start */);
 
 #ifdef __linux__
