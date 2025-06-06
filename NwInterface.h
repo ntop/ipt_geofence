@@ -40,16 +40,18 @@ class NwInterface {
   GeoIP *geoip;
   std::thread *reloaderThread;
   double banTimeout = 900.0; // 15 minutes
-  std::unordered_map<std::string /* numeric IP */, WatchMatches*> watches_blacklist;
+  std::map<std::string /* numeric IP */, WatchMatches*> watches_blacklist;
   std::string confPath;
   ZMQ *zmq;
 #ifndef __linux__
   pcap_t *pcap_handle;
   int pcap_handle_fileno;
 #endif
-  std::unordered_map<std::string, std::pair<std::string,bool> > *watches;
-  std::vector<FILE*> pipes;
-  std::vector<std::pair<int, std::string>> pipes_fileno;
+  std::map<std::string, std::pair<std::string,bool> > *watches;
+  //std::vector<FILE*> pipes;
+  //std::vector<bool>  geo_ip_pipes;
+  // std::vector<std::pair<int, std::string>> pipes_fileno;
+  std::vector<WatcherItam*> watchers;
   
   Marker makeVerdict(bool is_ingress_packet,
 		     u_int8_t proto, u_int16_t vlanId,
@@ -82,6 +84,7 @@ class NwInterface {
   void addCommonJSON(Json::Value *root);
   void logStartStop(bool start);
   int sendTelegramMessage(std::string message);
+  bool startWatcher(std::string label, std::pair<std::string, bool> item);
   
  public:
   NwInterface(u_int nf_device_id, Configuration *_c, GeoIP *_g, std::string c_path);

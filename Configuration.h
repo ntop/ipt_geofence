@@ -31,9 +31,9 @@ typedef std::pair<u_int16_t,u_int16_t> port_range; // first -> upper bound && se
 
 class Configuration {
  private:
-  std::unordered_map<u_int16_t, Marker> ctrs_conts;
-  std::unordered_map<u_int16_t, bool>   tcp_ports, udp_ports, ignored_ports, hp_ports, hp_all_except_ports;
-  std::unordered_map<std::string /* name */, std::pair<std::string /* cmd */, bool /* true=geo-ip, false=block IP */> > watches;
+  std::map<u_int16_t, Marker> ctrs_conts;
+  std::map<u_int16_t, bool>   tcp_ports, udp_ports, ignored_ports, hp_ports, hp_all_except_ports;
+  std::map<std::string /* name */, std::pair<std::string /* cmd */, bool /* true=geo-ip, false=block IP */> > watches;
   std::string dump_path;
   unsigned int nfq_queue_id;
   Marker marker_unknown;
@@ -92,7 +92,7 @@ class Configuration {
   inline bool isWhitelistedIPv4(struct in_addr *addr)               { return(whitelists.isListedIPv4(addr));  }
   inline bool isWhitelistedIPv6(struct in6_addr *addr6)             { return(whitelists.isListedIPv6(addr6)); }
 
-  inline std::unordered_map<std::string, std::pair<std::string, bool> >* get_watches()
+  inline std::map<std::string, std::pair<std::string, bool> >* get_watches()
                                                                     { return(&watches);                 }
   inline const char *getHostIP()                                    { return(host_ip.c_str());          }
   inline const char *getHostName()                                  { return(host_name.c_str());        }

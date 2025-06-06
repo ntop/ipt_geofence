@@ -328,7 +328,7 @@ bool Configuration::readConfigFile(const char *path) {
 
 Marker Configuration::getMarker(char *country, char *continent) {
   u_int16_t id = ctry_cont2u16(country);
-  std::unordered_map<u_int16_t, Marker>::iterator it = ctrs_conts.find(id);
+  std::map<u_int16_t, Marker>::iterator it = ctrs_conts.find(id);
 
   if(it != ctrs_conts.end())
     return(it->second); // country found

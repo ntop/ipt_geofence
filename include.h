@@ -120,4 +120,5 @@ extern "C" {
 #include "LinuxFirewall.h"
 #include "FreeBSDFirewall.h"
 #include "NtopCloud.h"
+#include "WatcherItam.h"
 #include "NwInterface.h"

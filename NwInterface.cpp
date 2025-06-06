@@ -110,10 +110,13 @@ NwInterface::~NwInterface() {
     pcap_close(pcap_handle);
 #endif
 
-  for(u_int i=0, s = pipes.size(); i < s; i++)
-    pclose(pipes[i]);
+  for(u_int i=0, s = watchers.size(); i < s; i++) {
+    WatcherItam *item = watchers[i];
 
-  for(std::unordered_map<std::string, WatchMatches*>::iterator it = watches_blacklist.begin();
+    delete item;
+  }
+  
+  for(std::map<std::string, WatchMatches*>::iterator it = watches_blacklist.begin();
       it != watches_blacklist.end(); it++)
     delete it->second;
 
@@ -172,10 +175,33 @@ int netfilter_callback(struct nfq_q_handle *qh,
 
 /* **************************************************** */
 
+bool NwInterface::startWatcher(std::string label, std::pair<std::string, bool> item) {
+  WatcherItam *i = new WatcherItam();
+
+  i->label = label;
+  i->fd    = popen(item.first.c_str(), "r");
+  
+  if(i->fd == NULL) {
+    trace->traceEvent(TRACE_ERROR, "Unable to run watch %s", item.first.c_str());
+    return(false);
+  } else {
+    i->fd_fileno = fileno(i->fd);
+    i->cmd = item.first;
+    fcntl(i->fd_fileno, F_SETFL, O_NONBLOCK);
+    i->mode = item.second;
+    
+    watchers.push_back(i);
+    
+    trace->traceEvent(TRACE_NORMAL, "Added watch %s [%s]", i->label.c_str(), i->cmd.c_str());
+    return(true);
+  }
+}
+
+/* **************************************************** */
+
 void NwInterface::packetPollLoop() {
   struct nfq_handle *h;
   int fd;
-  std::vector<bool>  geo_ip_pipes;
   u_int num_loops = 0;
 
   pthread_setname_np(pthread_self(), __FUNCTION__);
@@ -184,25 +210,11 @@ void NwInterface::packetPollLoop() {
 
   watches = conf->get_watches();
 
-  
-
   /* Start watches */
-  for(std::unordered_map<std::string, std::pair<std::string, bool>>::iterator it = watches->begin(); it != watches->end(); it++) {
+  for(std::map<std::string, std::pair<std::string, bool>>::iterator it = watches->begin(); it != watches->end(); it++) {
     std::pair<std::string, bool> item = it->second;
-    FILE *watcher = popen(item.first.c_str(), "r");
 
-    if(watcher == NULL) {
-      trace->traceEvent(TRACE_ERROR, "Unable to run watch %s", item.first.c_str());
-    } else {
-      fd = fileno(watcher);
-
-      pipes.push_back(watcher);
-      fcntl(fd, F_SETFL, O_NONBLOCK);
-      pipes_fileno.push_back(std::make_pair(fd, it->first));
-
-      geo_ip_pipes.push_back(item.second); /* true = geo-ip, false = block-ip */
-      trace->traceEvent(TRACE_NORMAL, "Added watch %s [%s]", item.first.c_str(), item.first.c_str());
-    }
+    startWatcher(it->first, item);
   }
 
   ifaceRunning = true;
@@ -235,8 +247,8 @@ void NwInterface::packetPollLoop() {
     FD_ZERO(&mask);
     FD_SET(fd, &mask);
 
-    for(u_int i=0, s = pipes_fileno.size(); i < s; i++) {
-      int fd = pipes_fileno[i].first;
+    for(u_int i=0, s = watchers.size(); i < s; i++) {
+      int fd = watchers[i]->fd_fileno;
 
       FD_SET(fd, &mask);
 
@@ -283,23 +295,23 @@ void NwInterface::packetPollLoop() {
 #endif
 
       /* Watches */
-      for(u_int i=0, s = pipes_fileno.size(); i < s; i++) {
-	if(FD_ISSET(pipes_fileno[i].first, &mask)) {
+      for(u_int i=0, s = watchers.size(); i < s; i++) {
+	if(FD_ISSET(watchers[i]->fd_fileno, &mask)) {
 	  char ip[64];
 	  bool data_read = false;
 
-	  while(fgets(ip, sizeof(ip), pipes[i]) != NULL) {
+	  while(fgets(ip, sizeof(ip), watchers[i]->fd) != NULL) {
 	    char ip_country[3]={}, ip_continent[3]={};
 
 	    data_read = true;
 
 #ifdef DEBUG
-	    trace->traceEvent(TRACE_ERROR, "Watch %s received %s", pipes_fileno[i].second, ip);
+	    trace->traceEvent(TRACE_ERROR, "Watch %s received %s", watchers[i]->label.c_str(), ip);
 #endif
 	    ip[strlen(ip)-1] = '\0'; /* Zap trailing /n */
 	    geoip->lookup(ip, ip_country, sizeof(ip_country), ip_continent, sizeof(ip_continent));
 
-	    if(geo_ip_pipes[i] == true /* geo-ip */) {
+	    if(watchers[i]->mode == true /* geo-ip */) {
 	      /*
 		In this case we need to check if the returned IP
 		has to be geographically banned or not
@@ -312,7 +324,7 @@ void NwInterface::packetPollLoop() {
 		ip_addr.s_addr = inet_addr(ip);
 
 		if(conf->isBlacklistedIPv4(&ip_addr))
-		  ban(ip, true, true, "ban-" + pipes_fileno[i].second, ip_country);
+		  ban(ip, true, true, "ban-" + watchers[i]->label, ip_country);
 	      } else {
 		/* IPv6 */
 		struct in6_addr ip_addr;
@@ -320,16 +332,16 @@ void NwInterface::packetPollLoop() {
 		inet_pton(AF_INET6, ip, &ip_addr);
 
 		if(conf->isBlacklistedIPv6(&ip_addr))
-		  ban(ip, true, true, "ban-" + pipes_fileno[i].second, ip_country);
+		  ban(ip, true, true, "ban-" + watchers[i]->label, ip_country);
 	      }
 
 	      if(ip_country[0] != '\0') {
 		if(conf->getMarker(ip_country, ip_continent).get() != conf->getMarkerPass().get())
-		  ban(ip, true, true, "ban-" + pipes_fileno[i].second, ip_country);
+		  ban(ip, true, true, "ban-" + watchers[i]->label, ip_country);
 	      }
 	    } else {
 	      /* In this case the IP has to be banned immediately */
-	      ban(ip, true, true, "ban-" + pipes_fileno[i].second, ip_country);
+	      ban(ip, true, true, "ban-" + watchers[i]->label, ip_country);
 	    }
 	  } /* while */
 
@@ -344,12 +356,9 @@ void NwInterface::packetPollLoop() {
       } /* for */
 
       if(to_remove != -1) {
-	FILE *fd = pipes[to_remove];
-
-	trace->traceEvent(TRACE_WARNING, "Watcher %d terminated", to_remove);
-	pclose(pipes[to_remove]);
-	pipes.erase(pipes.begin() + to_remove);
-	pipes_fileno.erase(pipes_fileno.begin() + to_remove);
+	trace->traceEvent(TRACE_WARNING, "Watcher %d [%s] terminated",
+			  to_remove, watchers[to_remove]->label.c_str());
+	watchers.erase(watchers.begin() + to_remove);
       }
 
 #ifndef __linux__
@@ -893,7 +902,7 @@ void NwInterface::harvestWatches() {
   trace->traceEvent(TRACE_NORMAL, "NwInterface::harvestWatches()");
 #endif
 
-  for(std::unordered_map<std::string, WatchMatches*>::iterator it = watches_blacklist.begin();
+  for(std::map<std::string, WatchMatches*>::iterator it = watches_blacklist.begin();
       it != watches_blacklist.end();) {
     WatchMatches *match = it->second;
 
@@ -920,7 +929,7 @@ void NwInterface::ban(char *host, bool ban_ip,
 		      bool ban_traffic, std::string reason, std::string country) {
   char cmdbuf[128];
   bool is_ipv4 = (strchr(host, ':') == NULL) ? true /* IPv4 */ : false /* IPv6 */;
-  std::unordered_map<std::string, WatchMatches*>::iterator it = watches_blacklist.find(std::string(host));
+  std::map<std::string, WatchMatches*>::iterator it = watches_blacklist.find(std::string(host));
 
   // trace->traceEvent(TRACE_NORMAL, "*** %s ***", host);
 
@@ -1065,7 +1074,7 @@ bool NwInterface::saveTemporarelyBannedHosts(const char* path){
     return(false);
   }
 
-  for(std::unordered_map<std::string, WatchMatches*>::iterator it = watches_blacklist.begin();
+  for(std::map<std::string, WatchMatches*>::iterator it = watches_blacklist.begin();
       it != watches_blacklist.end(); it++)
     outfile << it->first << "\t" << it->second->get_num_matches() << "\n", num_entries++;
 
