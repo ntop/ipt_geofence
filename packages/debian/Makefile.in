@@ -18,7 +18,7 @@ pkg:
 	install -m755 ../../scripts/*.py ../../scripts/*.sh ${IPT_GEOFENCE_BUILD}/usr/share/ipt_geofence/scripts/
 	@/bin/rm -f ../ipt_geofence*.deb
 	dpkg-buildpackage -rfakeroot -d -us -uc @BUILDPACKAGE_EXTRA@
-	dpkg-sig --sign builder -k D1EB60BE ../ipt-geofence_*deb
+	@SIGN_CMD@ --sign builder -k D1EB60BE ../ipt-geofence_*deb
 	@\rm -f ../ipt-geofence_*dsc ../ipt-geofence_*.gz ../ipt-geofence_*changes
 	@/bin/mv ../ipt-geofence_*deb .
 	@echo
