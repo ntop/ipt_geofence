@@ -62,12 +62,6 @@ else
   CXX="$CXX -fno-color-diagnostics"
 fi
 
-if test -f /usr/bin/debsigs; then
-  SIGN_CMD="debsigs"
-else
-  SIGN_CMD="dpkg-sig"
-fi
-
 NTOPCLOUD_HOME="../ntopcloud"
 if test -d "${NTOPCLOUD_HOME}"; then
   SSL_INC="`pkg-config --cflags libssl` -I/usr/include/openssl"
@@ -163,7 +157,6 @@ AC_SUBST(DATE)
 AC_SUBST(EXTN)
 AC_SUBST(LIBS)
 AC_SUBST(INCS)
-AC_SUBST(SIGN_CMD)
 
 AC_CONFIG_HEADERS(config.h)
 AC_CONFIG_FILES(Makefile)

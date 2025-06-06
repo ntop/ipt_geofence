@@ -50,6 +50,12 @@ else
   fi
 fi
 
+if test -f /usr/bin/debsigs; then
+  SIGN_CMD="debsigs"
+else
+  SIGN_CMD="dpkg-sig"
+fi
+
 APP=ipt-geofence
 DATE=`date -R`
 
@@ -61,6 +67,7 @@ AC_SUBST(EXTN)
 AC_SUBST(DATE)
 AC_SUBST(EXTRA_DEP)
 AC_SUBST(GIT_COMMITS)
+AC_SUBST(SIGN_CMD)
 
 AC_CONFIG_FILES(debian/changelog)
 AC_CONFIG_FILES(debian/files)
