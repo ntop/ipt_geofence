@@ -432,6 +432,25 @@ Marker NwInterface::dissectPacket(bool is_ingress_packet,
       // ipv6 address stringification
       inet_ntop(AF_INET6, &(ip6h->ip6_src), src, sizeof(src));
       inet_ntop(AF_INET6, &(ip6h->ip6_dst), dst, sizeof(dst));
+
+      if (proto == IPPROTO_NONE) {
+        /* Logging the mass scan packet detected */
+        logFlow("MASS-SCAN",
+          src, sport, 
+          src_country, src_continent, false,
+          dst, dport,
+          dst_country, dst_continent, false,
+          false); /* Drop */
+        
+        ban(src,
+        true,   /* Ip address ban */
+        true,   /* Traffic ban */
+        "ban-massscan",
+        src_country);
+
+        return(conf->getMarkerDrop()); /* Drop packet from queue */
+      }
+	    
     } else if(iph->version == 4) {
       ipv4 = true;
       u_int8_t frag_off = ntohs(iph->frag_off);
@@ -446,6 +465,23 @@ Marker NwInterface::dissectPacket(bool is_ingress_packet,
       // ipv4 address stringification
       a.s_addr = iph->saddr, inet_ntop(AF_INET, &a, src, sizeof(src));
       a.s_addr = iph->daddr, inet_ntop(AF_INET, &a, dst, sizeof(dst));
+
+      if (proto == IPPROTO_IP) {
+        /* Logging the mass scan packet detected */
+        logFlow("MASS-SCAN",
+          src,  sport,  src_country, src_continent, false,
+          dst,  dport,  dst_country, dst_continent, false,
+          false /* drop */);
+        
+        ban(src,
+          true,   /* Ip address ban */
+          true,   /* Traffic ban */
+          "ban-massscan",
+          src_country);
+        
+        return(conf->getMarkerDrop()); /* Drop packet from queue */
+      }
+	    
     } else { // Neither ipv4 or ipv6...unlikely to be evaluated
       return(conf->getMarkerPass());
     }
