@@ -431,26 +431,7 @@ Marker NwInterface::dissectPacket(bool is_ingress_packet,
 
       // ipv6 address stringification
       inet_ntop(AF_INET6, &(ip6h->ip6_src), src, sizeof(src));
-      inet_ntop(AF_INET6, &(ip6h->ip6_dst), dst, sizeof(dst));
-
-      if (proto == IPPROTO_NONE) {
-        /* Logging the mass scan packet detected */
-        logFlow("MASS-SCAN",
-          src, sport, 
-          src_country, src_continent, false,
-          dst, dport,
-          dst_country, dst_continent, false,
-          false); /* Drop */
-        
-        ban(src,
-        true,   /* Ip address ban */
-        true,   /* Traffic ban */
-        "ban-massscan",
-        src_country);
-
-        return(conf->getMarkerDrop()); /* Drop packet from queue */
-      }
-	    
+      inet_ntop(AF_INET6, &(ip6h->ip6_dst), dst, sizeof(dst));  
     } else if(iph->version == 4) {
       ipv4 = true;
       u_int8_t frag_off = ntohs(iph->frag_off);
@@ -465,23 +446,6 @@ Marker NwInterface::dissectPacket(bool is_ingress_packet,
       // ipv4 address stringification
       a.s_addr = iph->saddr, inet_ntop(AF_INET, &a, src, sizeof(src));
       a.s_addr = iph->daddr, inet_ntop(AF_INET, &a, dst, sizeof(dst));
-
-      if (proto == IPPROTO_IP) {
-        /* Logging the mass scan packet detected */
-        logFlow("MASS-SCAN",
-          src,  sport,  src_country, src_continent, false,
-          dst,  dport,  dst_country, dst_continent, false,
-          false /* drop */);
-        
-        ban(src,
-          true,   /* Ip address ban */
-          true,   /* Traffic ban */
-          "ban-massscan",
-          src_country);
-        
-        return(conf->getMarkerDrop()); /* Drop packet from queue */
-      }
-	    
     } else { // Neither ipv4 or ipv6...unlikely to be evaluated
       return(conf->getMarkerPass());
     }
@@ -492,6 +456,36 @@ Marker NwInterface::dissectPacket(bool is_ingress_packet,
     case IPPROTO_TCP:
       tcph = (struct ndpi_tcphdr *)(nxt);
       src_port = tcph->source, dst_port = tcph->dest;
+
+      const u_int8_t tcp_hdr_len = tcph->doff * 4; /* TCP Header length in byte */
+      const u_int8_t options_len = (tcp_hdr_len > 20) ? (tcp_hdr_len - 20) : 0; /* Options = header_len - 20 B  */
+      const u_int16_t tcp_win = ntohs(tcph->window); /* Window size host-order, uso funzione network-to-host-short */
+
+      if(options_len == 0) {
+        const char *msg;
+
+        if(tcp_win == 1024)
+          msg = "Massive scanner detected (probably masscan)";
+        else if(tcp_win == 65535)
+          msg = "Massive scanner detected (probably zmap)";
+        else
+          msg = "Massive scanner detected";
+
+        /* Log + ban + drop */
+        logFlow(msg,
+                src, src_port,
+                src_country, src_continent, false,
+                dst, dst_port,
+                dst_country, dst_continent, false,
+                false);
+
+        ban(src,
+            true,   /* IP address ban */
+            "ban-massscan",
+            src_country);
+
+        return(conf->getMarkerDrop()); /* Drop packet */
+      }
       break;
     case IPPROTO_UDP:
       udph = (struct ndpi_udphdr *)(nxt);
