@@ -24,7 +24,6 @@
 	"blacklist_dump_path" : "/var/tmp/banned_addresses.txt",
     "blacklists": [
 	"https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/dshield_7d.netset",
-	"https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/alienvault_reputation.ipset",
 	"https://feodotracker.abuse.ch/downloads/ipblocklist_recommended.txt",
 	"https://rules.emergingthreats.net/fwrules/emerging-Block-IPs.txt",
 	"https://feodotracker.abuse.ch/downloads/ipblocklist.txt",
