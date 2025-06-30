@@ -603,7 +603,7 @@ void NwInterface::logStartStop(bool start) {
 
 /* **************************************************** */
 
-void NwInterface::logFlow(const char *proto_name,
+void NwInterface::logFlow(const char *proto_name, const char *sub_reason,
 			  char *src_host, u_int16_t sport, char *src_country, char *src_continent, bool src_blacklisted,
 			  char *dst_host, u_int16_t dport, char *dst_country, char *dst_continent, bool dst_blacklisted,
 			  bool pass_verdict) {
@@ -613,6 +613,7 @@ void NwInterface::logFlow(const char *proto_name,
 
   addCommonJSON(&root);
   root["reason"] = "flow-ban";
+  root["sub_reason"] = sub_reason;
   root["proto"]  = proto_name;
   root["src"]["host"] = src_host;
   root["src"]["port"] = sport;
@@ -682,7 +683,7 @@ Marker NwInterface::makeVerdict(bool is_ingress_packet,
     }
 
     if(conf->isBlacklistedIPv4(&in)) {
-      logFlow(proto_name,
+      logFlow(proto_name, "blacklisted-client",
 	      src_host, sport, src_country, src_continent, true,
 	      dst_host, dport, dst_country, dst_continent, false,
 	      false /* drop */);
@@ -699,7 +700,7 @@ Marker NwInterface::makeVerdict(bool is_ingress_packet,
     }
 
     if(conf->isBlacklistedIPv4(&in)) {
-      logFlow(proto_name,
+      logFlow(proto_name, "blacklisted-server",
 	      src_host, sport, src_country, src_continent, false,
 	      dst_host, dport, dst_country, dst_continent, true,
 	      false /* drop */);
@@ -716,7 +717,7 @@ Marker NwInterface::makeVerdict(bool is_ingress_packet,
     inet_pton(AF_INET6, src_host, &a);
 
     if(conf->isBlacklistedIPv6(&a)) {
-      logFlow(proto_name,
+      logFlow(proto_name, "blacklisted-client",
               src_host, sport, src_country, src_continent, true,
               dst_host, dport, dst_country, dst_continent, false,
               false /* drop */);
@@ -728,7 +729,7 @@ Marker NwInterface::makeVerdict(bool is_ingress_packet,
     inet_pton(AF_INET6, dst_host, &a);
 
     if(conf->isBlacklistedIPv6(&a)) {
-      logFlow(proto_name,
+      logFlow(proto_name, "blacklisted-server",
               src_host, sport, src_country, src_continent, false,
               dst_host, dport, dst_country, dst_continent, true,
               false /* drop */);
@@ -742,7 +743,7 @@ Marker NwInterface::makeVerdict(bool is_ingress_packet,
 
   /* Pass flows on ignored ports */
   if(conf->isIgnoredPort(sport) || conf->isIgnoredPort(dport)) {
-    logFlow(proto_name,
+    logFlow(proto_name, "whitelisted-ports",
 	    src_host, sport, src_country, src_continent, false,
 	    dst_host, dport, dst_country, dst_continent, false,
 	    true /* pass */);
@@ -756,7 +757,7 @@ Marker NwInterface::makeVerdict(bool is_ingress_packet,
   if(is_ingress_packet && conf->isProtectedPort(dport)) {
     char str[128];
 
-    logFlow(proto_name,
+    logFlow(proto_name, "blacklisted-dst-port",
 	    src_host, sport, src_country, src_continent, false,
 	    dst_host, dport, dst_country, dst_continent, false,
 	    false /* drop */);
@@ -814,7 +815,7 @@ Marker NwInterface::makeVerdict(bool is_ingress_packet,
      && (dst_marker.get() == conf->getMarkerPass().get())) {
     m = conf->getMarkerPass();
 
-    logFlow(proto_name,
+    logFlow(proto_name, "allowed-flow",
 	    src_host, sport, src_country, src_continent, false,
 	    dst_host, dport, dst_country, dst_continent, false,
 	    true /* pass */);
@@ -823,7 +824,7 @@ Marker NwInterface::makeVerdict(bool is_ingress_packet,
 
     m = conf->getMarkerDrop();
 
-    logFlow(proto_name,
+    logFlow(proto_name, msg.c_str(),
 	    src_host, sport, src_country, src_continent, false,
 	    dst_host, dport, dst_country, dst_continent, false,
 	    false /* drop */);

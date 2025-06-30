@@ -60,7 +60,7 @@ class NwInterface {
          char *src, char *dst,
          bool ipv4, bool ipv6);
   const char* getProtoName(u_int8_t proto);
-  void logFlow(const char *proto_name,
+  void logFlow(const char *proto_name, const char *sub_reason,
 	       char *src_host, u_int16_t sport, char *src_country, char *src_continent, bool src_blacklisted,
 	       char *dst_host, u_int16_t dport, char *dst_country, char *dst_continent, bool dst_blacklisted,
 	       bool pass_verdict);
