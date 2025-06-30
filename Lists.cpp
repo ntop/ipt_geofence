@@ -234,7 +234,14 @@ bool Lists::loadIPsetFromURL(const char *url) {
   fclose(fd);
 
   if(res == CURLE_OK) {
-    rc = loadIPsetFromFile(tmp_filename);
+    long http_code = 0;
+
+    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
+
+    if (http_code >= 200 && http_code <= 299)
+      rc = loadIPsetFromFile(tmp_filename);
+    else
+      trace->traceEvent(TRACE_ERROR, "Error while downloading %s [HTTP rc %lu]", url, http_code);
   } else {
     trace->traceEvent(TRACE_ERROR, "Error while downloading %s", url);
     rc = false;
