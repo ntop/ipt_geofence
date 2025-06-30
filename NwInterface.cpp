@@ -115,7 +115,7 @@ NwInterface::~NwInterface() {
 
     delete item;
   }
-  
+
   for(std::map<std::string, WatchMatches*>::iterator it = watches_blacklist.begin();
       it != watches_blacklist.end(); it++)
     delete it->second;
@@ -180,7 +180,7 @@ bool NwInterface::startWatcher(std::string label, std::pair<std::string, bool> i
 
   i->label = label;
   i->fd    = popen(item.first.c_str(), "r");
-  
+
   if(i->fd == NULL) {
     trace->traceEvent(TRACE_ERROR, "Unable to run watch %s", item.first.c_str());
     return(false);
@@ -189,9 +189,9 @@ bool NwInterface::startWatcher(std::string label, std::pair<std::string, bool> i
     i->cmd = item.first;
     fcntl(i->fd_fileno, F_SETFL, O_NONBLOCK);
     i->mode = item.second;
-    
+
     watchers.push_back(i);
-    
+
     trace->traceEvent(TRACE_NORMAL, "Added watch %s [%s]", i->label.c_str(), i->cmd.c_str());
     return(true);
   }
@@ -422,6 +422,7 @@ Marker NwInterface::dissectPacket(bool is_ingress_packet,
     u_int16_t src_port, dst_port;
     u_int8_t proto, ip_payload_offset = 40 /* ipv6 is 40B long */;
     char src[INET6_ADDRSTRLEN] = {}, dst[INET6_ADDRSTRLEN] = {};
+    u_int16_t tcp_header_len;
 
     if(iph->version == 6) {
       struct ndpi_ipv6hdr *ip6h = (struct ndpi_ipv6hdr *)&payload[ip_offset];
@@ -456,11 +457,60 @@ Marker NwInterface::dissectPacket(bool is_ingress_packet,
     case IPPROTO_TCP:
       tcph = (struct ndpi_tcphdr *)(nxt);
       src_port = tcph->source, dst_port = tcph->dest;
+
+      tcp_header_len = tcph->doff * 4;
+      if(payload_len >= (ip_payload_offset + tcp_header_len)) {
+	if(tcp_header_len >= sizeof(struct ndpi_tcphdr)) {
+	  u_int8_t *t = (u_int8_t*)tcph;
+	  u_int8_t *options = (u_int8_t*)(&t[sizeof(struct ndpi_tcphdr)]);
+	  u_int8_t options_len = tcp_header_len - sizeof(struct ndpi_tcphdr);
+	  u_int16_t flags = ntohs(*((u_int16_t*)&t[12])) & 0xFFF;
+	  u_int16_t syn_mask = TH_SYN | 0x40 /* TH_ECE */ | 0x80 /* TH_CWR */;
+
+	  if((flags & syn_mask) && ((flags & TH_ACK) == 0)) {
+	    if(options_len == 0) {
+	      char msg[256];
+	      u_int16_t tcp_win = ntohs(tcph->window);
+	      char src_country[3]={}, dst_country[3]={}, src_continent[3]={}, dst_continent[3]={} ;
+
+	      /*
+		Massive Internet scanner detected. Examples:
+		- https://zmap.io
+		- https://github.com/robertdavidgraham/masscan
+	      */
+
+	      if(tcp_win == 1024)
+		snprintf(msg, sizeof(msg), "ban-massive-scanner-masscan");
+	      else if(tcp_win == 65535)
+		snprintf(msg, sizeof(msg), "ban-massive-scanner-zmap");
+	      else
+		snprintf(msg, sizeof(msg), "ban-massive-scanner [tcp_win %u]", tcp_win);
+
+	      geoip->lookup(src, src_country, sizeof(src_country), src_continent, sizeof(src_continent));
+	      geoip->lookup(dst, dst_country, sizeof(dst_country), dst_continent, sizeof(dst_continent));
+
+	      /* Log + ban + drop */
+	      logFlow("tcp-masscan", msg,
+		      src, src_port, src_country, src_continent, false,
+		      dst, dst_port, dst_country, dst_continent, false,
+		      false /* drop */);
+
+	      ban(src, true /* ban */, true, msg, src_country);
+
+	      /* trace->traceEvent(TRACE_ERROR, "*** %s (%s / %s)", msg, src, src_country); */
+
+	      return(conf->getMarkerDrop()); /* Drop flow */
+	    }
+	  }
+	}
+      }
       break;
+
     case IPPROTO_UDP:
       udph = (struct ndpi_udphdr *)(nxt);
       src_port = udph->source, dst_port = udph->dest;
       break;
+
     default:
       // we do not care about ports in other protocols
       src_port = dst_port = 0;
