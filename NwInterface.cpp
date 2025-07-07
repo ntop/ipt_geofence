@@ -862,7 +862,9 @@ Marker NwInterface::makeVerdict(bool is_ingress_packet,
 
   /* Final step: compute the flow verdict */
   if((src_marker.get() == conf->getMarkerPass().get())
-     && (dst_marker.get() == conf->getMarkerPass().get())) {
+     /* We check only the client ignoring the server country that we're protecing */
+     /* && (dst_marker.get() == conf->getMarkerPass().get()) */
+     ) {
     m = conf->getMarkerPass();
 
     logFlow(proto_name, "allowed-flow",
