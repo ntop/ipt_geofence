@@ -96,6 +96,9 @@ try:
         elif(ret_code == "403"):
             inc_hit(failure_cache, ip, 10, "failure")
 
+        elif(ret_code == "503"):
+            inc_hit(failure_cache, ip, 10, "failure")
+
         elif(ret_code == "301"):
             inc_hit(redirect_cache, ip, 20, "redirect")
 
