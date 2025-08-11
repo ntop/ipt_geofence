@@ -7,7 +7,7 @@ This tool allows you to protect your host/network by preventing communications w
 You need to install GeoIP libraries, Netfilter Queue, curl and JSONCPP packages in addition to the compiler.
 
 For Ubuntu/Debian based systems do:
-``sudo apt-get install build-essential autoconf automake autogen libmaxminddb-dev libcurl4-openssl-dev libnetfilter-queue-dev libjsoncpp-dev``
+``sudo apt-get install build-essential autoconf automake autogen libmaxminddb-dev libcurl4-openssl-dev libnetfilter-queue-dev libjsoncpp-dev cppzmq-dev``
 
 On FreeBSD
 ``pkg install -y autoconf automake curl libmaxminddb jsoncpp libzmq4 python3``
