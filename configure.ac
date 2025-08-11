@@ -23,7 +23,7 @@ fi
 
 AC_DEFINE_UNQUOTED(PACKAGE_OS, "$OSNAME", [Opeating system])
    
-CFLAGS="${CFLAGS} -I/usr/local/include -I/opt/homebrew/include"
+CFLAGS="${CFLAGS} -I/usr/local/include -I/opt/homebrew/include -I/usr/include/jsoncpp"
 LDFLAGS="${LDFLAGS} -L/usr/local/lib -L/opt/homebrew/lib"
 
 IPT_RELEASE="${VERSION}.${DATE}"
