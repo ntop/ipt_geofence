@@ -97,24 +97,29 @@ if ! test ".${ac_cv_lib_jsoncpp_main}" = ".yes"; then
 fi
 
 dnl nDPI
-if ! test -f "$HOME/nDPI/src/lib/libndpi.a"; then :
-  if ! test -f "..//nDPI/src/lib/libndpi.a"; then :
-    echo "nDPI missing. Please do:"
-    echo "- cd $HOME"
-    echo "- git clone https://github.com/ntop/nDPI.git"
-    echo "- cd nDPI"
-    echo "- ./autogen.sh"
-    echo "- make"
-    echo ""
-    echo "And run this configure again"
-    exit 0
+if ! test -f "./nDPI/src/lib/libndpi.a"; then :
+  if ! test -f "$HOME/nDPI/src/lib/libndpi.a"; then :
+    if ! test -f "..//nDPI/src/lib/libndpi.a"; then :
+      echo "nDPI missing. Please do:"
+      echo "- cd $HOME"
+      echo "- git clone https://github.com/ntop/nDPI.git"
+      echo "- cd nDPI"
+      echo "- ./autogen.sh"
+      echo "- make"
+      echo ""
+      echo "And run this configure again"
+      exit 0
+    else
+      LIBS="$LIBS ../nDPI/src/lib/libndpi.a"
+      INCS="$INCS -I ../nDPI/src/include"    
+    fi
   else
-    LIBS="$LIBS ../nDPI/src/lib/libndpi.a"
-    INCS="$INCS -I ../nDPI/src/include"    
+    LIBS="$LIBS $HOME/nDPI/src/lib/libndpi.a"
+    INCS="$INCS -I $HOME/nDPI/src/include"
   fi
 else
-  LIBS="$LIBS $HOME/nDPI/src/lib/libndpi.a"
-  INCS="$INCS -I $HOME/nDPI/src/include"
+  LIBS="$LIBS ./nDPI/src/lib/libndpi.a"
+  INCS="$INCS -I ./nDPI/src/include"
 fi
 
 LIBS="$LIBS -lpthread -lm"
