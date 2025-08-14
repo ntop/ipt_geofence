@@ -54,11 +54,7 @@
 #include <libnetfilter_queue/libnetfilter_queue.h>
 #endif
 
-#ifdef __linux__
-#include <jsoncpp/json/json.h>
-#else
 #include <json/json.h>
-#endif
 
 #include <curl/curl.h>
 #include <maxminddb.h>
