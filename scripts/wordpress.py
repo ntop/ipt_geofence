@@ -88,7 +88,7 @@ try:
         # Delete entries older than 1h
         harvest(failure_cache, now)
 
-        if(("/wp-login" in line) or ("/wp-admin" in line) or ("/wp-config" in line)):
+        if(("/wp-login" in line) or ("/wp-admin" in line) or ("/wp-config" in line) or ("/xmlrpc.php" in line)):
             #  1.2.3.4 - - [09/Jan/2023:14:03:02 +0100] "GET /wp-admin/ HTTP/1.1" 401 583
             #print(line)
             hit_found(ip)
