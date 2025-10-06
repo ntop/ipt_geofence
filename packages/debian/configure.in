@@ -16,6 +16,10 @@ else
  JSONDEP="libjsoncpp25"
 fi
 
+if test $DEBIAN_VERSION = "13"; then
+ JSONDEP="libjsoncpp26"
+fi
+
 EXTRA_DEP="libnetfilter-queue1, libmaxminddb0, ${JSONDEP}, libcurl4, conntrack"
 BUILDPACKAGE_EXTRA=
 
