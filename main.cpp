@@ -28,10 +28,6 @@ const char *version = IPT_RELEASE;
 u_int32_t last_modification_time = 0;
 NwInterface *iface;
 
-#ifdef HAVE_NTOP_CLOUD
-NtopCloud *cloud = NULL;
-#endif
-
 // #define DEBUG
 
 /* ************************************************* */
@@ -191,14 +187,6 @@ int main(int argc, char *argv[]) {
   alarm(60);
 #endif
 
-#ifdef HAVE_NTOP_CLOUD
-  try {
-    cloud = new NtopCloud();
-  } catch (...) {
-    cloud = NULL;
-  }
-#endif
-  
   try {
     iface = new NwInterface(conf->getQueueId(), conf, &geoip, confPath);
 

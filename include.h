@@ -72,12 +72,6 @@
 #include <zmq.h>
 #endif
 
-#ifdef HAVE_NTOP_CLOUD
-extern "C" {
-#include "ntop_cloud.h"
-};
-#endif
-
 /* ***** C++ ***** */
 #include <unordered_map>
 #include <fstream>
@@ -115,6 +109,5 @@ extern "C" {
 #include "Firewall.h"
 #include "LinuxFirewall.h"
 #include "FreeBSDFirewall.h"
-#include "NtopCloud.h"
 #include "WatcherItam.h"
 #include "NwInterface.h"

@@ -62,24 +62,6 @@ else
   CXX="$CXX -fno-color-diagnostics"
 fi
 
-NTOPCLOUD_HOME="../ntopcloud"
-if test -d "${NTOPCLOUD_HOME}"; then
-  SSL_INC="`pkg-config --cflags libssl` -I/usr/include/openssl"
-  SSL_LIB="`pkg-config --libs libssl` -lssl -lcrypto -lsodium"
-
-  CFLAGS="${CFLAGS} -I${NTOPCLOUD_HOME} ${SSL_INC}"
-  CXXFLAGS="${CXXFLAGS} -I${NTOPCLOUD_HOME} ${SSL_INC}"
-  LIBS="${NTOPCLOUD_HOME}/libcloud.a ${LIBS} ${SSL_LIB}"
-
-  if test -d /usr/include/json-c; then
-    LIBS="${LIBS} -ljson-c"
-  else
-   echo "FATAL ERROR: Please apt install libjson-c-dev"
- fi
-
- AC_DEFINE(HAVE_NTOP_CLOUD, 1, [ntop cloud detected])
-fi
-
 dnl> GeoIP
 AC_CHECK_LIB([maxminddb], [MMDB_lookup_sockaddr])
 dnl> AC_CHECK_HEADERS([maxminddb.h])
