@@ -1,6 +1,6 @@
 /*
  *
- * (C) 2021-24 - ntop.org 
+ * (C) 2021-26 - ntop.org 
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -56,7 +56,7 @@ ZMQ::ZMQ(const char *endpoint, const char *server_public_key) {
       goto no_encrypt;
     }
 
-    trace->traceEvent(TRACE_INFO, "Setting ZMQ server curve key to '%s'", server_public_key);
+    trace->traceEvent(TRACE_INFO, "Setting ZMQ server curve key");
 
     /* (1) - Generate client keypairs */
     rc = zmq_curve_keypair(client_public_key, client_secret_key);
@@ -69,21 +69,21 @@ ZMQ::ZMQ(const char *endpoint, const char *server_public_key) {
     /* (2) - Enable client secret key */
     rc = zmq_setsockopt(zmq_socket_handler, ZMQ_CURVE_SECRETKEY, client_secret_key, 41);
     if(rc != 0) {
-      trace->traceEvent(TRACE_ERROR, "Error setting ZMQ_CURVE_SECRETKEY = %s", client_secret_key);
+      trace->traceEvent(TRACE_ERROR, "Error setting ZMQ_CURVE_SECRETKEY");
       goto no_encrypt;
     }
 
     /* (3) - Enable client public key */
     rc = zmq_setsockopt(zmq_socket_handler, ZMQ_CURVE_PUBLICKEY, client_public_key, 41);
     if(rc != 0) {
-      trace->traceEvent(TRACE_ERROR, "Error setting ZMQ_CURVE_PUBLICKEY = %s", client_public_key);
+      trace->traceEvent(TRACE_ERROR, "Error setting ZMQ_CURVE_PUBLICKEY");
       goto no_encrypt;
     }
 
     /* (4) - Set the public server key generated on the server side */
     rc = zmq_setsockopt(zmq_socket_handler, ZMQ_CURVE_SERVERKEY, server_public_key, 41);
     if(rc != 0) {
-      trace->traceEvent(TRACE_ERROR, "Error setting ZMQ_CURVE_SERVERKEY = %s (%d)", server_public_key, errno);
+      trace->traceEvent(TRACE_ERROR, "Error setting ZMQ_CURVE_SERVERKEY (%d)", errno);
       goto no_encrypt;
     }
 

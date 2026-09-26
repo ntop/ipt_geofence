@@ -1,6 +1,6 @@
 /*
  *
- * (C) 2021-24 - ntop.org
+ * (C) 2021-26 - ntop.org
  *
  *
  * This program is free software; you can redistribute it and/or modify
@@ -72,7 +72,7 @@ bool GeoIP::lookup(char *ip,
       if((status != MMDB_SUCCESS) || (!entry_data.has_data))
 	country_code[0] = '\0';
       else {
-	int str_len = min(entry_data.data_size, country_code_len);
+	int str_len = min(entry_data.data_size, country_code_len-1);
 
 	memcpy(country_code, entry_data.utf8_string, str_len);
 	country_code[str_len] = '\0';
@@ -85,7 +85,7 @@ bool GeoIP::lookup(char *ip,
       if((status != MMDB_SUCCESS) || (!entry_data.has_data))
 	continent[0] = '\0';
       else {
-	int str_len = min(entry_data.data_size, continent_len);
+	int str_len = min(entry_data.data_size, continent_len-1);
 
 	memcpy(continent, entry_data.utf8_string, str_len);
 	continent[str_len] = '\0';

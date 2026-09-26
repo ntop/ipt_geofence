@@ -1,6 +1,6 @@
 /*
  *
- * (C) 2021-24 - ntop.org
+ * (C) 2021-26 - ntop.org
  *
  *
  * This program is free software; you can redistribute it and/or modify
@@ -211,7 +211,7 @@ bool Lists::loadIPsetFromURL(const char *url) {
   CURL *curl = curl_easy_init();
   FILE *fd;
   CURLcode res;
-  char tmp_filename[64] = "/tmp/ipset_tempfile-XXXXXX";
+  char tmp_filename[] = "/tmp/ipset_tempfile-XXXXXX";
   bool rc;
 
   if(!curl) {
@@ -219,8 +219,17 @@ bool Lists::loadIPsetFromURL(const char *url) {
     return(false);
   }
 
-  if((fd = fopen(tmp_filename, "w")) == NULL) {
+  // Securely create and open a unique temporary file
+  int file_desc = mkstemp(tmp_filename);
+  if (file_desc == -1) {
+    trace->traceEvent(TRACE_ERROR, "Unable to create unique temporary file template %s", tmp_filename);
+    curl_easy_cleanup(curl);
+    return(false);
+  }
+
+  if((fd = fdopen(file_desc, "w")) == NULL) {
     trace->traceEvent(TRACE_ERROR, "Unable to open temporary file %s", tmp_filename);
+    unlink(tmp_filename);
     return(false);
   }
 
@@ -229,9 +238,19 @@ bool Lists::loadIPsetFromURL(const char *url) {
   curl_easy_setopt(curl, CURLOPT_URL, url);
   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, NULL);
   curl_easy_setopt(curl, CURLOPT_WRITEDATA, fd);
+
+  // Set a hard restriction to ONLY allow HTTP and HTTPS transfers
+  curl_easy_setopt(curl, CURLOPT_PROTOCOLS_STR, "http,https");
+
+  // Set a hard restriction for redirect schemes if CURLOPT_FOLLOWLOCATION is enabled
+  curl_easy_setopt(curl, CURLOPT_REDIR_PROTOCOLS_STR, "http,https");
+  
+  if (strncmp(url, "https", 5) == 0) {
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 1L);
+  }
+
   res = curl_easy_perform(curl);
-  curl_easy_cleanup(curl);
-  fclose(fd);
 
   if(res == CURLE_OK) {
     long http_code = 0;
@@ -246,6 +265,9 @@ bool Lists::loadIPsetFromURL(const char *url) {
     trace->traceEvent(TRACE_ERROR, "Error while downloading %s", url);
     rc = false;
   }
+
+  curl_easy_cleanup(curl);
+  fclose(fd);
 
   unlink(tmp_filename); // Delete temporary file
 

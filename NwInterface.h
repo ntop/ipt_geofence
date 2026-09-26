@@ -1,6 +1,6 @@
 /*
  *
- * (C) 2021-24 - ntop.org 
+ * (C) 2021-26 - ntop.org 
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -85,6 +85,7 @@ class NwInterface {
   void logStartStop(bool start);
   int sendTelegramMessage(std::string message);
   bool startWatcher(std::string label, std::pair<std::string, bool> item);
+  bool sanitizeHost(const char *unsanitized_host);
   
  public:
   NwInterface(u_int nf_device_id, Configuration *_c, GeoIP *_g, std::string c_path);

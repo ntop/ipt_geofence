@@ -1,6 +1,6 @@
 /*
  *
- * (C) 2021-24 - ntop.org
+ * (C) 2021-26 - ntop.org
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -41,25 +41,38 @@ bool Utils::toHex(char *in, u_int in_len, char *out, u_int out_len) {
 
 /* ************************************************************* */
 
-bool Utils::fromHex(char *in, u_int in_len,
-		    char *out, u_int out_len) {
-  u_int i, j;
+#include <cstdlib>
+#include <sys/types.h>
 
-  if((in_len/2) > out_len)
-    return(false);
+bool Utils::fromHex(char *in, u_int in_len, char *out, u_int out_len) {
+  // Basic structural checks: pointers must be valid, and hex strings must have an even length
+  if (in == nullptr || out == nullptr || in_len == 0 || (in_len % 2) != 0) {
+    return false;
+  }
 
-  for(i=0, j=0; i<in_len;) {
+  // Ensure target buffer can hold the output bytes AND the null-terminator
+  u_int expected_out_len = in_len / 2;
+  if (expected_out_len >= out_len) {
+    return false;
+  }
+
+  u_int i = 0;
+  u_int j = 0;
+
+  // Safely iterate by pairs
+  while (i < in_len) {
     char s[3];
+    s[0] = in[i];
+    s[1] = in[i + 1]; // Guaranteed safe because in_len is even and i < in_len
+    s[2] = '\0';
 
-    s[0] = in[i], s[1] = in[i+1], s[2] = 0;
-    out[j++] = strtoul(s, NULL, 16);
-    
+    out[j++] = static_cast<char>(strtoul(s, nullptr, 16));
     i += 2;
   }
 
+  // Add the safe null-terminator inside the allocated buffer boundaries
   out[j] = '\0';
-
-  return(true);
+  return true;
 }
 
 /* ****************************************************** */

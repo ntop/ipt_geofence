@@ -1,6 +1,6 @@
 /*
  *
- * (C) 2021-24 - ntop.org
+ * (C) 2021-26 - ntop.org
  *
  *
  * This program is free software; you can redistribute it and/or modify
@@ -55,7 +55,7 @@ void sigproc(int sig) {
 
 static void help() {
   printf("Welcome to ipt_geofence v.%s\n", version);
-  printf("Copyright 2021-24 ntop\n");
+  printf("Copyright 2021-26 ntop\n");
 
   printf("\nUsage:\n");
   printf("ipt_geofence [-h][-v][-s] -c <config file> -m <city>\n");

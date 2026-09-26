@@ -1,6 +1,6 @@
 /*
  *
- * (C) 2021-24 - ntop.org
+ * (C) 2021-26 - ntop.org
  *
  *
  * This program is free software; you can redistribute it and/or modify
@@ -308,40 +308,42 @@ void NwInterface::packetPollLoop() {
 #ifdef DEBUG
 	    trace->traceEvent(TRACE_ERROR, "Watch %s received %s", watchers[i]->label.c_str(), ip);
 #endif
-	    ip[strlen(ip)-1] = '\0'; /* Zap trailing /n */
-	    geoip->lookup(ip, ip_country, sizeof(ip_country), ip_continent, sizeof(ip_continent));
+	    if(sanitizeHost(ip)) {
+	      ip[strlen(ip)-1] = '\0'; /* Zap trailing /n */
+	      geoip->lookup(ip, ip_country, sizeof(ip_country), ip_continent, sizeof(ip_continent));
 
-	    if(watchers[i]->mode == true /* geo-ip */) {
-	      /*
-		In this case we need to check if the returned IP
-		has to be geographically banned or not
-	      */
+	      if(watchers[i]->mode == true /* geo-ip */) {
+		/*
+		  In this case we need to check if the returned IP
+		  has to be geographically banned or not
+		*/
 
-	      if(strchr(ip, ':') == NULL) {
-		/* IPv4 */
-		struct in_addr ip_addr;
+		if(strchr(ip, ':') == NULL) {
+		  /* IPv4 */
+		  struct in_addr ip_addr;
 
-		ip_addr.s_addr = inet_addr(ip);
+		  ip_addr.s_addr = inet_addr(ip);
 
-		if(conf->isBlacklistedIPv4(&ip_addr))
-		  ban(ip, true, true, "ban-" + watchers[i]->label, ip_country);
+		  if(conf->isBlacklistedIPv4(&ip_addr))
+		    ban(ip, true, true, "ban-" + watchers[i]->label, ip_country);
+		} else {
+		  /* IPv6 */
+		  struct in6_addr ip_addr;
+
+		  inet_pton(AF_INET6, ip, &ip_addr);
+
+		  if(conf->isBlacklistedIPv6(&ip_addr))
+		    ban(ip, true, true, "ban-" + watchers[i]->label, ip_country);
+		}
+
+		if(ip_country[0] != '\0') {
+		  if(conf->getMarker(ip_country, ip_continent).get() != conf->getMarkerPass().get())
+		    ban(ip, true, true, "ban-" + watchers[i]->label, ip_country);
+		}
 	      } else {
-		/* IPv6 */
-		struct in6_addr ip_addr;
-
-		inet_pton(AF_INET6, ip, &ip_addr);
-
-		if(conf->isBlacklistedIPv6(&ip_addr))
-		  ban(ip, true, true, "ban-" + watchers[i]->label, ip_country);
+		/* In this case the IP has to be banned immediately */
+		ban(ip, true, true, "ban-" + watchers[i]->label, ip_country);
 	      }
-
-	      if(ip_country[0] != '\0') {
-		if(conf->getMarker(ip_country, ip_continent).get() != conf->getMarkerPass().get())
-		  ban(ip, true, true, "ban-" + watchers[i]->label, ip_country);
-	      }
-	    } else {
-	      /* In this case the IP has to be banned immediately */
-	      ban(ip, true, true, "ban-" + watchers[i]->label, ip_country);
 	    }
 	  } /* while */
 
@@ -391,11 +393,13 @@ void NwInterface::packetPollLoop() {
 
     if(shadowConf != NULL) {
       /* Swap configurations */
+      Configuration *tmp = conf;
 
-      delete conf;
       conf = shadowConf;
       shadowConf = NULL;
-
+      sleep(1);
+      delete tmp;
+      
       trace->traceEvent(TRACE_NORMAL, "New configuration has been updated");
     }
   } /* while */
@@ -413,48 +417,48 @@ Marker NwInterface::dissectPacket(bool is_ingress_packet,
 				  const u_char *payload, u_int payload_len) {
   /* We can see only IP addresses */
   u_int16_t ip_offset = 0, vlan_id = 0 /* FIX */;
+  struct ndpi_iphdr *iph = (struct ndpi_iphdr *)&payload[ip_offset];
+  bool ipv4 = false, ipv6 = false;
+  struct ndpi_tcphdr *tcph = NULL;
+  struct ndpi_udphdr *udph = NULL;
+  u_int16_t src_port, dst_port;
+  u_int8_t proto, ip_payload_offset = 40 /* ipv6 is 40B long */;
+  char src[INET6_ADDRSTRLEN] = {}, dst[INET6_ADDRSTRLEN] = {};
+  u_int16_t tcp_header_len;
 
-  if(payload_len >= ip_offset) {
-    struct ndpi_iphdr *iph = (struct ndpi_iphdr *)&payload[ip_offset];
-    bool ipv4 = false, ipv6 = false;
-    struct ndpi_tcphdr *tcph = NULL;
-    struct ndpi_udphdr *udph = NULL;
-    u_int16_t src_port, dst_port;
-    u_int8_t proto, ip_payload_offset = 40 /* ipv6 is 40B long */;
-    char src[INET6_ADDRSTRLEN] = {}, dst[INET6_ADDRSTRLEN] = {};
-    u_int16_t tcp_header_len;
+  if(iph->version == 6) {
+    struct ndpi_ipv6hdr *ip6h = (struct ndpi_ipv6hdr *)&payload[ip_offset];
 
-    if(iph->version == 6) {
-      struct ndpi_ipv6hdr *ip6h = (struct ndpi_ipv6hdr *)&payload[ip_offset];
+    ipv6 = true;
+    proto = ip6h->ip6_hdr.ip6_un1_nxt;
 
-      ipv6 = true;
-      proto = ip6h->ip6_hdr.ip6_un1_nxt;
+    // ipv6 address stringification
+    inet_ntop(AF_INET6, &(ip6h->ip6_src), src, sizeof(src));
+    inet_ntop(AF_INET6, &(ip6h->ip6_dst), dst, sizeof(dst));
+  } else if(iph->version == 4) {
+    ipv4 = true;
+    u_int8_t frag_off = ntohs(iph->frag_off);
+    struct in_addr a;
 
-      // ipv6 address stringification
-      inet_ntop(AF_INET6, &(ip6h->ip6_src), src, sizeof(src));
-      inet_ntop(AF_INET6, &(ip6h->ip6_dst), dst, sizeof(dst));
-    } else if(iph->version == 4) {
-      ipv4 = true;
-      u_int8_t frag_off = ntohs(iph->frag_off);
-      struct in_addr a;
+    if((iph->protocol == IPPROTO_UDP) && ((frag_off & 0x3FFF /* IP_MF | IP_OFFSET */) != 0))
+      return(conf->getMarkerUnknown()); /* Don't block it */
 
-      if((iph->protocol == IPPROTO_UDP) && ((frag_off & 0x3FFF /* IP_MF | IP_OFFSET */) != 0))
-        return(conf->getMarkerUnknown()); /* Don't block it */
+    // get protocol and offset
+    proto = iph->protocol;
+    ip_payload_offset = iph->ihl * 4;
+    // ipv4 address stringification
+    a.s_addr = iph->saddr, inet_ntop(AF_INET, &a, src, sizeof(src));
+    a.s_addr = iph->daddr, inet_ntop(AF_INET, &a, dst, sizeof(dst));
+  } else { // Neither ipv4 or ipv6...unlikely to be evaluated
+    return(conf->getMarkerPass());
+  }
 
-      // get protocol and offset
-      proto = iph->protocol;
-      ip_payload_offset = iph->ihl * 4;
-      // ipv4 address stringification
-      a.s_addr = iph->saddr, inet_ntop(AF_INET, &a, src, sizeof(src));
-      a.s_addr = iph->daddr, inet_ntop(AF_INET, &a, dst, sizeof(dst));
-    } else { // Neither ipv4 or ipv6...unlikely to be evaluated
-      return(conf->getMarkerPass());
-    }
-
-    u_int8_t *nxt = ((u_int8_t *)iph + ip_payload_offset);
-
-    switch (proto) {
-    case IPPROTO_TCP:
+  u_int8_t *nxt = ((u_int8_t *)iph + ip_payload_offset);
+  u_int16_t offset = ip_offset + ip_payload_offset;
+    
+  switch (proto) {
+  case IPPROTO_TCP:
+    if((offset+sizeof(struct ndpi_tcphdr)) < payload_len) {
       tcph = (struct ndpi_tcphdr *)(nxt);
       src_port = tcph->source, dst_port = tcph->dest;
 
@@ -504,25 +508,27 @@ Marker NwInterface::dissectPacket(bool is_ingress_packet,
 	  }
 	}
       }
-      break;
+    } else
+      return(conf->getMarkerUnknown()); /* Don't block it */
+    break;
 
-    case IPPROTO_UDP:
+  case IPPROTO_UDP:
+    if((offset+sizeof(struct ndpi_udphdr)) < payload_len) {
       udph = (struct ndpi_udphdr *)(nxt);
       src_port = udph->source, dst_port = udph->dest;
-      break;
+    } else
+      return(conf->getMarkerUnknown()); /* Don't block it */
+    break;
 
-    default:
-      // we do not care about ports in other protocols
-      src_port = dst_port = 0;
-    }
-
-    return(makeVerdict(is_ingress_packet,
-		       proto, vlan_id,
-		       src_port, dst_port,
-		       src, dst, ipv4, ipv6));
+  default:
+    // we do not care about ports in other protocols
+    src_port = dst_port = 0;
   }
 
-  return(conf->getMarkerPass());
+  return(makeVerdict(is_ingress_packet,
+		     proto, vlan_id,
+		     src_port, dst_port,
+		     src, dst, ipv4, ipv6));
 }
 
 /* **************************************************** */
@@ -605,7 +611,7 @@ void NwInterface::logHostBan(char *host_ip,
   json_txt = writer.write(root);
 
   trace->traceEvent(TRACE_INFO, "%s", json_txt.c_str());
-
+  
   if(zmq)
     zmq->sendMessage(ZMQ_TOPIC_NAME, json_txt.c_str());
 
@@ -968,11 +974,19 @@ void NwInterface::harvestWatches() {
 void NwInterface::ban(char *host, bool ban_ip,
 		      bool ban_traffic, std::string reason, std::string country) {
   char cmdbuf[128];
-  bool is_ipv4 = (strchr(host, ':') == NULL) ? true /* IPv4 */ : false /* IPv6 */;
-  std::map<std::string, WatchMatches*>::iterator it = watches_blacklist.find(std::string(host));
+  bool is_ipv4;
+  std::map<std::string, WatchMatches*>::iterator it;
 
   // trace->traceEvent(TRACE_NORMAL, "*** %s ***", host);
 
+  if(!sanitizeHost(host)) {
+      trace->traceEvent(TRACE_WARNING, "Invalid host %s", host ? host : "nullptr");
+    return;
+  }
+  
+  is_ipv4 = (strchr(host, ':') == NULL) ? true /* IPv4 */ : false /* IPv6 */;
+  it = watches_blacklist.find(std::string(host));
+  
   if(ban_ip) {
     /* Ban */
 
@@ -997,7 +1011,7 @@ void NwInterface::ban(char *host, bool ban_ip,
 
       /* Host already banned */
       watch->inc_matches();
-      num_matches = watch->get_num_matches();
+      num_matches = ndpi_min(watch->get_num_matches(), 300);
       until_time = time(NULL) + (DEFAULT_BAN_TIME * num_matches * num_matches);
 
       trace->traceEvent(TRACE_INFO, "Recurrent (times: %d/until: %u) time banning %s [%s]",
@@ -1065,6 +1079,7 @@ bool NwInterface::loadTemporarelyBannedHosts(const char* path) {
 
   while(getline(infile, line)) {
     char item[256], *ip, *num_bans;
+    const char *host;
 
     if((line[0] == '#') || (line[0] == '\0'))
       continue;
@@ -1072,7 +1087,11 @@ bool NwInterface::loadTemporarelyBannedHosts(const char* path) {
     // trace->traceEvent(TRACE_INFO, "Adding %s", line.c_str());
     /* Format: IP\tnum_bans */
 
-    snprintf(item, sizeof(item), "%s", line.c_str());
+    host = line.c_str();
+    if(!sanitizeHost(host))
+      continue;
+    
+    snprintf(item, sizeof(item), "%s", host);
     ip = strtok(item, "\t");
 
     if(ip)
@@ -1123,4 +1142,30 @@ bool NwInterface::saveTemporarelyBannedHosts(const char* path){
   trace->traceEvent(TRACE_NORMAL, "Saved %u banned IPs to %s", num_entries, path);
 
   return(true);
+}
+
+/* ****************************************** */
+
+bool NwInterface::sanitizeHost(const char *unsanitized_host) {
+  // If the input pointer is null, the host is invalid
+  if (unsanitized_host == nullptr) {
+    return false;
+  }
+
+  // Buffer structures to hold the parsed network address
+  struct in_addr ipv4_buffer;
+  struct in6_addr ipv6_buffer;
+
+  // Check for a valid IPv4 address
+  if (inet_pton(AF_INET, unsanitized_host, &ipv4_buffer) == 1) {
+    return true;
+  }
+
+  // Check for a valid IPv6 address
+  if (inet_pton(AF_INET6, unsanitized_host, &ipv6_buffer) == 1) {
+    return true;
+  }
+
+  // Return false if it matches neither format
+  return false;
 }

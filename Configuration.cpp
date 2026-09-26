@@ -1,6 +1,6 @@
 /*
  *
- * (C) 2021-24 - ntop.org
+ * (C) 2021-26 - ntop.org
  *
  *
  * This program is free software; you can redistribute it and/or modify
@@ -527,13 +527,16 @@ void Configuration::executeCommands() {
   while(true) {
     if(cmd_queue.size() > 0) {
       std::string cmd;
-
+      
       cmd_queue_lock.lock();
-      cmd = cmd_queue.front();
-      cmd_queue.pop();
+      
+      if(cmd_queue.size() > 0) {      
+	cmd = cmd_queue.front();
+	cmd_queue.pop();
+	Utils::execCmd(cmd.c_str(), trace);
+      }
+      
       cmd_queue_lock.unlock();
-
-      Utils::execCmd(cmd.c_str(), trace);
     } else {
       if(!running)
 	break;

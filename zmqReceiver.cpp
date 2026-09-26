@@ -1,6 +1,6 @@
 /*
  *
- * (C) 2021-24 - ntop.org
+ * (C) 2021-26 - ntop.org
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -71,7 +71,7 @@ int main(int argc, char *argv[]) {
     rc = zmq_recv(subscriber, &hdr, sizeof(hdr), 0);
     assert(rc != -1);
 
-    hdr.size = ntohs(hdr.size);
+    hdr.size = ndpi_min(ntohs(hdr.size), sizeof(buffer));
     rc = zmq_recv(subscriber, buffer, hdr.size, 0);
     assert(rc != -1);
     

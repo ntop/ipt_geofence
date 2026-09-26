@@ -1,6 +1,6 @@
 /*
  *
- * (C) 2021-24 - ntop.org
+ * (C) 2021-26 - ntop.org
  *
  *
  * This program is free software; you can redistribute it and/or modify
@@ -28,7 +28,7 @@
 class LinuxFirewall : public Firewall {
  public:
   void ban(char *ip, bool is_ipv4) {
-    char cmdbuf[128];
+    char cmdbuf[256];
     
     snprintf(cmdbuf, sizeof(cmdbuf), "/usr/sbin/ip%stables -I IPT_GEOFENCE_BLACKLIST -s %s -j DROP",
 	     is_ipv4 ? "" : "6", ip);
@@ -36,7 +36,7 @@ class LinuxFirewall : public Firewall {
   }
 
   void unban(char *ip, bool is_ipv4) {
-    char cmdbuf[128];
+    char cmdbuf[256];
     
     snprintf(cmdbuf, sizeof(cmdbuf), "/usr/sbin/ip%stables -D IPT_GEOFENCE_BLACKLIST -s %s -j DROP",
 	     is_ipv4 ? "" : "6", ip);

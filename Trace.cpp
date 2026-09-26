@@ -1,6 +1,6 @@
 /*
  *
- * (C) 2021-24 - ntop.org 
+ * (C) 2021-26 - ntop.org 
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -77,8 +77,10 @@ void Trace::traceEvent(int eventTraceLevel, const char* _file,
     else if(eventTraceLevel == 1 /* TRACE_WARNING */)
       extra_msg = "WARNING: ";
 
-    while(buf[strlen(buf)-1] == '\n') buf[strlen(buf)-1] = '\0';
-
+    if(strlen(buf) > 0) {
+      while(buf[strlen(buf)-1] == '\n') buf[strlen(buf)-1] = '\0';
+    }
+    
     if(!syslogOnly) {
       snprintf(out_buf, sizeof(out_buf), "%s [%s:%d] %s%s", theDate, file, line, extra_msg, buf);
       printf("%s\n", out_buf);
