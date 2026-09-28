@@ -239,12 +239,14 @@ bool Lists::loadIPsetFromURL(const char *url) {
   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, NULL);
   curl_easy_setopt(curl, CURLOPT_WRITEDATA, fd);
 
-  // Set a hard restriction to ONLY allow HTTP and HTTPS transfers
-  curl_easy_setopt(curl, CURLOPT_PROTOCOLS_STR, "http,https");
-
-  // Set a hard restriction for redirect schemes if CURLOPT_FOLLOWLOCATION is enabled
+#if LIBCURL_VERSION_NUM >= 0x075500
+  // Modern libcurl (7.85.0+)
   curl_easy_setopt(curl, CURLOPT_REDIR_PROTOCOLS_STR, "http,https");
-  
+#else
+  // Older libcurl fallback
+  curl_easy_setopt(curl, CURLOPT_REDIR_PROTOCOLS, CURLPROTO_HTTP | CURLPROTO_HTTPS);
+#endif
+    
   if (strncmp(url, "https", 5) == 0) {
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 1L);
