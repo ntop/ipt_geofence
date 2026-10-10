@@ -34,8 +34,13 @@ protected:
   
 
 public:
-  Firewall()  { setup();     }
-  ~Firewall() { tearDown();  }
+  /*
+    Note: setup()/tearDown() are virtual and so they cannot be called
+    from the constructor/destructor (they would resolve to the base class
+    no-op versions): the owner must call them explicitly
+  */
+  Firewall()          { ; }
+  virtual ~Firewall() { ; }
   
   virtual void setup() { ; }
   virtual void tearDown() { ; }

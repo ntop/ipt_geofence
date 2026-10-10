@@ -27,19 +27,34 @@
 #ifdef __linux__
 class LinuxFirewall : public Firewall {
  public:
+  /*
+    Notes:
+    - -w waits for the xtables lock: without it iptables fails immediately
+      if another process (fail2ban, docker, the cmd ban/unban scripts...)
+      holds the lock, leaving the kernel out of sync with watches_blacklist
+    - ban() is idempotent (-C before -I) so no duplicate rules are created
+    - unban() loops until no matching rule is left: a single -D removes only
+      one rule, so any duplicate would keep the host blocked until restart
+  */
   void ban(char *ip, bool is_ipv4) {
-    char cmdbuf[256];
-    
-    snprintf(cmdbuf, sizeof(cmdbuf), "/usr/sbin/ip%stables -I IPT_GEOFENCE_BLACKLIST -s %s -j DROP",
-	     is_ipv4 ? "" : "6", ip);
+    char cmdbuf[512];
+    const char *v = is_ipv4 ? "" : "6";
+
+    snprintf(cmdbuf, sizeof(cmdbuf),
+	     "/usr/sbin/ip%stables -w -C IPT_GEOFENCE_BLACKLIST -s %s -j DROP 2>/dev/null"
+	     " || /usr/sbin/ip%stables -w -I IPT_GEOFENCE_BLACKLIST -s %s -j DROP",
+	     v, ip, v, ip);
     execCmd(cmdbuf);
   }
 
   void unban(char *ip, bool is_ipv4) {
-    char cmdbuf[256];
-    
-    snprintf(cmdbuf, sizeof(cmdbuf), "/usr/sbin/ip%stables -D IPT_GEOFENCE_BLACKLIST -s %s -j DROP",
-	     is_ipv4 ? "" : "6", ip);
+    char cmdbuf[512];
+    const char *v = is_ipv4 ? "" : "6";
+
+    snprintf(cmdbuf, sizeof(cmdbuf),
+	     "n=0; while [ $n -lt 64 ] && /usr/sbin/ip%stables -w -D IPT_GEOFENCE_BLACKLIST -s %s -j DROP 2>/dev/null;"
+	     " do n=$((n+1)); done",
+	     v, ip);
     execCmd(cmdbuf);
   }
 };

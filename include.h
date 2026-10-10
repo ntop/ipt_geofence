@@ -34,6 +34,11 @@
 #include <unistd.h>
 #include <errno.h>
 #include <pthread.h>
+
+#ifdef __APPLE__
+/* On macOS pthread_setname_np() can only name the calling thread */
+#define pthread_setname_np(t, n) pthread_setname_np(n)
+#endif
 #include <signal.h>
 #ifdef __linux__
 #include <linux/types.h>

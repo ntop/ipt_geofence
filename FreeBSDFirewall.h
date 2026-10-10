@@ -35,9 +35,10 @@ class FreeBSDFirewall : public Firewall {
 
     snprintf(cmdbuf, sizeof(cmdbuf), "/sbin/ipfw table %u create 2>/dev/null || /sbin/ipfw table %u list > /dev/null",
 	     IPFW_TABLE, IPFW_TABLE);
+    execCmd(cmdbuf);
   }
 
-  void teardown() {
+  void tearDown() {
     char cmdbuf[128];
     
     snprintf(cmdbuf, sizeof(cmdbuf), "/sbin/ipfw table %u destroy > /dev/null", IPFW_TABLE);

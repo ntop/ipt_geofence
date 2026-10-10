@@ -51,6 +51,8 @@ NwInterface::NwInterface(u_int nf_device_id,
 #endif
 #endif
 
+  if(fw) fw->setup();
+
 #ifdef __linux__
   queueId = nf_device_id, nfHandle = nfq_open();
 
@@ -139,7 +141,10 @@ NwInterface::~NwInterface() {
 
   logStartStop(false /* stop */);
   if(zmq) delete zmq;
-  if(fw)  delete fw;
+  if(fw) {
+    fw->tearDown();
+    delete fw;
+  }
 }
 
 /* **************************************************** */
@@ -308,8 +313,9 @@ void NwInterface::packetPollLoop() {
 #ifdef DEBUG
 	    trace->traceEvent(TRACE_ERROR, "Watch %s received %s", watchers[i]->label.c_str(), ip);
 #endif
+	    ip[strcspn(ip, "\r\n")] = '\0'; /* Zap trailing \n before validating */
+
 	    if(sanitizeHost(ip)) {
-	      ip[strlen(ip)-1] = '\0'; /* Zap trailing /n */
 	      geoip->lookup(ip, ip_country, sizeof(ip_country), ip_continent, sizeof(ip_continent));
 
 	      if(watchers[i]->mode == true /* geo-ip */) {
@@ -1011,6 +1017,10 @@ void NwInterface::ban(char *host, bool ban_ip,
 
       /* Host already banned */
       watch->inc_matches();
+
+      /* Make sure the rule is in place (no-op if already present) */
+      if(fw) fw->ban(host, is_ipv4);
+
       num_matches = ndpi_min(watch->get_num_matches(), 300);
       until_time = time(NULL) + (DEFAULT_BAN_TIME * num_matches * num_matches);
 
@@ -1051,8 +1061,8 @@ void NwInterface::ban_ipv6(struct ndpi_in6_addr ip6, bool ban_ip,
 void NwInterface::flush_ban() {
   try {
 #ifdef __linux__
-    Utils::execCmd("/usr/sbin/iptables  -F IPT_GEOFENCE_BLACKLIST", trace);
-    Utils::execCmd("/usr/sbin/ip6tables -F IPT_GEOFENCE_BLACKLIST", trace);
+    Utils::execCmd("/usr/sbin/iptables  -w -F IPT_GEOFENCE_BLACKLIST", trace);
+    Utils::execCmd("/usr/sbin/ip6tables -w -F IPT_GEOFENCE_BLACKLIST", trace);
 #endif
   } catch (...) {
     trace->traceEvent(TRACE_ERROR, "Error while flushing blacklists");
@@ -1088,9 +1098,6 @@ bool NwInterface::loadTemporarelyBannedHosts(const char* path) {
     /* Format: IP\tnum_bans */
 
     host = line.c_str();
-    if(!sanitizeHost(host))
-      continue;
-    
     snprintf(item, sizeof(item), "%s", host);
     ip = strtok(item, "\t");
 
@@ -1099,15 +1106,25 @@ bool NwInterface::loadTemporarelyBannedHosts(const char* path) {
     else
       num_bans = NULL;
 
-    if(num_bans == NULL) {
+    if((num_bans == NULL) || (!sanitizeHost(ip))) {
       trace->traceEvent(TRACE_WARNING, "Skipping invalid line %s", line.c_str());
       continue;
     }
+
+    if(watches_blacklist.find(std::string(ip)) != watches_blacklist.end())
+      continue; /* Duplicate */
 
     try {
       WatchMatches *wm = new WatchMatches(atoi(num_bans), time(NULL) + DEFAULT_BAN_TIME);
 
       watches_blacklist[ip] = wm;
+
+      /*
+	The chain has been flushed at startup: the rule must be
+	reinstalled, otherwise the host is believed to be banned
+	but traffic flows (and later bans would never add the rule)
+      */
+      if(fw) fw->ban(ip, (strchr(ip, ':') == NULL) ? true : false);
       num_entries++;
     } catch(std::bad_alloc& ex) {
       trace->traceEvent(TRACE_WARNING, "Not enough memory");
