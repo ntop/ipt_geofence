@@ -50,7 +50,7 @@ class Configuration {
   std::mutex telegram_queue_lock, cmd_queue_lock;
   std::queue<std::string> telegram_queue, cmd_queue;
   std::set<port_range> hp_ranges;
-  bool running;
+  std::atomic<bool> running;
 #if defined __FreeBSD__ || defined __APPLE__
   std::string ifname;
 #endif

@@ -31,7 +31,12 @@ public:
   int         fd_fileno;
 
   WatcherItam()  { fd = NULL; }
-  ~WatcherItam() { if(fd) pclose(fd); }
+  /*
+    fclose() and not pclose(): pclose() waits for the child to exit and
+    watchers (e.g. tail -f) usually never exit, hanging the shutdown.
+    The child terminates with SIGPIPE at its next write
+  */
+  ~WatcherItam() { if(fd) fclose(fd); }
 };
 
 #endif /* _WATCHER_ITEM_H_ */

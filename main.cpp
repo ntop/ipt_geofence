@@ -197,12 +197,10 @@ int main(int argc, char *argv[]) {
 		      "errors and try again");
   }
 
-#ifdef NTOP_CLOUD
-  if(cloud) delete cloud;
-#endif
-  
-  delete iface;
-  delete conf;
+  if(iface)
+    delete iface; /* It also deletes the (current) configuration */
+  else
+    delete conf;
   delete trace;
   
   return(0);

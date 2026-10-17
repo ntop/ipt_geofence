@@ -174,6 +174,14 @@ int Utils::sendTelegramMessage(std::string bot_token, std::string chat_id,
       + "&text=" + std::string(msg);
     
     curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+    /*
+      Without timeouts a slow/unreachable API blocks this thread forever
+      (and the configuration destructor that joins it). NOSIGNAL is
+      mandatory in multithreaded programs
+    */
+    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 5L);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L);
+    curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
     curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &response_code);
 
 #ifdef CURL_DEBUG

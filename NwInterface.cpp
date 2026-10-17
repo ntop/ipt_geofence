@@ -91,7 +91,22 @@ NwInterface::NwInterface(u_int nf_device_id,
     throw 1;
   }
 
+#ifdef NFQA_CFG_F_FAIL_OPEN
+  /* When the queue is full accept packets instead of dropping them (i.e. never cut the host off) */
+  if(nfq_set_queue_flags(queueHandle, NFQA_CFG_F_FAIL_OPEN, NFQA_CFG_F_FAIL_OPEN) < 0)
+    trace->traceEvent(TRACE_WARNING, "Unable to set NFQUEUE fail-open mode");
+#endif
+
   nf_fd = nfq_fd(nfHandle);
+
+#if defined(SOL_NETLINK) && defined(NETLINK_NO_ENOBUFS)
+  {
+    int one = 1;
+
+    /* Don't report ENOBUFS when the socket buffer overflows: packets are lost anyway */
+    setsockopt(nf_fd, SOL_NETLINK, NETLINK_NO_ENOBUFS, &one, sizeof(one));
+  }
+#endif
 #endif
 
   if(!conf->getZMQUrl().empty()) {
@@ -107,6 +122,17 @@ NwInterface::NwInterface(u_int nf_device_id,
 /* **************************************************** */
 
 NwInterface::~NwInterface() {
+#ifdef __linux__
+  /*
+    Detach from NFQUEUE first: the poll loop is over, so from now on
+    nobody would issue verdicts and (with the queue still bound)
+    all the host traffic would be stuck in the queue
+  */
+  nf_fd = 0;
+  if(queueHandle) nfq_destroy_queue(queueHandle), queueHandle = NULL;
+  if(nfHandle)    nfq_close(nfHandle), nfHandle = NULL;
+#endif
+
 #ifndef __linux__
   if(pcap_handle != NULL)
     pcap_close(pcap_handle);
@@ -128,16 +154,10 @@ NwInterface::~NwInterface() {
     delete reloaderThread;
   }
 
-#ifdef __linux__
-  nf_fd = 0;
-#endif
+  if(retiredConf) delete retiredConf.exchange(NULL);
+  if(shadowConf)  delete shadowConf.exchange(NULL);
 
   flush_ban();
-
-#ifdef __linux__
-  if(queueHandle) nfq_destroy_queue(queueHandle);
-  if(nfHandle)    nfq_close(nfHandle);
-#endif
 
   logStartStop(false /* stop */);
   if(zmq) delete zmq;
@@ -145,6 +165,13 @@ NwInterface::~NwInterface() {
     fw->tearDown();
     delete fw;
   }
+
+  /*
+    The interface owns the configuration (it can be replaced at runtime
+    by reloadConfLoop): delete it last as its destructor flushes pending
+    Telegram messages/commands such as the above stop notification
+  */
+  delete conf;
 }
 
 /* **************************************************** */
@@ -290,8 +317,13 @@ void NwInterface::packetPollLoop() {
 
 	  if(rc < 0)
 	    trace->traceEvent(TRACE_ERROR, "nfq_handle_packet() failed: [len: %d][rc: %d][errno: %d]", len, rc, errno);
+	} else if((errno == ENOBUFS) || (errno == EINTR) || (errno == EAGAIN)) {
+	  /* Transient (e.g. ENOBUFS = packets lost under load): keep going */
+	  trace->traceEvent(TRACE_WARNING, "NF_QUEUE receive error: [len: %d][errno: %d/%s]",
+			    len, errno, strerror(errno));
 	} else {
-	  trace->traceEvent(TRACE_ERROR, "NF_QUEUE receive error: [len: %d][errno: %d]", len, errno);
+	  trace->traceEvent(TRACE_ERROR, "NF_QUEUE receive error: [len: %d][errno: %d/%s]",
+			    len, errno, strerror(errno));
 	  break;
 	}
 
@@ -397,15 +429,15 @@ void NwInterface::packetPollLoop() {
       num_loops = 0;
     }
 
-    if(shadowConf != NULL) {
-      /* Swap configurations */
-      Configuration *tmp = conf;
+    if((shadowConf != NULL) && (retiredConf == NULL)) {
+      /*
+	Swap configurations. The old one is deleted by the reloader thread:
+	its destructor joins the Telegram/command threads that may need the
+	network, i.e. this thread serving NFQUEUE (deleting it here = deadlock)
+      */
+      retiredConf = conf;
+      conf = shadowConf.exchange(NULL);
 
-      conf = shadowConf;
-      shadowConf = NULL;
-      sleep(1);
-      delete tmp;
-      
       trace->traceEvent(TRACE_NORMAL, "New configuration has been updated");
     }
   } /* while */
@@ -905,14 +937,20 @@ u_int32_t NwInterface::computeNextReloadTime() {
 void NwInterface::reloadConfLoop() {
   u_int32_t next_reload = computeNextReloadTime();
 
-  shadowConf = NULL;
-
   pthread_setname_np(pthread_self(), __FUNCTION__);
 
   trace->traceEvent(TRACE_NORMAL, "Starting reload configuration loop");
 
   while(isRunning()) {
     u_int32_t now = time(NULL);
+    Configuration *old = retiredConf.load();
+
+    if(old != NULL) {
+      /* Might take a while (pending Telegram messages/commands) */
+      delete old;
+      retiredConf = NULL;
+      trace->traceEvent(TRACE_NORMAL, "Old configuration has been deleted");
+    }
 
     if(now > next_reload) {
       trace->traceEvent(TRACE_NORMAL, "Reloading config file");

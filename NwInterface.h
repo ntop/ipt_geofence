@@ -36,7 +36,9 @@ class NwInterface {
   Firewall *fw;
   pthread_t pollLoop;
   bool ifaceRunning;
-  Configuration *conf, *shadowConf = NULL;
+  Configuration *conf;
+  /* shadowConf: new conf (reloader -> packet thread), retiredConf: old conf to delete (packet -> reloader thread) */
+  std::atomic<Configuration*> shadowConf{NULL}, retiredConf{NULL};
   GeoIP *geoip;
   std::thread *reloaderThread;
   double banTimeout = 900.0; // 15 minutes

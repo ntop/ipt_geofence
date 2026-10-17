@@ -88,6 +88,7 @@
 #include <set>
 #include <vector>
 #include <mutex>
+#include <atomic>
 #include <queue>
 
 /* ********************************************** */

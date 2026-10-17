@@ -493,16 +493,20 @@ void Configuration::sendTelegramMessages() {
   pthread_setname_np(pthread_self(), __FUNCTION__);
 
   while(true) {
-    if(telegram_queue.size() > 0) {
-      std::string message;
+    std::string message;
+    bool found = false;
 
-      telegram_queue_lock.lock();
+    telegram_queue_lock.lock();
+    if(!telegram_queue.empty()) {
       message = telegram_queue.front();
       telegram_queue.pop();
-      telegram_queue_lock.unlock();
+      found = true;
+    }
+    telegram_queue_lock.unlock();
 
+    if(found)
       Utils::sendTelegramMessage(telegram_bot_token, telegram_chat_id, message, trace);
-    } else {
+    else {
       if(!running)
 	break;
       else
@@ -525,19 +529,26 @@ void Configuration::executeCommands() {
   pthread_setname_np(pthread_self(), __FUNCTION__);
 
   while(true) {
-    if(cmd_queue.size() > 0) {
-      std::string cmd;
-      
-      cmd_queue_lock.lock();
-      
-      if(cmd_queue.size() > 0) {      
-	cmd = cmd_queue.front();
-	cmd_queue.pop();
-	Utils::execCmd(cmd.c_str(), trace);
-      }
-      
-      cmd_queue_lock.unlock();
-    } else {
+    std::string cmd;
+    bool found = false;
+
+    /*
+      The lock must NOT be held while the command runs: the packet thread
+      enqueues commands (execDeferredCmd) and would block on it, and if the
+      command uses the network its packets go through NFQUEUE that is
+      served by the very same (blocked) packet thread: deadlock
+    */
+    cmd_queue_lock.lock();
+    if(!cmd_queue.empty()) {
+      cmd = cmd_queue.front();
+      cmd_queue.pop();
+      found = true;
+    }
+    cmd_queue_lock.unlock();
+
+    if(found)
+      Utils::execCmd(cmd.c_str(), trace);
+    else {
       if(!running)
 	break;
       else
