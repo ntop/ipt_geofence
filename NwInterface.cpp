@@ -1022,7 +1022,7 @@ void NwInterface::reloadConfLoop() {
 /* **************************************************** */
 
 void NwInterface::harvestWatches() {
-  u_int32_t when = time(NULL) - MAX_IDLENESS;
+  u_int32_t now = time(NULL);
 
 #ifdef DEBUG
   trace->traceEvent(TRACE_NORMAL, "NwInterface::harvestWatches()");
@@ -1032,20 +1032,17 @@ void NwInterface::harvestWatches() {
       it != watches_blacklist.end();) {
     WatchMatches *match = it->second;
 
-#ifdef DEBUG
-    trace->traceEvent(TRACE_NORMAL, "last_match=%u / now=%u [to go: %d]",
-		      match->get_last_match(), when, (match->get_last_match() - when));
-#endif
-
-    if(match->ready_to_harvest(when)) {
-#ifdef DEBUG
-      trace->traceEvent(TRACE_NORMAL, "Harvesting");
-#endif
+    if(match->ready_to_unban(now)) {
+      /* Ban expired: unban the host but keep its history */
       IPAddress host = it->first;
 
       ban(&host, false /* unban */, false, "unban", "");
-      delete it->second;
-      watches_blacklist.erase(it++);    // or "it = m.erase(it)" since C++11
+      match->unban();
+      ++it;
+    } else if(match->ready_to_forget(now)) {
+      /* Not banned for BAN_MEMORY_TIME: forget it */
+      delete match;
+      watches_blacklist.erase(it++);
     } else
       ++it;
   }
@@ -1069,16 +1066,16 @@ void NwInterface::ban(IPAddress *host, bool ban_ip,
 
   if(ban_ip) {
     /* Ban */
+    u_int32_t now = time(NULL);
 
     if(it == watches_blacklist.end()) {
       /* New ban */
       try {
-	u_int32_t until_time =  time(NULL) + DEFAULT_BAN_TIME;
-	WatchMatches *watch = new WatchMatches(1, until_time);
+	WatchMatches *watch = new WatchMatches(now);
 
 	host->toString(buf, sizeof(buf));
 	trace->traceEvent(TRACE_INFO, "First time (until: %u) banning %s [%s]",
-			  until_time, buf, reason.c_str());
+			  watch->get_banned_until(), buf, reason.c_str());
 	watches_blacklist[*host] = watch;
 	if(fw) fw->ban(buf, is_ipv4);
 	logHostBan(buf, ban_ip, ban_traffic, reason, country);
@@ -1087,29 +1084,32 @@ void NwInterface::ban(IPAddress *host, bool ban_ip,
       }
     } else {
       WatchMatches *watch = it->second;
+      bool was_banned = watch->is_banned();
       u_int32_t until_time;
-      u_int32_t num_matches;
 
-      /* Host already banned */
-      watch->inc_matches();
+      if(!watch->offence(now))
+	return; /* Banned and already counted less than MIN_MATCH_INTERVAL ago */
 
-      /*
-	Do NOT call fw->ban() here: this path runs for every packet of an
-	already banned host (NFQUEUE sits in mangle PREROUTING, before the
-	IPT_GEOFENCE_BLACKLIST DROP in filter INPUT), and fork/exec'ing
-	iptables per packet stalls the poll loop until the queue overflows
-	("nf_queue: full at 8192 entries")
-      */
+      until_time = watch->ban(now);
 
-      num_matches = ndpi_min(watch->get_num_matches(), 300);
-      until_time = time(NULL) + (DEFAULT_BAN_TIME * num_matches * num_matches);
-
-      if(trace->get_trace_level() >= TRACE_LEVEL_INFO)
-	trace->traceEvent(TRACE_INFO, "Recurrent (times: %d/until: %u) time banning %s [%s]",
-			  watch->get_num_matches(), until_time,
-			  host->toString(buf, sizeof(buf)), reason.c_str());
-
-      watch->ban_until(until_time);
+      if(was_banned) {
+	/*
+	  Host still banned: just extend the ban. Do NOT call fw->ban() here:
+	  the rule is already there, and this path can run for many packets
+	  of a banned host (fork/exec'ing iptables would stall the poll loop)
+	*/
+	if(trace->get_trace_level() >= TRACE_LEVEL_INFO)
+	  trace->traceEvent(TRACE_INFO, "Recurrent (times: %u/until: %u) time banning %s [%s]",
+			    watch->get_num_matches(), until_time,
+			    host->toString(buf, sizeof(buf)), reason.c_str());
+      } else {
+	/* Previously banned host (ban expired) misbehaving again */
+	host->toString(buf, sizeof(buf));
+	trace->traceEvent(TRACE_INFO, "Banning again (times: %u/until: %u) %s [%s]",
+			  watch->get_num_matches(), until_time, buf, reason.c_str());
+	if(fw) fw->ban(buf, is_ipv4);
+	logHostBan(buf, ban_ip, ban_traffic, reason, country);
+      }
     }
   } else {
     /* Unban */
