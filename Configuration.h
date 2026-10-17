@@ -34,7 +34,6 @@ class Configuration {
   std::map<u_int16_t, Marker> ctrs_conts;
   std::map<u_int16_t, bool>   tcp_ports, udp_ports, ignored_ports, hp_ports, hp_all_except_ports;
   std::map<std::string /* name */, std::pair<std::string /* cmd */, bool /* true=geo-ip, false=block IP */> > watches;
-  std::string dump_path;
   unsigned int nfq_queue_id;
   Marker marker_unknown;
   Marker marker_pass;
@@ -107,8 +106,6 @@ class Configuration {
 #endif
 
   inline std::string getCmd(bool ban_cmd)                           { return(ban_cmd ? cmd_ban : cmd_unban); }
-  void setDumpPath(const char *path)                                { dump_path = std::string(path);         }
-  const char* getDumpPath()                                         { return(dump_path.c_str());             }
 };
 
 

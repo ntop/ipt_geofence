@@ -274,17 +274,6 @@ bool Configuration::readConfigFile(const char *path) {
 
   /* **************************** */
 
-  if(root["blacklist_dump_path"].empty()) {
-    const char *def = "/var/tmp/banned_addresses.txt";
-
-    trace->traceEvent(TRACE_WARNING, "Missing %s: using default %s",
-		      "blacklist_dump_path", def);
-    setDumpPath(def);
-  } else
-    setDumpPath(root["blacklist_dump_path"].asCString());
-
-  /* **************************** */
-
   if(!root["telegram"].empty()) {
     if(!root["telegram"]["bot_token"].empty())
       telegram_bot_token = root["telegram"]["bot_token"].asString();

@@ -238,8 +238,6 @@ void NwInterface::packetPollLoop() {
 
   pthread_setname_np(pthread_self(), __FUNCTION__);
 
-  loadTemporarelyBannedHosts(conf->getDumpPath());
-
   watches = conf->get_watches();
 
   /* Start watches */
@@ -441,8 +439,6 @@ void NwInterface::packetPollLoop() {
       trace->traceEvent(TRACE_NORMAL, "New configuration has been updated");
     }
   } /* while */
-
-  saveTemporarelyBannedHosts(conf->getDumpPath());
 
   trace->traceEvent(TRACE_NORMAL, "Leaving packet poll loop");
 
@@ -1116,92 +1112,6 @@ void NwInterface::flush_ban() {
 
 int NwInterface::sendTelegramMessage(std::string message) {
   return(conf->sendTelegramMessage(message));
-}
-
-/* ****************************************** */
-
-bool NwInterface::loadTemporarelyBannedHosts(const char* path) {
-  std::ifstream infile(path);
-  std::string line;
-  u_int32_t num_entries = 0;
-
-  if(!infile.is_open()) {
-    trace->traceEvent(TRACE_WARNING, "Unable to open file %s", path);
-    return(false);
-  }
-
-  while(getline(infile, line)) {
-    char item[256], *ip, *num_bans;
-    const char *host;
-
-    if((line[0] == '#') || (line[0] == '\0'))
-      continue;
-
-    // trace->traceEvent(TRACE_INFO, "Adding %s", line.c_str());
-    /* Format: IP\tnum_bans */
-
-    host = line.c_str();
-    snprintf(item, sizeof(item), "%s", host);
-    ip = strtok(item, "\t");
-
-    if(ip)
-      num_bans = strtok(NULL, "\t");
-    else
-      num_bans = NULL;
-
-    if((num_bans == NULL) || (!sanitizeHost(ip))) {
-      trace->traceEvent(TRACE_WARNING, "Skipping invalid line %s", line.c_str());
-      continue;
-    }
-
-    if(watches_blacklist.find(std::string(ip)) != watches_blacklist.end())
-      continue; /* Duplicate */
-
-    try {
-      WatchMatches *wm = new WatchMatches(atoi(num_bans), time(NULL) + DEFAULT_BAN_TIME);
-
-      watches_blacklist[ip] = wm;
-
-      /*
-	The chain has been flushed at startup: the rule must be
-	reinstalled, otherwise the host is believed to be banned
-	but traffic flows (and later bans would never add the rule)
-      */
-      if(fw) fw->ban(ip, (strchr(ip, ':') == NULL) ? true : false);
-      num_entries++;
-    } catch(std::bad_alloc& ex) {
-      trace->traceEvent(TRACE_WARNING, "Not enough memory");
-    }
-  }
-
-  trace->traceEvent(TRACE_NORMAL, "Loaded %u banned IPs to %s", num_entries, path);
-
-  infile.close();
-
-  return(true);
-}
-
-/* ****************************************** */
-
-bool NwInterface::saveTemporarelyBannedHosts(const char* path){
-  std::ofstream outfile(path);
-  std::string line;
-  u_int32_t num_entries = 0;
-
-  if(!outfile.is_open()) {
-    trace->traceEvent(TRACE_WARNING, "Unable to open file %s", path);
-    return(false);
-  }
-
-  for(std::map<std::string, WatchMatches*>::iterator it = watches_blacklist.begin();
-      it != watches_blacklist.end(); it++)
-    outfile << it->first << "\t" << it->second->get_num_matches() << "\n", num_entries++;
-
-  outfile.close();
-
-  trace->traceEvent(TRACE_NORMAL, "Saved %u banned IPs to %s", num_entries, path);
-
-  return(true);
 }
 
 /* ****************************************** */

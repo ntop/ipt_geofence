@@ -105,9 +105,6 @@ class NwInterface {
   inline bool isRunning()                       { return(ifaceRunning);                };
   void packetPollLoop();
   void flush_ban();
-
-  bool loadTemporarelyBannedHosts(const char* path);
-  bool saveTemporarelyBannedHosts(const char* path);
 };
 
 #endif /* _NETWORK_INTERFACE_H_ */
