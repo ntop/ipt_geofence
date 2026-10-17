@@ -30,7 +30,8 @@ class Lists {
   
   void addAddress(int family, void *addr, int bits);
   bool findAddress(int family, struct in_addr *addr, int bits);
-
+  static void print_ndpi_prefix(const ndpi_prefix_t *prefix);
+    
  public:
   Lists();
   ~Lists();

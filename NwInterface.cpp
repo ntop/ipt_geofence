@@ -440,7 +440,7 @@ void NwInterface::packetPollLoop() {
 Marker NwInterface::dissectPacket(bool is_ingress_packet,
 				  const u_char *payload, u_int payload_len) {
   /* We can see only IP addresses */
-  u_int16_t ip_offset = 0, vlan_id = 0 /* FIX */;
+  u_int16_t ip_offset = 0;
   struct ndpi_iphdr *iph = (struct ndpi_iphdr *)&payload[ip_offset];
   struct ndpi_tcphdr *tcph = NULL;
   struct ndpi_udphdr *udph = NULL;
@@ -540,8 +540,7 @@ Marker NwInterface::dissectPacket(bool is_ingress_packet,
     src_port = dst_port = 0;
   }
 
-  return(makeVerdict(is_ingress_packet,
-		     proto, vlan_id,
+  return(makeVerdict(is_ingress_packet, proto,
 		     src_port, dst_port,
 		     &src, &dst));
 }
@@ -792,8 +791,7 @@ void NwInterface::logFlow(const char *proto_name, const char *sub_reason,
 
 /* **************************************************** */
 
-Marker NwInterface::makeVerdict(bool is_ingress_packet,
-				u_int8_t proto, u_int16_t vlanId,
+Marker NwInterface::makeVerdict(bool is_ingress_packet, u_int8_t proto,
 				u_int16_t sport /* network byte order */,
 				u_int16_t dport /* network byte order */,
 				IPAddress *src_host, IPAddress *dst_host) {
@@ -1053,6 +1051,7 @@ void NwInterface::harvestWatches() {
 void NwInterface::ban(IPAddress *host, bool ban_ip,
 		      bool ban_traffic, std::string reason, std::string country) {
   char buf[INET6_ADDRSTRLEN];
+  char ip_buf[64];
   bool is_ipv4 = host->isIPv4();
   std::map<IPAddress, WatchMatches*>::iterator it;
 
@@ -1062,6 +1061,13 @@ void NwInterface::ban(IPAddress *host, bool ban_ip,
     return;
   }
 
+#if 0
+  trace->traceEvent(TRACE_NORMAL, "%s banning %s [%s]",
+		    ban_ip ? "BAN" : "UNBAN",
+		    host->toString(ip_buf, sizeof(ip_buf)),
+		    reason.c_str());
+#endif
+  
   it = watches_blacklist.find(*host);
 
   if(ban_ip) {

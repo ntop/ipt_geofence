@@ -58,8 +58,7 @@ class NwInterface {
   std::set<IPAddress> local_addresses;
   time_t local_addresses_refresh_time = 0;
   
-  Marker makeVerdict(bool is_ingress_packet,
-		     u_int8_t proto, u_int16_t vlanId,
+  Marker makeVerdict(bool is_ingress_packet, u_int8_t proto,
 		     u_int16_t sport,
 		     u_int16_t dport,
 		     IPAddress *src, IPAddress *dst);

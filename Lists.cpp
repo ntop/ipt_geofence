@@ -65,12 +65,14 @@ void Lists::addAddress(int family, void *addr, int bits) {
 
 bool Lists::isListedIPv4(struct in_addr *addr) {
   ndpi_prefix_t prefix;
+  ndpi_patricia_node_t *p;
 
   ndpi_fill_prefix_v4(&prefix, addr, 32, ptree_v4->maxbits);
 
-  if(ndpi_patricia_search_best(ptree_v4, &prefix) != NULL)
+  if((p = ndpi_patricia_search_best(ptree_v4, &prefix)) != NULL) {
+    // print_ndpi_prefix(p->prefix);
     return(true);
-  else
+  } else
     return(false);
 }
 
@@ -78,12 +80,14 @@ bool Lists::isListedIPv4(struct in_addr *addr) {
 
 bool Lists::isListedIPv6(struct in6_addr *addr6) {
   ndpi_prefix_t prefix;
+    ndpi_patricia_node_t *p;
 
   ndpi_fill_prefix_v6(&prefix, addr6, 128, ptree_v6->maxbits);
 
-  if(ndpi_patricia_search_best(ptree_v6, &prefix) != NULL)
+  if((p = ndpi_patricia_search_best(ptree_v6, &prefix)) != NULL) {
+    // print_ndpi_prefix(p->prefix);
     return(true);
-  else
+  } else
     return(false);
 }
 
@@ -121,12 +125,22 @@ void Lists::addAddress(char *net) {
 
     if(bits == 0) bits = 128;
 
+    if(bits < 8) {
+      trace->traceEvent(TRACE_WARNING, "Skipping network %s/%u", net, bits);
+      return;
+    }
+
     if(inet_pton(AF_INET6, net, &addr6))
       addAddress(AF_INET6, &addr6, bits);
   } else {
     struct in_addr pin;
 
     if(bits == 0) bits = 32;
+
+    if(bits < 8) {
+      trace->traceEvent(TRACE_WARNING, "Skipping network %s/%u", net, bits);
+      return;
+    }
 
     inet_aton(net, &pin);
     addAddress(AF_INET, &pin, bits);
@@ -175,26 +189,26 @@ bool Lists::loadIPsetFromFile(const char *path) {
     trace->traceEvent(TRACE_WARNING, "Unable to open file %s", path);
     return(false);
   }
-  
-  while(getline(infile, line)){   
+
+  while(getline(infile, line)) {
     if((line[0] == '#') || (line[0] == '\0'))
       continue;
 
     // trace->traceEvent(TRACE_INFO, "Adding %s", line.c_str());
 
     if(line.find(',') != std::string::npos) {
-      /* 
+      /*
 	 Check Stratosphere IPS format
 	 66,185.156.73.120,0.0033643602135959
       */
       char *token, *dup = strdup(line.c_str());
-      
+
       if((token = strtok(dup, ",")) != NULL) {
 	if((token = strtok(NULL, ",")) != NULL) {
 	  addAddress(token);
 	}
       }
-      
+
       free(dup);
     } else
       addAddress((char*)line.c_str());
@@ -246,7 +260,7 @@ bool Lists::loadIPsetFromURL(const char *url) {
   // Older libcurl fallback
   curl_easy_setopt(curl, CURLOPT_REDIR_PROTOCOLS, CURLPROTO_HTTP | CURLPROTO_HTTPS);
 #endif
-    
+
   if (strncmp(url, "https", 5) == 0) {
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 1L);
@@ -281,3 +295,46 @@ bool Lists::loadIPsetFromURL(const char *url) {
   return(rc);
 }
 
+/* ****************************************** */
+
+void Lists::print_ndpi_prefix(const ndpi_prefix_t *prefix) {
+  if (prefix == NULL) {
+    printf("Prefix is NULL\n");
+    return;
+  }
+
+  printf("--- ndpi_prefix_t Content ---\n");
+  printf("Family:    %d ", prefix->family);
+
+  char buf[INET6_ADDRSTRLEN];
+
+  switch (prefix->family) {
+  case AF_INET:
+    printf("(IPv4)\n");
+    // The IPv4 address is stored in prefix->sin
+    if (inet_ntop(AF_INET, &(prefix->add.sin), buf, sizeof(buf))) {
+      printf("Address:   %s\n", buf);
+    } else {
+      printf("Address:   [Invalid IPv4]\n");
+    }
+    break;
+
+  case AF_INET6:
+    printf("(IPv6)\n");
+    // The IPv6 address is stored in prefix->sin6
+    if (inet_ntop(AF_INET6, &(prefix->add.sin6), buf, sizeof(buf))) {
+      printf("Address:   %s\n", buf);
+    } else {
+      printf("Address:   [Invalid IPv6]\n");
+    }
+    break;
+
+  default:
+    printf("(Unknown / Custom)\n");
+    break;
+  }
+
+  printf("Bit Length: %u\n", prefix->bitlen);
+  printf("Ref Count:  %u\n", prefix->ref_count);
+  printf("-----------------------------\n");
+}
