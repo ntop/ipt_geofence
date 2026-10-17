@@ -54,6 +54,10 @@ class NwInterface {
   //std::vector<bool>  geo_ip_pipes;
   // std::vector<std::pair<int, std::string>> pipes_fileno;
   std::vector<WatcherItam*> watchers;
+  /* Addresses of this host (network byte order) that must never be banned/blocked */
+  std::set<u_int32_t> local_ipv4;
+  std::set<std::string /* 16 bytes */> local_ipv6;
+  time_t local_addresses_refresh_time = 0;
   
   Marker makeVerdict(bool is_ingress_packet,
 		     u_int8_t proto, u_int16_t vlanId,
@@ -72,6 +76,8 @@ class NwInterface {
   bool isPrivateIPv4(u_int32_t addr /* network byte order */);
   bool isPrivateIPv6(struct ndpi_in6_addr ip6addr);
   bool isBroadMulticastIPv4(u_int32_t addr /* network byte order */);
+  void refreshLocalAddresses(u_int max_age);
+  bool isLocalAddress(const char *host, bool fresh = false);
   void reloadConfLoop();
   u_int32_t computeNextReloadTime();
   bool isBanned(char *host, struct in_addr *a4, struct ndpi_in6_addr *a6);

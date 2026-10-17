@@ -53,6 +53,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/mman.h>
+#include <ifaddrs.h>
 #ifdef __linux__
 #include <linux/netfilter.h> /* for NF_ACCEPT */
 #include <libnfnetlink/libnfnetlink.h>
