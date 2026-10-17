@@ -99,6 +99,9 @@ NwInterface::NwInterface(u_int nf_device_id,
 
   nf_fd = nfq_fd(nfHandle);
 
+  /* Not inherited by the commands (e.g. ban/unban) we spawn */
+  fcntl(nf_fd, F_SETFD, FD_CLOEXEC);
+
 #if defined(SOL_NETLINK) && defined(NETLINK_NO_ENOBUFS)
   {
     int one = 1;
@@ -117,6 +120,8 @@ NwInterface::NwInterface(u_int nf_device_id,
     zmq = NULL;
 
   flush_ban();
+
+  refreshLocalAddresses(0);
 }
 
 /* **************************************************** */
@@ -211,20 +216,18 @@ bool NwInterface::startWatcher(std::string label, std::pair<std::string, bool> i
   WatcherItam *i = new WatcherItam();
 
   i->label = label;
-  i->fd    = popen(item.first.c_str(), "r");
 
-  if(i->fd == NULL) {
-    trace->traceEvent(TRACE_ERROR, "Unable to run watch %s", item.first.c_str());
+  if(!i->start(item.first)) {
+    trace->traceEvent(TRACE_ERROR, "Unable to run watch %s: %s", item.first.c_str(), strerror(errno));
+    delete i;
     return(false);
   } else {
-    i->fd_fileno = fileno(i->fd);
-    i->cmd = item.first;
-    fcntl(i->fd_fileno, F_SETFL, O_NONBLOCK);
     i->mode = item.second;
 
     watchers.push_back(i);
 
-    trace->traceEvent(TRACE_NORMAL, "Added watch %s [%s]", i->label.c_str(), i->cmd.c_str());
+    trace->traceEvent(TRACE_NORMAL, "Added watch %s [%s][pid %d]",
+		      i->label.c_str(), i->cmd.c_str(), (int)i->pid);
     return(true);
   }
 }
@@ -382,6 +385,7 @@ void NwInterface::packetPollLoop() {
       if(to_remove != -1) {
 	trace->traceEvent(TRACE_WARNING, "Watcher %d [%s] terminated",
 			  to_remove, watchers[to_remove]->label.c_str());
+	delete watchers[to_remove]; /* Reap the process(es) */
 	watchers.erase(watchers.begin() + to_remove);
       }
 
@@ -602,7 +606,8 @@ void NwInterface::refreshLocalAddresses(u_int max_age) {
   struct ifaddrs *ifap, *ifa;
   std::set<IPAddress> addresses;
 
-  if((local_addresses_refresh_time != 0)
+  if((max_age != 0)
+     && (local_addresses_refresh_time != 0)
      && ((now - local_addresses_refresh_time) < (time_t)max_age))
     return;
 
@@ -616,7 +621,8 @@ void NwInterface::refreshLocalAddresses(u_int max_age) {
 
   for(ifa = ifap; ifa != NULL; ifa = ifa->ifa_next) {
     IPAddress a;
-
+    char buf[64];
+    
     if(ifa->ifa_addr == NULL)
       continue;
 
@@ -627,6 +633,8 @@ void NwInterface::refreshLocalAddresses(u_int max_age) {
     else
       continue;
 
+    trace->traceEvent(TRACE_NORMAL, "Local IP found: %s", a.toString(buf, sizeof(buf)));
+    
     addresses.insert(a);
   }
 
@@ -645,8 +653,10 @@ void NwInterface::refreshLocalAddresses(u_int max_age) {
 bool NwInterface::isLocalAddress(IPAddress *ip, bool fresh) {
   u_int32_t v4;
 
+#ifdef PERIODIC_IP_RELOAD
   refreshLocalAddresses(fresh ? 1 : 30);
-
+#endif
+  
   if(ip->isIPv4())
     v4 = ip->getIPv4()->s_addr;
   else {

@@ -54,6 +54,10 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <ifaddrs.h>
+#include <sys/wait.h>
+#ifdef __linux__
+#include <sys/prctl.h>
+#endif
 #ifdef __linux__
 #include <linux/netfilter.h> /* for NF_ACCEPT */
 #include <libnfnetlink/libnfnetlink.h>
