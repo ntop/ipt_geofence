@@ -144,7 +144,7 @@ NwInterface::~NwInterface() {
     delete item;
   }
 
-  for(std::map<std::string, WatchMatches*>::iterator it = watches_blacklist.begin();
+  for(std::map<IPAddress, WatchMatches*>::iterator it = watches_blacklist.begin();
       it != watches_blacklist.end(); it++)
     delete it->second;
 
@@ -337,6 +337,7 @@ void NwInterface::packetPollLoop() {
 
 	  while(fgets(ip, sizeof(ip), watchers[i]->fd) != NULL) {
 	    char ip_country[3]={}, ip_continent[3]={};
+	    IPAddress addr;
 
 	    data_read = true;
 
@@ -345,8 +346,8 @@ void NwInterface::packetPollLoop() {
 #endif
 	    ip[strcspn(ip, "\r\n")] = '\0'; /* Zap trailing \n before validating */
 
-	    if(sanitizeHost(ip)) {
-	      geoip->lookup(ip, ip_country, sizeof(ip_country), ip_continent, sizeof(ip_continent));
+	    if(addr.set(ip) /* Valid numeric IP */) {
+	      geoip->lookup(&addr, ip_country, sizeof(ip_country), ip_continent, sizeof(ip_continent));
 
 	      if(watchers[i]->mode == true /* geo-ip */) {
 		/*
@@ -354,31 +355,16 @@ void NwInterface::packetPollLoop() {
 		  has to be geographically banned or not
 		*/
 
-		if(strchr(ip, ':') == NULL) {
-		  /* IPv4 */
-		  struct in_addr ip_addr;
-
-		  ip_addr.s_addr = inet_addr(ip);
-
-		  if(conf->isBlacklistedIPv4(&ip_addr))
-		    ban(ip, true, true, "ban-" + watchers[i]->label, ip_country);
-		} else {
-		  /* IPv6 */
-		  struct in6_addr ip_addr;
-
-		  inet_pton(AF_INET6, ip, &ip_addr);
-
-		  if(conf->isBlacklistedIPv6(&ip_addr))
-		    ban(ip, true, true, "ban-" + watchers[i]->label, ip_country);
-		}
+		if(conf->isBlacklisted(&addr))
+		  ban(&addr, true, true, "ban-" + watchers[i]->label, ip_country);
 
 		if(ip_country[0] != '\0') {
 		  if(conf->getMarker(ip_country, ip_continent).get() != conf->getMarkerPass().get())
-		    ban(ip, true, true, "ban-" + watchers[i]->label, ip_country);
+		    ban(&addr, true, true, "ban-" + watchers[i]->label, ip_country);
 		}
 	      } else {
 		/* In this case the IP has to be banned immediately */
-		ban(ip, true, true, "ban-" + watchers[i]->label, ip_country);
+		ban(&addr, true, true, "ban-" + watchers[i]->label, ip_country);
 	      }
 	    }
 	  } /* while */
@@ -452,27 +438,20 @@ Marker NwInterface::dissectPacket(bool is_ingress_packet,
   /* We can see only IP addresses */
   u_int16_t ip_offset = 0, vlan_id = 0 /* FIX */;
   struct ndpi_iphdr *iph = (struct ndpi_iphdr *)&payload[ip_offset];
-  bool ipv4 = false, ipv6 = false;
   struct ndpi_tcphdr *tcph = NULL;
   struct ndpi_udphdr *udph = NULL;
   u_int16_t src_port, dst_port;
   u_int8_t proto, ip_payload_offset = 40 /* ipv6 is 40B long */;
-  char src[INET6_ADDRSTRLEN] = {}, dst[INET6_ADDRSTRLEN] = {};
+  IPAddress src, dst;
   u_int16_t tcp_header_len;
 
   if(iph->version == 6) {
     struct ndpi_ipv6hdr *ip6h = (struct ndpi_ipv6hdr *)&payload[ip_offset];
 
-    ipv6 = true;
     proto = ip6h->ip6_hdr.ip6_un1_nxt;
-
-    // ipv6 address stringification
-    inet_ntop(AF_INET6, &(ip6h->ip6_src), src, sizeof(src));
-    inet_ntop(AF_INET6, &(ip6h->ip6_dst), dst, sizeof(dst));
+    src.setIPv6(&ip6h->ip6_src), dst.setIPv6(&ip6h->ip6_dst);
   } else if(iph->version == 4) {
-    ipv4 = true;
     u_int8_t frag_off = ntohs(iph->frag_off);
-    struct in_addr a;
 
     if((iph->protocol == IPPROTO_UDP) && ((frag_off & 0x3FFF /* IP_MF | IP_OFFSET */) != 0))
       return(conf->getMarkerUnknown()); /* Don't block it */
@@ -480,9 +459,7 @@ Marker NwInterface::dissectPacket(bool is_ingress_packet,
     // get protocol and offset
     proto = iph->protocol;
     ip_payload_offset = iph->ihl * 4;
-    // ipv4 address stringification
-    a.s_addr = iph->saddr, inet_ntop(AF_INET, &a, src, sizeof(src));
-    a.s_addr = iph->daddr, inet_ntop(AF_INET, &a, dst, sizeof(dst));
+    src.setIPv4(iph->saddr), dst.setIPv4(iph->daddr);
   } else { // Neither ipv4 or ipv6...unlikely to be evaluated
     return(conf->getMarkerPass());
   }
@@ -506,7 +483,7 @@ Marker NwInterface::dissectPacket(bool is_ingress_packet,
 	  u_int16_t syn_mask = TH_SYN | 0x40 /* TH_ECE */ | 0x80 /* TH_CWR */;
 
 	  if((flags & syn_mask) && ((flags & TH_ACK) == 0)) {
-	    if((options_len == 0) && (!isLocalAddress(src))) {
+	    if((options_len == 0) && (!isLocalAddress(&src))) {
 	      char msg[256];
 	      u_int16_t tcp_win = ntohs(tcph->window);
 	      char src_country[3]={}, dst_country[3]={}, src_continent[3]={}, dst_continent[3]={} ;
@@ -524,16 +501,16 @@ Marker NwInterface::dissectPacket(bool is_ingress_packet,
 	      else
 		snprintf(msg, sizeof(msg), "ban-massive-scanner [tcp_win %u]", tcp_win);
 
-	      geoip->lookup(src, src_country, sizeof(src_country), src_continent, sizeof(src_continent));
-	      geoip->lookup(dst, dst_country, sizeof(dst_country), dst_continent, sizeof(dst_continent));
+	      geoip->lookup(&src, src_country, sizeof(src_country), src_continent, sizeof(src_continent));
+	      geoip->lookup(&dst, dst_country, sizeof(dst_country), dst_continent, sizeof(dst_continent));
 
 	      /* Log + ban + drop */
 	      logFlow("tcp-masscan", msg,
-		      src, src_port, src_country, src_continent, false,
-		      dst, dst_port, dst_country, dst_continent, false,
+		      &src, src_port, src_country, src_continent, false,
+		      &dst, dst_port, dst_country, dst_continent, false,
 		      false /* drop */);
 
-	      ban(src, true /* ban */, true, msg, src_country);
+	      ban(&src, true /* ban */, true, msg, src_country);
 
 	      /* trace->traceEvent(TRACE_ERROR, "*** %s (%s / %s)", msg, src, src_country); */
 
@@ -562,7 +539,7 @@ Marker NwInterface::dissectPacket(bool is_ingress_packet,
   return(makeVerdict(is_ingress_packet,
 		     proto, vlan_id,
 		     src_port, dst_port,
-		     src, dst, ipv4, ipv6));
+		     &src, &dst));
 }
 
 /* **************************************************** */
@@ -623,8 +600,7 @@ bool NwInterface::isPrivateIPv6(struct ndpi_in6_addr addr) {
 void NwInterface::refreshLocalAddresses(u_int max_age) {
   time_t now = time(NULL);
   struct ifaddrs *ifap, *ifa;
-  std::set<u_int32_t> v4;
-  std::set<std::string> v6;
+  std::set<IPAddress> addresses;
 
   if((local_addresses_refresh_time != 0)
      && ((now - local_addresses_refresh_time) < (time_t)max_age))
@@ -639,55 +615,61 @@ void NwInterface::refreshLocalAddresses(u_int max_age) {
   }
 
   for(ifa = ifap; ifa != NULL; ifa = ifa->ifa_next) {
+    IPAddress a;
+
     if(ifa->ifa_addr == NULL)
       continue;
 
     if(ifa->ifa_addr->sa_family == AF_INET)
-      v4.insert(((struct sockaddr_in*)ifa->ifa_addr)->sin_addr.s_addr);
+      a.setIPv4(((struct sockaddr_in*)ifa->ifa_addr)->sin_addr.s_addr);
     else if(ifa->ifa_addr->sa_family == AF_INET6)
-      v6.insert(std::string((const char*)&((struct sockaddr_in6*)ifa->ifa_addr)->sin6_addr, 16));
+      a.setIPv6(&((struct sockaddr_in6*)ifa->ifa_addr)->sin6_addr);
+    else
+      continue;
+
+    addresses.insert(a);
   }
 
   freeifaddrs(ifap);
 
-  local_ipv4.swap(v4), local_ipv6.swap(v6);
+  local_addresses.swap(addresses);
 }
 
 /* **************************************************** */
 
 /*
-  Return true if host is an address of this host (including loopback).
+  Return true if ip is an address of this host (including loopback).
   Addresses can change (e.g. DHCP): they are reloaded every 30 sec, or
   at most once a second when fresh is set (i.e. before banning a host)
 */
-bool NwInterface::isLocalAddress(const char *host, bool fresh) {
-  struct in_addr a4;
-  struct in6_addr a6;
+bool NwInterface::isLocalAddress(IPAddress *ip, bool fresh) {
   u_int32_t v4;
-
-  if(host == NULL)
-    return(false);
 
   refreshLocalAddresses(fresh ? 1 : 30);
 
-  if(inet_pton(AF_INET, host, &a4) == 1)
-    v4 = a4.s_addr;
-  else if(inet_pton(AF_INET6, host, &a6) == 1) {
-    if(IN6_IS_ADDR_LOOPBACK(&a6))
+  if(ip->isIPv4())
+    v4 = ip->getIPv4()->s_addr;
+  else {
+    struct in6_addr *a6 = ip->getIPv6();
+
+    if(IN6_IS_ADDR_LOOPBACK(a6))
       return(true);
 
-    if(!IN6_IS_ADDR_V4MAPPED(&a6))
-      return(local_ipv6.find(std::string((const char*)&a6, 16)) != local_ipv6.end());
+    if(!IN6_IS_ADDR_V4MAPPED(a6))
+      return(local_addresses.find(*ip) != local_addresses.end());
 
     /* ::ffff:a.b.c.d */
-    memcpy(&v4, &a6.s6_addr[12], 4);
-  } else
-    return(false);
+    memcpy(&v4, &a6->s6_addr[12], 4);
+  }
 
   if((ntohl(v4) & 0xFF000000) == 0x7F000000 /* 127.0.0.0/8 */)
     return(true);
+  else {
+    IPAddress a;
 
-  return(local_ipv4.find(v4) != local_ipv4.end());
+    a.setIPv4(v4);
+    return(local_addresses.find(a) != local_addresses.end());
+  }
 }
 
 /* **************************************************** */
@@ -754,24 +736,29 @@ void NwInterface::logStartStop(bool start) {
 /* **************************************************** */
 
 void NwInterface::logFlow(const char *proto_name, const char *sub_reason,
-			  char *src_host, u_int16_t sport, char *src_country, char *src_continent, bool src_blacklisted,
-			  char *dst_host, u_int16_t dport, char *dst_country, char *dst_continent, bool dst_blacklisted,
+			  IPAddress *src_host, u_int16_t sport, char *src_country, char *src_continent, bool src_blacklisted,
+			  IPAddress *dst_host, u_int16_t dport, char *dst_country, char *dst_continent, bool dst_blacklisted,
 			  bool pass_verdict) {
   Json::Value root;
   std::string json_txt;
   Json::FastWriter writer;
+  char src_buf[INET6_ADDRSTRLEN], dst_buf[INET6_ADDRSTRLEN];
+
+  /* Nothing to do: the flow is neither traced (verbose only) nor exported via ZMQ (drops only) */
+  if((trace->get_trace_level() < TRACE_LEVEL_INFO) && (pass_verdict || (zmq == NULL)))
+    return;
 
   addCommonJSON(&root);
   root["reason"] = "flow-ban";
   root["sub_reason"] = sub_reason;
   root["proto"]  = proto_name;
-  root["src"]["host"] = src_host;
+  root["src"]["host"] = src_host->toString(src_buf, sizeof(src_buf));
   root["src"]["port"] = sport;
   if(src_country && (src_country[0] != '\0')) root["src"]["country"] = src_country;
   if(src_continent && (src_continent[0] != '\0')) root["src"]["continent"] = src_continent;
   if(src_blacklisted) root["src"]["blacklisted"] = src_blacklisted;
 
-  root["dst"]["host"] = dst_host;
+  root["dst"]["host"] = dst_host->toString(dst_buf, sizeof(dst_buf));
   root["dst"]["port"] = dport;
   if(dst_country && (dst_country[0] != '\0')) root["dst"]["country"] = dst_country;
   if(dst_continent && (dst_continent[0] != '\0')) root["dst"]["continent"] = dst_continent;
@@ -799,12 +786,7 @@ Marker NwInterface::makeVerdict(bool is_ingress_packet,
 				u_int8_t proto, u_int16_t vlanId,
 				u_int16_t sport /* network byte order */,
 				u_int16_t dport /* network byte order */,
-				char *src_host, char *dst_host,
-				bool ipv4, bool ipv6) {
-  // Step 0 - Check ip protocol
-  if(!(ipv4 || ipv6)) return(conf->getDefaultPolicy());
-
-  struct in_addr in;
+				IPAddress *src_host, IPAddress *dst_host) {
   char src_country[3]={}, dst_country[3]={}, src_continent[3]={}, dst_continent[3]={} ;
   const char *proto_name = getProtoName(proto);
   Marker m, src_marker, dst_marker;
@@ -824,75 +806,35 @@ Marker NwInterface::makeVerdict(bool is_ingress_packet,
 
   /* ******************************************************* */
 
-  /* Check if sender/recipient are blacklisted */
-  if(ipv4) {
-    u_int32_t saddr = inet_addr(src_host), daddr = inet_addr(dst_host);
+  /* Broadcast/multicast destination (e.g. for DHCP) traffic should pass */
+  if(dst_host->isIPv4() && isBroadMulticastIPv4(dst_host->getIPv4()->s_addr))
+    return(conf->getMarkerPass());
 
-    /* Broadcast source (e.g. for DHCP) traffic shoud paas */
-    if(isBroadMulticastIPv4(daddr))
-      return(conf->getMarkerPass());
+  /* For all ports/protocols, check if sender/recipient are white/black-listed and if so, pass/block this flow */
+  if(conf->isWhitelisted(src_host))
+    return(conf->getMarkerPass()); /* Whitelisted IP (src) */
 
-    /* For all ports/protocols, check if sender/recipient are white/black-listed and if so, pass/block this flow */
-    in.s_addr = saddr;
-    if(conf->isWhitelistedIPv4(&in)) {
-      return(conf->getMarkerPass()); /* Whitelisted IP (src) */
-    }
+  if((!src_local) && conf->isBlacklisted(src_host)) {
+    logFlow(proto_name, "blacklisted-client",
+	    src_host, sport, src_country, src_continent, true,
+	    dst_host, dport, dst_country, dst_continent, false,
+	    false /* drop */);
 
-    if((!src_local) && conf->isBlacklistedIPv4(&in)) {
-      logFlow(proto_name, "blacklisted-client",
-	      src_host, sport, src_country, src_continent, true,
-	      dst_host, dport, dst_country, dst_continent, false,
-	      false /* drop */);
+    ban(src_host, true /* ban */, true, "blacklisted-client", src_country);
+    return(conf->getMarkerDrop());
+  }
 
-      // trace->traceEvent(TRACE_ERROR, "(1) %s <-> %s", src_host, dst_host);
+  if(conf->isWhitelisted(dst_host))
+    return(conf->getMarkerPass()); /* Whitelisted IP (dst) */
 
-      ban(src_host, true /* ban */, true, "blacklisted-client", src_country);
-      return(conf->getMarkerDrop());
-    }
+  if((!dst_local) && conf->isBlacklisted(dst_host)) {
+    logFlow(proto_name, "blacklisted-server",
+	    src_host, sport, src_country, src_continent, false,
+	    dst_host, dport, dst_country, dst_continent, true,
+	    false /* drop */);
 
-    in.s_addr = daddr;
-    if(conf->isWhitelistedIPv4(&in)) {
-      return(conf->getMarkerPass()); /* Whitelisted IP (dst) */
-    }
-
-    if((!dst_local) && conf->isBlacklistedIPv4(&in)) {
-      logFlow(proto_name, "blacklisted-server",
-	      src_host, sport, src_country, src_continent, false,
-	      dst_host, dport, dst_country, dst_continent, true,
-	      false /* drop */);
-      // trace->traceEvent(TRACE_ERROR, "(2) %s <-> %s", src_host, dst_host);
-
-      ban(dst_host, true /* ban */, true, "blacklisted-server", dst_country);
-      return(conf->getMarkerDrop());
-    }
-
-    // trace->traceEvent(TRACE_ERROR, "(3) %s <-> %s", src_host, dst_host);
-  } else if(ipv6) {
-    struct in6_addr a;
-
-    inet_pton(AF_INET6, src_host, &a);
-
-    if((!src_local) && conf->isBlacklistedIPv6(&a)) {
-      logFlow(proto_name, "blacklisted-client",
-              src_host, sport, src_country, src_continent, true,
-              dst_host, dport, dst_country, dst_continent, false,
-              false /* drop */);
-
-      ban(src_host, true /* ban */, true, "blacklisted-client", src_country);
-      return(conf->getMarkerDrop());
-    }
-
-    inet_pton(AF_INET6, dst_host, &a);
-
-    if((!dst_local) && conf->isBlacklistedIPv6(&a)) {
-      logFlow(proto_name, "blacklisted-server",
-              src_host, sport, src_country, src_continent, false,
-              dst_host, dport, dst_country, dst_continent, true,
-              false /* drop */);
-
-      ban(dst_host, true /* ban */, true, "blacklisted-server", dst_country);
-      return(conf->getMarkerDrop());
-    }
+    ban(dst_host, true /* ban */, true, "blacklisted-server", dst_country);
+    return(conf->getMarkerDrop());
   }
 
   /* ******************************************************* */
@@ -1076,7 +1018,7 @@ void NwInterface::harvestWatches() {
   trace->traceEvent(TRACE_NORMAL, "NwInterface::harvestWatches()");
 #endif
 
-  for(std::map<std::string, WatchMatches*>::iterator it = watches_blacklist.begin();
+  for(std::map<IPAddress, WatchMatches*>::iterator it = watches_blacklist.begin();
       it != watches_blacklist.end();) {
     WatchMatches *match = it->second;
 
@@ -1089,7 +1031,9 @@ void NwInterface::harvestWatches() {
 #ifdef DEBUG
       trace->traceEvent(TRACE_NORMAL, "Harvesting");
 #endif
-      ban((char*)it->first.c_str(), false /* unban */, false, "unban", "");
+      IPAddress host = it->first;
+
+      ban(&host, false /* unban */, false, "unban", "");
       delete it->second;
       watches_blacklist.erase(it++);    // or "it = m.erase(it)" since C++11
     } else
@@ -1099,28 +1043,20 @@ void NwInterface::harvestWatches() {
 
 /* **************************************************** */
 
-void NwInterface::ban(char *host, bool ban_ip,
+void NwInterface::ban(IPAddress *host, bool ban_ip,
 		      bool ban_traffic, std::string reason, std::string country) {
-  char cmdbuf[128];
-  bool is_ipv4;
-  std::map<std::string, WatchMatches*>::iterator it;
+  char buf[INET6_ADDRSTRLEN];
+  bool is_ipv4 = host->isIPv4();
+  std::map<IPAddress, WatchMatches*>::iterator it;
 
-  // trace->traceEvent(TRACE_NORMAL, "*** %s ***", host);
-
-  if(!sanitizeHost(host)) {
-      trace->traceEvent(TRACE_WARNING, "Invalid host %s", host ? host : "nullptr");
-    return;
-  }
-  
   if(ban_ip && isLocalAddress(host, true /* fresh */)) {
     trace->traceEvent(TRACE_WARNING, "Not banning %s [%s]: it is an address of this host",
-		      host, reason.c_str());
+		      host->toString(buf, sizeof(buf)), reason.c_str());
     return;
   }
 
-  is_ipv4 = (strchr(host, ':') == NULL) ? true /* IPv4 */ : false /* IPv6 */;
-  it = watches_blacklist.find(std::string(host));
-  
+  it = watches_blacklist.find(*host);
+
   if(ban_ip) {
     /* Ban */
 
@@ -1130,11 +1066,12 @@ void NwInterface::ban(char *host, bool ban_ip,
 	u_int32_t until_time =  time(NULL) + DEFAULT_BAN_TIME;
 	WatchMatches *watch = new WatchMatches(1, until_time);
 
+	host->toString(buf, sizeof(buf));
 	trace->traceEvent(TRACE_INFO, "First time (until: %u) banning %s [%s]",
-			  until_time, host, reason.c_str());
-	watches_blacklist[host] = watch;
-	if(fw) fw->ban(host, is_ipv4);
-	logHostBan(host, ban_ip, ban_traffic, reason, country);
+			  until_time, buf, reason.c_str());
+	watches_blacklist[*host] = watch;
+	if(fw) fw->ban(buf, is_ipv4);
+	logHostBan(buf, ban_ip, ban_traffic, reason, country);
       } catch(std::bad_alloc& ex) {
 	trace->traceEvent(TRACE_WARNING, "Not enough memory");
       }
@@ -1157,36 +1094,20 @@ void NwInterface::ban(char *host, bool ban_ip,
       num_matches = ndpi_min(watch->get_num_matches(), 300);
       until_time = time(NULL) + (DEFAULT_BAN_TIME * num_matches * num_matches);
 
-      trace->traceEvent(TRACE_INFO, "Recurrent (times: %d/until: %u) time banning %s [%s]",
-			watch->get_num_matches(), until_time,
-			host, reason.c_str());
+      if(trace->get_trace_level() >= TRACE_LEVEL_INFO)
+	trace->traceEvent(TRACE_INFO, "Recurrent (times: %d/until: %u) time banning %s [%s]",
+			  watch->get_num_matches(), until_time,
+			  host->toString(buf, sizeof(buf)), reason.c_str());
 
       watch->ban_until(until_time);
     }
   } else {
     /* Unban */
 
-    if(fw) fw->unban(host, is_ipv4);
-    logHostBan(host, ban_ip, ban_traffic, reason, country);
+    host->toString(buf, sizeof(buf));
+    if(fw) fw->unban(buf, is_ipv4);
+    logHostBan(buf, ban_ip, ban_traffic, reason, country);
   }
-}
-
-/* **************************************************** */
-
-void NwInterface::ban_ipv4(u_int32_t ip4 /* network byte order */, bool ban_ip,
-			   std::string reason, std::string country) {
-  char ipbuf[32], *host = Utils::intoaV4(ntohl(ip4), ipbuf, sizeof(ipbuf));
-
-  ban(host, ban_ip, true, reason, country);
-}
-
-/* **************************************************** */
-
-void NwInterface::ban_ipv6(struct ndpi_in6_addr ip6, bool ban_ip,
-			   std::string reason, std::string country) {
-  char ipbuf[64], *host = Utils::intoaV6(ip6, 128, ipbuf, sizeof(ipbuf));
-
-  ban(host, ban_ip, true, reason, country);
 }
 
 /* **************************************************** */
@@ -1206,30 +1127,4 @@ void NwInterface::flush_ban() {
 
 int NwInterface::sendTelegramMessage(std::string message) {
   return(conf->sendTelegramMessage(message));
-}
-
-/* ****************************************** */
-
-bool NwInterface::sanitizeHost(const char *unsanitized_host) {
-  // If the input pointer is null, the host is invalid
-  if (unsanitized_host == nullptr) {
-    return false;
-  }
-
-  // Buffer structures to hold the parsed network address
-  struct in_addr ipv4_buffer;
-  struct in6_addr ipv6_buffer;
-
-  // Check for a valid IPv4 address
-  if (inet_pton(AF_INET, unsanitized_host, &ipv4_buffer) == 1) {
-    return true;
-  }
-
-  // Check for a valid IPv6 address
-  if (inet_pton(AF_INET6, unsanitized_host, &ipv6_buffer) == 1) {
-    return true;
-  }
-
-  // Return false if it matches neither format
-  return false;
 }

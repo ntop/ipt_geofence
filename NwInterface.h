@@ -42,7 +42,7 @@ class NwInterface {
   GeoIP *geoip;
   std::thread *reloaderThread;
   double banTimeout = 900.0; // 15 minutes
-  std::map<std::string /* numeric IP */, WatchMatches*> watches_blacklist;
+  std::map<IPAddress, WatchMatches*> watches_blacklist;
   std::string confPath;
   ZMQ *zmq;
 #ifndef __linux__
@@ -55,20 +55,18 @@ class NwInterface {
   // std::vector<std::pair<int, std::string>> pipes_fileno;
   std::vector<WatcherItam*> watchers;
   /* Addresses of this host (network byte order) that must never be banned/blocked */
-  std::set<u_int32_t> local_ipv4;
-  std::set<std::string /* 16 bytes */> local_ipv6;
+  std::set<IPAddress> local_addresses;
   time_t local_addresses_refresh_time = 0;
   
   Marker makeVerdict(bool is_ingress_packet,
 		     u_int8_t proto, u_int16_t vlanId,
 		     u_int16_t sport,
 		     u_int16_t dport,
-         char *src, char *dst,
-         bool ipv4, bool ipv6);
+		     IPAddress *src, IPAddress *dst);
   const char* getProtoName(u_int8_t proto);
   void logFlow(const char *proto_name, const char *sub_reason,
-	       char *src_host, u_int16_t sport, char *src_country, char *src_continent, bool src_blacklisted,
-	       char *dst_host, u_int16_t dport, char *dst_country, char *dst_continent, bool dst_blacklisted,
+	       IPAddress *src_host, u_int16_t sport, char *src_country, char *src_continent, bool src_blacklisted,
+	       IPAddress *dst_host, u_int16_t dport, char *dst_country, char *dst_continent, bool dst_blacklisted,
 	       bool pass_verdict);
   void logHostBan(char *host_ip, bool ban_ip, bool ban_traffic,
 		  std::string reason, std::string country);
@@ -77,23 +75,17 @@ class NwInterface {
   bool isPrivateIPv6(struct ndpi_in6_addr ip6addr);
   bool isBroadMulticastIPv4(u_int32_t addr /* network byte order */);
   void refreshLocalAddresses(u_int max_age);
-  bool isLocalAddress(const char *host, bool fresh = false);
+  bool isLocalAddress(IPAddress *ip, bool fresh = false);
   void reloadConfLoop();
   u_int32_t computeNextReloadTime();
-  bool isBanned(char *host, struct in_addr *a4, struct ndpi_in6_addr *a6);
   void harvestWatches();
-  char* intoaV4(unsigned int addr, char* buf, u_short bufLen);
-  char* intoaV6(struct ndpi_ndpi_in6_addr ipv6, u_int8_t bitmask, char* buf, u_short bufLen);
-  void ban(char *host, bool ban_ip, bool ban_traffic,
+  void ban(IPAddress *host, bool ban_ip, bool ban_traffic,
 	   std::string reason, std::string country);
-  void ban_ipv4(u_int32_t ip4 /* network byte order */, bool ban_ip, std::string reason, std::string country);
-  void ban_ipv6(struct ndpi_in6_addr ipv6, bool ban_ip, std::string reason, std::string country);
   std::string execCmd(const char* cmd);
   void addCommonJSON(Json::Value *root);
   void logStartStop(bool start);
   int sendTelegramMessage(std::string message);
   bool startWatcher(std::string label, std::pair<std::string, bool> item);
-  bool sanitizeHost(const char *unsanitized_host);
   
  public:
   NwInterface(u_int nf_device_id, Configuration *_c, GeoIP *_g, std::string c_path);

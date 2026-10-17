@@ -91,6 +91,9 @@ class Configuration {
   inline bool isWhitelistedIPv4(struct in_addr *addr)               { return(whitelists.isListedIPv4(addr));  }
   inline bool isWhitelistedIPv6(struct in6_addr *addr6)             { return(whitelists.isListedIPv6(addr6)); }
 
+  inline bool isBlacklisted(IPAddress *a) { return(a->isIPv4() ? isBlacklistedIPv4(a->getIPv4()) : isBlacklistedIPv6(a->getIPv6())); }
+  inline bool isWhitelisted(IPAddress *a) { return(a->isIPv4() ? isWhitelistedIPv4(a->getIPv4()) : isWhitelistedIPv6(a->getIPv6())); }
+
   inline std::map<std::string, std::pair<std::string, bool> >* get_watches()
                                                                     { return(&watches);                 }
   inline const char *getHostIP()                                    { return(host_ip.c_str());          }

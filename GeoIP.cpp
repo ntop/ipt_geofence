@@ -48,17 +48,30 @@ GeoIP::~GeoIP() {
 
 /* ********************************************************************************* */
 
-bool GeoIP::lookup(char *ip,
+bool GeoIP::lookup(IPAddress *ip,
 		   char *country_code, u_int8_t country_code_len,
 		   char *continent, u_int8_t continent_len) {
-  int gai_error, mmdb_error;
+  int mmdb_error;
   MMDB_lookup_result_s result;
   MMDB_entry_data_s entry_data;
+  struct sockaddr_in sa4;
+  struct sockaddr_in6 sa6;
+  struct sockaddr *sa;
 
-  result = MMDB_lookup_string(&mmdb_country, ip, &gai_error, &mmdb_error);
+  /* Numeric lookup: no need to convert the address to string */
+  if(ip->isIPv4()) {
+    memset(&sa4, 0, sizeof(sa4));
+    sa4.sin_family = AF_INET, sa4.sin_addr = *ip->getIPv4();
+    sa = (struct sockaddr*)&sa4;
+  } else {
+    memset(&sa6, 0, sizeof(sa6));
+    sa6.sin6_family = AF_INET6, sa6.sin6_addr = *ip->getIPv6();
+    sa = (struct sockaddr*)&sa6;
+  }
 
-  if((gai_error != 0)
-     || (mmdb_error != MMDB_SUCCESS)
+  result = MMDB_lookup_sockaddr(&mmdb_country, sa, &mmdb_error);
+
+  if((mmdb_error != MMDB_SUCCESS)
      || (!result.found_entry)) {
     country_code[0] = '\0';
 

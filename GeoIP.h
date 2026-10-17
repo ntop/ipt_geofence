@@ -35,7 +35,7 @@ class GeoIP {
 
   inline bool isLoaded()       { return(loaded);   }
   bool loadCountry(const char *ip_city_data);
-  bool lookup(char *ip,
+  bool lookup(IPAddress *ip,
 	      char *country_code, u_int8_t country_code_len,
 	      char *continent, u_int8_t continent_len);
 };

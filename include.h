@@ -107,6 +107,7 @@
 
 #include "Trace.h"
 #include "Utils.h"
+#include "IPAddress.h"
 #include "Lists.h"
 #include "Marker.h"
 #include "Configuration.h"
