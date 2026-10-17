@@ -1018,8 +1018,13 @@ void NwInterface::ban(char *host, bool ban_ip,
       /* Host already banned */
       watch->inc_matches();
 
-      /* Make sure the rule is in place (no-op if already present) */
-      if(fw) fw->ban(host, is_ipv4);
+      /*
+	Do NOT call fw->ban() here: this path runs for every packet of an
+	already banned host (NFQUEUE sits in mangle PREROUTING, before the
+	IPT_GEOFENCE_BLACKLIST DROP in filter INPUT), and fork/exec'ing
+	iptables per packet stalls the poll loop until the queue overflows
+	("nf_queue: full at 8192 entries")
+      */
 
       num_matches = ndpi_min(watch->get_num_matches(), 300);
       until_time = time(NULL) + (DEFAULT_BAN_TIME * num_matches * num_matches);
