@@ -41,8 +41,8 @@ class LinuxFirewall : public Firewall {
     const char *v = is_ipv4 ? "" : "6";
 
     snprintf(cmdbuf, sizeof(cmdbuf),
-	     "/usr/sbin/ip%stables -w -C IPT_GEOFENCE_BLACKLIST -s %s -j DROP 2>/dev/null"
-	     " || /usr/sbin/ip%stables -w -I IPT_GEOFENCE_BLACKLIST -s %s -j DROP",
+	     "/usr/sbin/ip%stables -w -t raw -C IPT_GEOFENCE_BLACKLIST -s %s -j DROP 2>/dev/null"
+	     " || /usr/sbin/ip%stables -w -t raw -I IPT_GEOFENCE_BLACKLIST -s %s -j DROP",
 	     v, ip, v, ip);
     execCmd(cmdbuf);
   }
@@ -52,7 +52,7 @@ class LinuxFirewall : public Firewall {
     const char *v = is_ipv4 ? "" : "6";
 
     snprintf(cmdbuf, sizeof(cmdbuf),
-	     "n=0; while [ $n -lt 64 ] && /usr/sbin/ip%stables -w -D IPT_GEOFENCE_BLACKLIST -s %s -j DROP 2>/dev/null;"
+	     "n=0; while [ $n -lt 64 ] && /usr/sbin/ip%stables -w -t raw -D IPT_GEOFENCE_BLACKLIST -s %s -j DROP 2>/dev/null;"
 	     " do n=$((n+1)); done",
 	     v, ip);
     execCmd(cmdbuf);

@@ -48,9 +48,9 @@ public:
 
   /*
     Register a new offence. While banned, the offences seen less than
-    MIN_MATCH_INTERVAL ago are ignored (return false): each new connection
-    (including SYN retransmissions) of a banned host is still inspected,
-    as NFQUEUE (mangle) comes before the IPT_GEOFENCE_BLACKLIST drop (filter)
+    MIN_MATCH_INTERVAL ago are ignored (return false): the IPT_GEOFENCE_BLACKLIST
+    drop (raw PREROUTING) comes before NFQUEUE (mangle), but packets of a
+    banned host can still be queued before its rule is in place
   */
   inline bool offence(u_int32_t now) {
     if(banned && ((now - last_match) < MIN_MATCH_INTERVAL))

@@ -7,8 +7,9 @@ Wants=network-online.target
 Type=simple
 User=root
 Group=root
-ExecStartPre=/etc/ipt_geofence/ipt_setup.sh
+ExecStartPre=/etc/ipt_geofence/ipt_setup.sh start
 ExecStart=/usr/sbin/ipt_geofence -s -c /etc/ipt_geofence/config.json -m /etc/ipt_geofence/dbip-country-lite.mmdb
+ExecStopPost=/etc/ipt_geofence/ipt_setup.sh stop
 Restart=on-abnormal
 RestartSec=5
 

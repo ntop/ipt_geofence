@@ -28,7 +28,7 @@ MARK_DROP=2000
 WAIT="-w 10"
 
 # Chains
-BLACKLIST=IPT_GEOFENCE_BLACKLIST   # filter: banned IPs (managed by ipt_geofence)
+BLACKLIST=IPT_GEOFENCE_BLACKLIST   # raw PREROUTING: banned IPs (managed by ipt_geofence)
 PRE=IPT_GEOFENCE_PRE               # mangle PREROUTING
 OUT=IPT_GEOFENCE_OUT               # mangle OUTPUT
 SAVE=IPT_GEOFENCE_SAVE             # mangle INPUT and POSTROUTING
@@ -73,6 +73,11 @@ remove_chain() {
 remove_legacy_rules() {
     local ipt="$1" proto chain
 
+    # Blacklist hooked on filter INPUT: it was evaluated after NFQUEUE
+    # (mangle PREROUTING) so banned hosts were still sent to ipt_geofence
+    delete_rule  $ipt filter INPUT -j $BLACKLIST
+    remove_chain $ipt filter $BLACKLIST
+
     # multichain.sh
     delete_rule  $ipt mangle PREROUTING  -j GEO_PREROUTING
     delete_rule  $ipt mangle POSTROUTING -j GEO_POSTROUTING
@@ -110,12 +115,12 @@ stop_family() {
     delete_rule $ipt mangle OUTPUT      -j $OUT
     delete_rule $ipt mangle INPUT       -j $SAVE
     delete_rule $ipt mangle POSTROUTING -j $SAVE
-    delete_rule $ipt filter INPUT       -j $BLACKLIST
+    delete_rule $ipt raw    PREROUTING  -j $BLACKLIST
 
     remove_chain $ipt mangle $PRE
     remove_chain $ipt mangle $OUT
     remove_chain $ipt mangle $SAVE
-    remove_chain $ipt filter $BLACKLIST
+    remove_chain $ipt raw    $BLACKLIST
 }
 
 ###################################################
@@ -131,10 +136,13 @@ start_family() {
     remove_legacy_rules $ipt
 
     # Blacklist: created if missing but NOT flushed, as its content (the
-    # banned hosts) is managed by ipt_geofence that might be running
-    $ipt $WAIT -t filter -N $BLACKLIST 2>/dev/null
-    delete_rule $ipt filter INPUT -j $BLACKLIST          # Remove duplicates (if any)
-    ensure_rule $ipt filter INPUT -j $BLACKLIST || return 1
+    # banned hosts) is managed by ipt_geofence that might be running.
+    # It lives in raw PREROUTING, the first hook a packet traverses: banned
+    # hosts are dropped before conntrack and before NFQUEUE (mangle), and
+    # this applies to both local and routed traffic
+    $ipt $WAIT -t raw -N $BLACKLIST 2>/dev/null
+    delete_rule $ipt raw PREROUTING -j $BLACKLIST        # Remove duplicates (if any)
+    ensure_rule $ipt raw PREROUTING -j $BLACKLIST || return 1
 
     reset_chain $ipt mangle $PRE  || return 1
     reset_chain $ipt mangle $OUT  || return 1
@@ -220,7 +228,7 @@ for IPTABLES in iptables ip6tables; do
 	if start_family $IPTABLES; then
 	    echo "$IPTABLES: ipt_geofence rules installed"
 	    $IPTABLES $WAIT -t mangle -S | grep IPT_GEOFENCE
-	    $IPTABLES $WAIT -t filter -S | grep -- "-j $BLACKLIST"
+	    $IPTABLES $WAIT -t raw -S | grep -- "-j $BLACKLIST"
 	else
 	    echo "$IPTABLES: unable to install the ipt_geofence rules" >&2
 	    RC=1

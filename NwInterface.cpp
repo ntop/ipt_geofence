@@ -1131,8 +1131,8 @@ void NwInterface::ban(IPAddress *host, bool ban_ip,
 void NwInterface::flush_ban() {
   try {
 #ifdef __linux__
-    Utils::execCmd("/usr/sbin/iptables  -w -F IPT_GEOFENCE_BLACKLIST", trace);
-    Utils::execCmd("/usr/sbin/ip6tables -w -F IPT_GEOFENCE_BLACKLIST", trace);
+    Utils::execCmd("/usr/sbin/iptables  -w -t raw -F IPT_GEOFENCE_BLACKLIST", trace);
+    Utils::execCmd("/usr/sbin/ip6tables -w -t raw -F IPT_GEOFENCE_BLACKLIST", trace);
 #endif
   } catch (...) {
     trace->traceEvent(TRACE_ERROR, "Error while flushing blacklists");
