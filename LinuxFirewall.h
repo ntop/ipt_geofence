@@ -52,8 +52,7 @@ class LinuxFirewall : public Firewall {
     const char *v = is_ipv4 ? "" : "6";
 
     snprintf(cmdbuf, sizeof(cmdbuf),
-	     "n=0; while [ $n -lt 64 ] && /usr/sbin/ip%stables -w -t raw -D IPT_GEOFENCE_BLACKLIST -s %s -j DROP 2>/dev/null;"
-	     " do n=$((n+1)); done",
+	     "/usr/sbin/ip%stables -w -t raw -D IPT_GEOFENCE_BLACKLIST -s %s -j DROP 2>/dev/null",
 	     v, ip);
     execCmd(cmdbuf);
   }
