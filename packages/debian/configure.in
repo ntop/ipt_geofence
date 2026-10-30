@@ -16,7 +16,7 @@ else
  JSONDEP="libjsoncpp25"
 fi
 
-if test $DEBIAN_VERSION = "13"; then
+if test $DEBIAN_VERSION = "13" || test $UBUNTU_VERSION == "26.04"; then
  JSONDEP="libjsoncpp26"
 fi
 
