@@ -16,7 +16,7 @@ try:
         line = f.stdout.readline()
 
         if(len(line) == 0):
-            break
+            continue
         else:
             line = line.decode('utf-8').strip()
 

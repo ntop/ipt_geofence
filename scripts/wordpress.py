@@ -77,13 +77,20 @@ try:
         now = int(time.time())
 
         if(len(line) == 0):
-            break
+            continue
         else:
             line = line.decode('utf-8').strip()
 
-        res = line.split(" ")
-        ip =  res[0]
-        ret_code = res[len(res)-2]
+        pattern = r'^([\d\.]+)\s+.*?"([A-Z]+)\s+(\S+)\s+HTTP/[0-9.]+"\s+(\d{3})'
+        match = re.search(pattern, line)
+
+        if match:
+            ip = match.group(1)
+            method = match.group(2)
+            url = match.group(3)
+            ret_code = match.group(4)
+        else:
+            continue
 
         # Delete entries older than 1h
         harvest(failure_cache, now)
